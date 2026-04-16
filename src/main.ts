@@ -20,7 +20,9 @@ export class CodeViewerView extends ItemView {
 	getDisplayText() { return 'Pharos 코드 뷰어'; }
 	getIcon() { return 'code'; }
 
-	async onOpen() { await this.render(); }
+	async onOpen() {
+		await this.render();
+	}
 
 	async render() {
 		const container = this.containerEl.children[1] as HTMLElement;
