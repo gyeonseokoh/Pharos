@@ -1,0 +1,19 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@import "@fontsource/pretendard/variable.css";
+
+/* Pharos 루트 컨테이너에만 Pretendard 폰트 적용 — Obsidian 기본 폰트에 영향 X */
+.pharos-root {
+	font-family: "Pretendard Variable", Pretendard, -apple-system, BlinkMacSystemFont,
+		"Segoe UI", Roboto, sans-serif;
+	color: var(--text-normal);
+}
+
+/* Tailwind preflight 없이도 최소 리셋을 스코프 안에만 적용 */
+.pharos-root *,
+.pharos-root *::before,
+.pharos-root *::after {
+	box-sizing: border-box;
+}
