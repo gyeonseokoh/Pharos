@@ -1,12 +1,14 @@
 /**
- * RoadmapView — 로드맵 뷰 (MOCKUP).
+ * RoadmapView — 로드맵 뷰.
+ *
+ * 순수 프레젠테이션 컴포넌트. 데이터는 props(`data`)로만 받는다.
  *
  * 두 가지 시각화 모드를 탭으로 전환:
- *   1) 흐름 (Flow) — 프로젝트가 어떤 단계로 굴러가는지 한눈에 보여주는 phase-level 뷰
+ *   1) 흐름 (Flow) — 프로젝트가 어떤 단계로 굴러가는지 보여주는 phase-level 뷰
  *   2) 간트 (Gantt) — 작업별 시작·종료 날짜가 보이는 상세 타임라인
  *
- * Pharos 스스로를 프로젝트로 가정한 가짜 데이터. 실제 구현에서는 PO-1(기획 로드맵 생성)이
- * 만든 Task 목록을 여기에 연결한다.
+ * 오늘: `RoadmapItemView`가 `mockRoadmapData`를 주입.
+ * 미래: 같은 ItemView가 `roadmapService.generate(...)` 결과를 주입. 이 파일은 무변경.
  */
 
 import { useMemo, useState } from "react";
@@ -27,224 +29,24 @@ import {
 	CardTitle,
 } from "shared/ui/Card";
 import { cn } from "shared/ui/utils";
+import type {
+	PhaseIconName,
+	RoadmapData,
+	RoadmapPhase,
+	RoadmapProjectInfo,
+	RoadmapTask,
+	TaskStatus,
+} from "../domain/roadmapData";
 
-// ───────────────────────── Types ─────────────────────────
+// ───────────────────────── Icon Mapping ─────────────────────────
 
-type TaskKind = "task" | "milestone";
-type TaskStatus = "done" | "in-progress" | "todo";
-
-interface RoadmapTask {
-	id: string;
-	name: string;
-	kind: TaskKind;
-	status: TaskStatus;
-	start: string;
-	end: string;
-	progress: number;
-	assignee?: string;
-	dependsOn?: string[];
-}
-
-interface RoadmapPhase {
-	id: string;
-	name: string;
-	start: string;
-	end: string;
-	status: TaskStatus;
-	activities: string[];
-	icon: LucideIcon;
-	/** 화살표 블록의 메인 색상 (HEX). */
-	color: string;
-}
-
-// ───────────────────────── Mock Data ─────────────────────────
-
-const mockProject = {
-	name: "Pharos — AI 프로젝트 매니저 플러그인",
-	start: "2026-04-01",
-	end: "2026-06-30",
+const PHASE_ICON: Record<PhaseIconName, LucideIcon> = {
+	compass: Compass,
+	code: Code2,
+	server: Server,
+	flask: FlaskConical,
+	rocket: Rocket,
 };
-
-// 큰 단계(흐름)
-const mockPhases: RoadmapPhase[] = [
-	{
-		id: "phase-plan",
-		name: "기획 및 설계",
-		start: "2026-04-01",
-		end: "2026-04-25",
-		status: "done",
-		icon: Compass,
-		color: "#f97316", // orange
-		activities: [
-			"주제 구체화 · 문제 정의",
-			"유스케이스 17개 정의",
-			"환경 시나리오 12개",
-			"아키텍처 · 기술스택 확정",
-			"UI/UX 레이아웃 설계",
-		],
-	},
-	{
-		id: "phase-mvp",
-		name: "MVP 기능 개발",
-		start: "2026-04-25",
-		end: "2026-05-31",
-		status: "in-progress",
-		icon: Code2,
-		color: "#3b82f6", // blue
-		activities: [
-			"프로젝트 생성 (PO-0)",
-			"기획 · 개발 로드맵 (PO-1/6)",
-			"회의 주제 · 자료 (PO-2/3)",
-			"회의록 분석 (PO-5)",
-			"체크리스트 · 진척도 (PO-11/12)",
-		],
-	},
-	{
-		id: "phase-integration",
-		name: "서버 · AI 연동",
-		start: "2026-05-15",
-		end: "2026-06-15",
-		status: "todo",
-		icon: Server,
-		color: "#8b5cf6", // violet
-		activities: [
-			"Hocuspocus 서버 연결",
-			"JWT 인증 구현",
-			"OpenAI 연동",
-			"GitHub REST API 연동",
-		],
-	},
-	{
-		id: "phase-test",
-		name: "통합 테스트 · 논문",
-		start: "2026-06-10",
-		end: "2026-06-25",
-		status: "todo",
-		icon: FlaskConical,
-		color: "#ec4899", // pink
-		activities: [
-			"통합 테스트",
-			"사용자 테스트",
-			"논문 작성",
-		],
-	},
-	{
-		id: "phase-release",
-		name: "최종 발표 · 배포",
-		start: "2026-06-25",
-		end: "2026-06-30",
-		status: "todo",
-		icon: Rocket,
-		color: "#10b981", // emerald
-		activities: [
-			"시연 영상 제작",
-			"최종 발표 준비",
-			"GitHub Release",
-		],
-	},
-];
-
-// 세부 작업(간트)
-const mockTasks: RoadmapTask[] = [
-	{
-		id: "mile-kickoff",
-		name: "프로젝트 킥오프",
-		kind: "milestone",
-		status: "done",
-		start: "2026-04-01",
-		end: "2026-04-01",
-		progress: 100,
-	},
-	{
-		id: "task-topic",
-		name: "주제 구체화",
-		kind: "task",
-		status: "done",
-		start: "2026-04-01",
-		end: "2026-04-03",
-		progress: 100,
-		assignee: "유석",
-	},
-	{
-		id: "task-problem",
-		name: "문제 정의",
-		kind: "task",
-		status: "done",
-		start: "2026-04-03",
-		end: "2026-04-05",
-		progress: 100,
-		assignee: "유석",
-	},
-	{
-		id: "task-uc",
-		name: "유스케이스 정의 (PO-0 ~ PM-4)",
-		kind: "task",
-		status: "done",
-		start: "2026-04-05",
-		end: "2026-04-15",
-		progress: 100,
-		assignee: "유석",
-	},
-	{
-		id: "task-scenario",
-		name: "환경 시나리오 작성",
-		kind: "task",
-		status: "done",
-		start: "2026-04-10",
-		end: "2026-04-18",
-		progress: 100,
-		assignee: "유석",
-	},
-	{
-		id: "task-stack",
-		name: "기술 스택 조사 · 확정",
-		kind: "task",
-		status: "done",
-		start: "2026-04-08",
-		end: "2026-04-20",
-		progress: 100,
-		assignee: "경석",
-	},
-	{
-		id: "task-arch",
-		name: "아키텍처 설계",
-		kind: "task",
-		status: "done",
-		start: "2026-04-20",
-		end: "2026-04-22",
-		progress: 100,
-		assignee: "유석",
-	},
-	{
-		id: "task-ux",
-		name: "UI/UX 레이아웃 설계",
-		kind: "task",
-		status: "in-progress",
-		start: "2026-04-22",
-		end: "2026-04-25",
-		progress: 60,
-		assignee: "유석 + 우덕",
-	},
-	{
-		id: "task-mvp",
-		name: "MVP 범위 확정 (시나리오 1~4)",
-		kind: "task",
-		status: "done",
-		start: "2026-04-20",
-		end: "2026-04-23",
-		progress: 100,
-		assignee: "유석",
-	},
-	{
-		id: "mile-dev-start",
-		name: "개발 로드맵 전환",
-		kind: "milestone",
-		status: "todo",
-		start: "2026-04-25",
-		end: "2026-04-25",
-		progress: 0,
-	},
-];
 
 // ───────────────────────── Helpers ─────────────────────────
 
@@ -256,15 +58,30 @@ const diffDays = (a: Date, b: Date): number =>
 
 type Mode = "flow" | "gantt";
 
-export function RoadmapView() {
+export interface RoadmapViewProps {
+	data: RoadmapData;
+	/** "AI 재생성" 버튼 클릭 핸들러. 미구현이면 버튼 숨김. */
+	onRegenerate?: () => void;
+}
+
+export function RoadmapView({ data, onRegenerate }: RoadmapViewProps) {
 	const [mode, setMode] = useState<Mode>("flow");
 
 	return (
 		<div className="pharos-root min-h-full w-full overflow-auto bg-bg-primary p-6">
 			<div className="mx-auto max-w-6xl space-y-6">
-				<Header project={mockProject} mode={mode} onModeChange={setMode} />
+				<Header
+					project={data.project}
+					mode={mode}
+					onModeChange={setMode}
+					onRegenerate={onRegenerate}
+				/>
 
-				{mode === "flow" ? <FlowView /> : <GanttViewInline />}
+				{mode === "flow" ? (
+					<FlowView project={data.project} phases={data.phases} />
+				) : (
+					<GanttViewInline project={data.project} tasks={data.tasks} />
+				)}
 			</div>
 		</div>
 	);
@@ -274,10 +91,12 @@ function Header({
 	project,
 	mode,
 	onModeChange,
+	onRegenerate,
 }: {
-	project: typeof mockProject;
+	project: RoadmapProjectInfo;
 	mode: Mode;
 	onModeChange: (m: Mode) => void;
+	onRegenerate?: () => void;
 }) {
 	return (
 		<header className="space-y-4">
@@ -290,12 +109,13 @@ function Header({
 						{project.start} ~ {project.end}
 					</p>
 				</div>
-				<Button variant="secondary" size="sm">
-					AI 재생성
-				</Button>
+				{onRegenerate && (
+					<Button variant="secondary" size="sm" onClick={onRegenerate}>
+						AI 재생성
+					</Button>
+				)}
 			</div>
 
-			{/* 모드 토글 */}
 			<div className="inline-flex rounded-md border border-bg-modifier bg-bg-secondary p-1">
 				<ModeButton
 					active={mode === "flow"}
@@ -343,7 +163,13 @@ function ModeButton({
 
 // ───────────────────────── Flow (Phase) View ─────────────────────────
 
-function FlowView() {
+function FlowView({
+	project,
+	phases,
+}: {
+	project: RoadmapProjectInfo;
+	phases: RoadmapPhase[];
+}) {
 	return (
 		<Card>
 			<CardHeader>
@@ -353,94 +179,14 @@ function FlowView() {
 				</CardDescription>
 			</CardHeader>
 			<CardContent className="pb-8">
-				<ArrowChain phases={mockPhases} />
-				<TimelineRuler
-					projectStart={mockProject.start}
-					projectEnd={mockProject.end}
-				/>
-				<StepDetails phases={mockPhases} />
+				<ArrowChain phases={phases} />
+				<TimelineRuler projectStart={project.start} projectEnd={project.end} />
+				<StepDetails phases={phases} />
 			</CardContent>
 		</Card>
 	);
 }
 
-/**
- * 월 단위 마커가 타임라인 위/아래 번갈아 표시되는 시간 눈금.
- * 가로선에 tick mark 가 월 경계마다 찍힌다.
- */
-function TimelineRuler({
-	projectStart,
-	projectEnd,
-}: {
-	projectStart: string;
-	projectEnd: string;
-}) {
-	const start = toDate(projectStart);
-	const end = toDate(projectEnd);
-	const totalDays = diffDays(start, end);
-
-	const monthMarkers = useMemo(() => {
-		const markers: { label: string; offset: number }[] = [];
-		// 시작 월부터 끝 월 다음 달까지
-		const cur = new Date(start);
-		cur.setDate(1);
-		while (cur <= end) {
-			markers.push({
-				label: `${cur.getFullYear()}.${cur.getMonth() + 1}`,
-				offset: Math.max(0, diffDays(start, cur)),
-			});
-			cur.setMonth(cur.getMonth() + 1);
-		}
-		// 끝 월 다음 마커 하나 더 (타임라인 끝점 표시)
-		markers.push({
-			label: `${cur.getFullYear()}.${cur.getMonth() + 1}`,
-			offset: totalDays,
-		});
-		return markers;
-	}, [start, end, totalDays]);
-
-	return (
-		<div className="relative mx-6 my-4 h-14">
-			{/* 가로 타임라인 */}
-			<div className="absolute top-1/2 left-0 right-0 h-px bg-bg-modifier" />
-
-			{/* 월 마커 */}
-			{monthMarkers.map((m, i) => {
-				const pct = (m.offset / totalDays) * 100;
-				const above = i % 2 === 0;
-				return (
-					<div
-						key={i}
-						className="absolute top-1/2 -translate-x-1/2 -translate-y-1/2"
-						style={{ left: `${pct}%` }}
-					>
-						<div className="flex flex-col items-center">
-							{/* 위쪽 라벨 */}
-							{above && (
-								<div className="absolute bottom-3 text-xs font-medium text-text-muted whitespace-nowrap">
-									{m.label}
-								</div>
-							)}
-							{/* tick mark */}
-							<div className="h-3 w-px bg-text-faint" />
-							{/* 아래쪽 라벨 */}
-							{!above && (
-								<div className="absolute top-3 text-xs font-medium text-text-muted whitespace-nowrap">
-									{m.label}
-								</div>
-							)}
-						</div>
-					</div>
-				);
-			})}
-		</div>
-	);
-}
-
-/**
- * 화살표 체인 — 각 phase가 균등 폭으로 오른쪽으로 이어지는 모양.
- * 첫 블록은 왼쪽이 평평하고, 나머지는 왼쪽에 화살표 꼬리가 들어간다.
- */
 function ArrowChain({ phases }: { phases: RoadmapPhase[] }) {
 	return (
 		<div className="mb-8 flex items-stretch">
@@ -465,9 +211,8 @@ function ArrowBlock({
 	isFirst: boolean;
 	isLast: boolean;
 }) {
-	const Icon = phase.icon;
+	const Icon = PHASE_ICON[phase.icon];
 
-	// 상태별 색상 투명도 조정
 	const opacity =
 		phase.status === "done"
 			? 1
@@ -475,7 +220,6 @@ function ArrowBlock({
 				? 1
 				: 0.4;
 
-	// 화살표 모양 (clip-path). 첫 블록은 왼쪽 notch 없음.
 	const notchWidth = 18;
 	const clipPath = isFirst
 		? `polygon(0 0, calc(100% - ${notchWidth}px) 0, 100% 50%, calc(100% - ${notchWidth}px) 100%, 0 100%)`
@@ -483,18 +227,13 @@ function ArrowBlock({
 
 	return (
 		<div className="relative flex flex-1 flex-col items-center">
-			{/* 상단 아이콘 */}
 			<div
 				className="mb-2 flex h-10 w-10 items-center justify-center rounded-full"
-				style={{
-					color: phase.color,
-					opacity,
-				}}
+				style={{ color: phase.color, opacity }}
 			>
 				<Icon className="h-7 w-7" strokeWidth={2.5} />
 			</div>
 
-			{/* 화살표 블록 */}
 			<div
 				className={cn(
 					"relative flex h-14 w-full items-center justify-center px-4 text-center font-bold text-white shadow-sm",
@@ -512,17 +251,77 @@ function ArrowBlock({
 	);
 }
 
-/**
- * 스텝별 상세 — 각 phase 아래 위치.
- * 타임라인 + 숫자 원 + Step N 라벨 + 활동 bullet 목록.
- */
+function TimelineRuler({
+	projectStart,
+	projectEnd,
+}: {
+	projectStart: string;
+	projectEnd: string;
+}) {
+	const start = toDate(projectStart);
+	const end = toDate(projectEnd);
+	const totalDays = diffDays(start, end);
+
+	const monthMarkers = useMemo(() => {
+		const markers: { label: string; offset: number }[] = [];
+		const cur = new Date(start);
+		cur.setDate(1);
+		while (cur <= end) {
+			markers.push({
+				label: `${cur.getFullYear()}.${cur.getMonth() + 1}`,
+				offset: Math.max(0, diffDays(start, cur)),
+			});
+			cur.setMonth(cur.getMonth() + 1);
+		}
+		markers.push({
+			label: `${cur.getFullYear()}.${cur.getMonth() + 1}`,
+			offset: totalDays,
+		});
+		return markers;
+	}, [start, end, totalDays]);
+
+	return (
+		<div className="relative mx-6 my-4 h-14">
+			<div className="absolute top-1/2 left-0 right-0 h-px bg-bg-modifier" />
+
+			{monthMarkers.map((m, i) => {
+				const pct = (m.offset / totalDays) * 100;
+				const above = i % 2 === 0;
+				return (
+					<div
+						key={i}
+						className="absolute top-1/2 -translate-x-1/2 -translate-y-1/2"
+						style={{ left: `${pct}%` }}
+					>
+						<div className="flex flex-col items-center">
+							{above && (
+								<div className="absolute bottom-3 text-xs font-medium text-text-muted whitespace-nowrap">
+									{m.label}
+								</div>
+							)}
+							<div className="h-3 w-px bg-text-faint" />
+							{!above && (
+								<div className="absolute top-3 text-xs font-medium text-text-muted whitespace-nowrap">
+									{m.label}
+								</div>
+							)}
+						</div>
+					</div>
+				);
+			})}
+		</div>
+	);
+}
+
 function StepDetails({ phases }: { phases: RoadmapPhase[] }) {
 	return (
 		<div className="relative">
-			{/* 가로 타임라인 */}
 			<div className="absolute left-[10%] right-[10%] top-3 h-px bg-bg-modifier" />
 
-			<div className="grid gap-4" style={{ gridTemplateColumns: `repeat(${phases.length}, 1fr)` }}>
+			<div
+				className="grid gap-4"
+				style={{ gridTemplateColumns: `repeat(${phases.length}, 1fr)` }}
+			>
 				{phases.map((phase, i) => (
 					<StepColumn key={phase.id} phase={phase} index={i} />
 				))}
@@ -540,7 +339,6 @@ function StepColumn({ phase, index }: { phase: RoadmapPhase; index: number }) {
 
 	return (
 		<div className="flex flex-col items-center px-2">
-			{/* 타임라인 위의 숫자 원 */}
 			<div
 				className="relative z-10 flex h-6 w-6 items-center justify-center rounded-full text-[10px] font-bold text-white ring-4 ring-bg-secondary"
 				style={{ backgroundColor: phase.color }}
@@ -548,7 +346,6 @@ function StepColumn({ phase, index }: { phase: RoadmapPhase; index: number }) {
 				{index + 1}
 			</div>
 
-			{/* Step N 라벨 */}
 			<div className="mt-3 text-center">
 				<p className="text-xs font-semibold text-text-normal">Step {index + 1}</p>
 				<p className="mt-0.5 text-[10px] text-text-faint">
@@ -565,7 +362,6 @@ function StepColumn({ phase, index }: { phase: RoadmapPhase; index: number }) {
 				</span>
 			</div>
 
-			{/* 활동 bullet 목록 */}
 			<ul className="mt-3 space-y-1 text-left text-[11px] text-text-muted">
 				{phase.activities.map((a, i) => (
 					<li key={i} className="flex gap-1.5">
@@ -580,9 +376,15 @@ function StepColumn({ phase, index }: { phase: RoadmapPhase; index: number }) {
 
 // ───────────────────────── Gantt (Detailed) View ─────────────────────────
 
-function GanttViewInline() {
-	const projectStart = toDate(mockProject.start);
-	const projectEnd = toDate(mockProject.end);
+function GanttViewInline({
+	project,
+	tasks,
+}: {
+	project: RoadmapProjectInfo;
+	tasks: RoadmapTask[];
+}) {
+	const projectStart = toDate(project.start);
+	const projectEnd = toDate(project.end);
 	const totalDays = diffDays(projectStart, projectEnd) + 1;
 
 	const [dayWidth, setDayWidth] = useState<number>(20);
@@ -638,7 +440,7 @@ function GanttViewInline() {
 			</CardHeader>
 			<CardContent>
 				<GanttChart
-					tasks={mockTasks}
+					tasks={tasks}
 					projectStart={projectStart}
 					totalDays={totalDays}
 					dayWidth={dayWidth}
@@ -786,17 +588,17 @@ function GanttRow({
 	const left = startOffset * dayWidth;
 	const width = duration * dayWidth;
 
-	const statusBg = {
+	const statusBg: Record<TaskStatus, string> = {
 		done: "bg-[color:var(--color-green)]",
 		"in-progress": "bg-[color:var(--color-orange)]",
 		todo: "bg-bg-modifier",
-	}[task.status];
+	};
 
-	const progressBg = {
+	const progressBg: Record<TaskStatus, string> = {
 		done: "bg-[color:var(--color-green)]/60",
 		"in-progress": "bg-[color:var(--color-orange)]/60",
 		todo: "bg-bg-modifier",
-	}[task.status];
+	};
 
 	return (
 		<div
@@ -833,13 +635,13 @@ function GanttRow({
 					<div
 						className={cn(
 							"absolute top-1/2 -translate-y-1/2 h-5 overflow-hidden rounded shadow-sm",
-							statusBg,
+							statusBg[task.status],
 						)}
 						style={{ left, width }}
 						title={`${task.name} · ${task.start} ~ ${task.end} · ${task.progress}%`}
 					>
 						<div
-							className={cn("h-full", progressBg)}
+							className={cn("h-full", progressBg[task.status])}
 							style={{ width: `${task.progress}%` }}
 						/>
 					</div>

@@ -4,6 +4,26 @@ import {
 	VIEW_TYPE_PHAROS_DASHBOARD,
 } from "./features/progress/ui/DashboardItemView";
 import {
+	MyTasksItemView,
+	VIEW_TYPE_PHAROS_MY_TASKS,
+} from "./features/progress/ui/MyTasksItemView";
+import {
+	ProgressPageItemView,
+	VIEW_TYPE_PHAROS_PROGRESS,
+} from "./features/progress/ui/ProgressPageItemView";
+import {
+	CalendarItemView,
+	VIEW_TYPE_PHAROS_CALENDAR,
+} from "./features/meeting/ui/CalendarItemView";
+import {
+	MeetingPageItemView,
+	VIEW_TYPE_PHAROS_MEETING_PAGE,
+} from "./features/meeting/ui/MeetingPageItemView";
+import {
+	MeetingsListItemView,
+	VIEW_TYPE_PHAROS_MEETINGS_LIST,
+} from "./features/meeting/ui/MeetingsListItemView";
+import {
 	RoadmapItemView,
 	VIEW_TYPE_PHAROS_ROADMAP,
 } from "./features/roadmap/ui/RoadmapItemView";
@@ -19,13 +39,33 @@ export default class PharosPlugin extends Plugin {
 			VIEW_TYPE_PHAROS_ROADMAP,
 			(leaf) => new RoadmapItemView(leaf),
 		);
+		this.registerView(
+			VIEW_TYPE_PHAROS_PROGRESS,
+			(leaf) => new ProgressPageItemView(leaf),
+		);
+		this.registerView(
+			VIEW_TYPE_PHAROS_MY_TASKS,
+			(leaf) => new MyTasksItemView(leaf),
+		);
+		this.registerView(
+			VIEW_TYPE_PHAROS_CALENDAR,
+			(leaf) => new CalendarItemView(leaf),
+		);
+		this.registerView(
+			VIEW_TYPE_PHAROS_MEETING_PAGE,
+			(leaf) => new MeetingPageItemView(leaf),
+		);
+		this.registerView(
+			VIEW_TYPE_PHAROS_MEETINGS_LIST,
+			(leaf) => new MeetingsListItemView(leaf),
+		);
 
-		// Ribbon 아이콘 (왼쪽 세로줄)
+		// Ribbon 아이콘
 		this.addRibbonIcon("layout-dashboard", "Pharos Dashboard", () => {
 			void this.activateView(VIEW_TYPE_PHAROS_DASHBOARD);
 		});
 
-		// 명령 팔레트 (Ctrl+P)
+		// 명령 팔레트
 		this.addCommand({
 			id: "open-dashboard",
 			name: "Open Pharos Dashboard",
@@ -35,6 +75,26 @@ export default class PharosPlugin extends Plugin {
 			id: "open-roadmap",
 			name: "Open Pharos Roadmap",
 			callback: () => void this.activateView(VIEW_TYPE_PHAROS_ROADMAP),
+		});
+		this.addCommand({
+			id: "open-progress",
+			name: "Open Team Progress",
+			callback: () => void this.activateView(VIEW_TYPE_PHAROS_PROGRESS),
+		});
+		this.addCommand({
+			id: "open-my-tasks",
+			name: "Open My Tasks",
+			callback: () => void this.activateView(VIEW_TYPE_PHAROS_MY_TASKS),
+		});
+		this.addCommand({
+			id: "open-calendar",
+			name: "Open Pharos Calendar",
+			callback: () => void this.activateView(VIEW_TYPE_PHAROS_CALENDAR),
+		});
+		this.addCommand({
+			id: "open-meetings",
+			name: "Open Meetings List",
+			callback: () => void this.activateView(VIEW_TYPE_PHAROS_MEETINGS_LIST),
 		});
 	}
 

@@ -1,13 +1,19 @@
 /**
  * DashboardItemView — DashboardView(React 컴포넌트)를 Obsidian ItemView로 감싸는 어댑터.
  *
- * Obsidian이 "탭"이라는 단위로 화면을 띄울 때는 ItemView 클래스를 상속해야 한다.
- * 우리는 React를 쓰므로 ItemView의 DOM 컨테이너(contentEl)에 React root를 mount하는 패턴.
+ * 이 어댑터가 "데이터 공급책" 역할도 함:
+ *   - 오늘: `mockDashboardData`를 props로 주입
+ *   - 미래: `progressService.getSummary()` 결과를 주입 (DashboardView 자체는 무변경)
  */
 
 import { ItemView, WorkspaceLeaf } from "obsidian";
 import { createRoot, type Root } from "react-dom/client";
 import { DashboardView } from "./DashboardView";
+import { mockDashboardData } from "./mock";
+import { VIEW_TYPE_PHAROS_MY_TASKS } from "./MyTasksItemView";
+import { VIEW_TYPE_PHAROS_PROGRESS } from "./ProgressPageItemView";
+import { VIEW_TYPE_PHAROS_CALENDAR } from "../../meeting/ui/CalendarItemView";
+import { VIEW_TYPE_PHAROS_MEETINGS_LIST } from "../../meeting/ui/MeetingsListItemView";
 import { VIEW_TYPE_PHAROS_ROADMAP } from "../../roadmap/ui/RoadmapItemView";
 
 export const VIEW_TYPE_PHAROS_DASHBOARD = "pharos-dashboard-view";
@@ -38,7 +44,12 @@ export class DashboardItemView extends ItemView {
 		this.root = createRoot(container);
 		this.root.render(
 			<DashboardView
+				data={mockDashboardData}
 				onOpenRoadmap={() => void this.openView(VIEW_TYPE_PHAROS_ROADMAP)}
+				onOpenMeetings={() => void this.openView(VIEW_TYPE_PHAROS_MEETINGS_LIST)}
+				onOpenProgress={() => void this.openView(VIEW_TYPE_PHAROS_PROGRESS)}
+				onOpenMyTasks={() => void this.openView(VIEW_TYPE_PHAROS_MY_TASKS)}
+				onOpenCalendar={() => void this.openView(VIEW_TYPE_PHAROS_CALENDAR)}
 			/>,
 		);
 	}
