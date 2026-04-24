@@ -4,12 +4,15 @@
  * 회의 카드 클릭 → Meeting Page 열기 (meetingId 전달).
  */
 
-import { ItemView, Notice, WorkspaceLeaf } from "obsidian";
+import { ItemView, WorkspaceLeaf } from "obsidian";
 import { createRoot, type Root } from "react-dom/client";
 import { MeetingsListView } from "./MeetingsListView";
 import { mockMeetingsListData } from "./meetingsListMock";
 import { VIEW_TYPE_PHAROS_CALENDAR } from "./CalendarItemView";
 import { VIEW_TYPE_PHAROS_MEETING_PAGE } from "./MeetingPageItemView";
+import { VIEW_TYPE_PHAROS_MINUTES_ARCHIVE } from "./MinutesArchiveItemView";
+import { VIEW_TYPE_PHAROS_DASHBOARD } from "../../progress/ui/DashboardItemView";
+import { AdhocMeetingModal } from "./AdhocMeetingModal";
 
 export const VIEW_TYPE_PHAROS_MEETINGS_LIST = "pharos-meetings-list-view";
 
@@ -42,12 +45,9 @@ export class MeetingsListItemView extends ItemView {
 				data={mockMeetingsListData}
 				onOpenMeeting={(id) => void this.openMeetingPage(id)}
 				onOpenCalendar={() => void this.openCalendar()}
-				onAddAdhocMeeting={() =>
-					new Notice("[미구현] 임시 회의 추가 Modal이 열릴 예정")
-				}
-				onOpenMinutesArchive={() =>
-					new Notice("[미구현] 회의록 모음 페이지가 생길 예정")
-				}
+				onAddAdhocMeeting={() => new AdhocMeetingModal(this.app).open()}
+				onOpenMinutesArchive={() => void this.openView(VIEW_TYPE_PHAROS_MINUTES_ARCHIVE)}
+				onBackToHome={() => void this.openView(VIEW_TYPE_PHAROS_DASHBOARD)}
 			/>,
 		);
 	}
@@ -80,13 +80,17 @@ export class MeetingsListItemView extends ItemView {
 	}
 
 	private async openCalendar(): Promise<void> {
+		await this.openView(VIEW_TYPE_PHAROS_CALENDAR);
+	}
+
+	private async openView(viewType: string): Promise<void> {
 		const { workspace } = this.app;
-		const [existing] = workspace.getLeavesOfType(VIEW_TYPE_PHAROS_CALENDAR);
+		const [existing] = workspace.getLeavesOfType(viewType);
 		if (existing) {
 			workspace.revealLeaf(existing);
 			return;
 		}
 		const leaf = workspace.getLeaf("tab");
-		await leaf.setViewState({ type: VIEW_TYPE_PHAROS_CALENDAR, active: true });
+		await leaf.setViewState({ type: viewType, active: true });
 	}
 }

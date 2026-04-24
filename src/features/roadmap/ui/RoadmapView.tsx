@@ -20,6 +20,7 @@ import {
 	Server,
 	type LucideIcon,
 } from "lucide-react";
+import { BackNav, type BackNavItem } from "shared/ui/BackNav";
 import { Button } from "shared/ui/Button";
 import {
 	Card,
@@ -62,14 +63,24 @@ export interface RoadmapViewProps {
 	data: RoadmapData;
 	/** "AI 재생성" 버튼 클릭 핸들러. 미구현이면 버튼 숨김. */
 	onRegenerate?: () => void;
+	onBackToHome?: () => void;
 }
 
-export function RoadmapView({ data, onRegenerate }: RoadmapViewProps) {
+export function RoadmapView({
+	data,
+	onRegenerate,
+	onBackToHome,
+}: RoadmapViewProps) {
 	const [mode, setMode] = useState<Mode>("flow");
+
+	const navItems: BackNavItem[] = [];
+	if (onBackToHome)
+		navItems.push({ icon: "home", label: "홈으로", onClick: onBackToHome });
 
 	return (
 		<div className="pharos-root min-h-full w-full overflow-auto bg-bg-primary p-6">
 			<div className="mx-auto max-w-6xl space-y-6">
+				{navItems.length > 0 && <BackNav items={navItems} />}
 				<Header
 					project={data.project}
 					mode={mode}

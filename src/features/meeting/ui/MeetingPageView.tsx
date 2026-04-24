@@ -12,14 +12,15 @@
  */
 
 import {
-	ArrowLeft,
 	CheckCircle2,
-	ExternalLink,
+	ChevronRight,
 	FileText,
+	Paperclip,
 	Pencil,
 	Sparkles,
 	Users,
 } from "lucide-react";
+import { BackNav, type BackNavItem } from "shared/ui/BackNav";
 import { Button } from "shared/ui/Button";
 import {
 	Card,
@@ -29,13 +30,11 @@ import {
 	CardTitle,
 } from "shared/ui/Card";
 import { cn } from "shared/ui/utils";
-import type { MeetingType } from "../domain/calendarData";
 import type {
 	MeetingAnalysis,
 	MeetingAttendee,
 	MeetingMinutes,
 	MeetingPageData,
-	MeetingResource,
 	MeetingStatus,
 	MeetingTopic,
 } from "../domain/meetingPageData";
@@ -43,39 +42,39 @@ import type {
 export interface MeetingPageViewProps {
 	data: MeetingPageData;
 	/** 캘린더로 돌아가기. */
-	onBack?: () => void;
+	onBackToCalendar?: () => void;
+	/** 홈(Dashboard)으로 돌아가기. */
+	onBackToHome?: () => void;
 	/** "AI 주제 생성" 버튼. */
 	onGenerateTopics?: () => void;
 	/** "회의록 작성하기" 버튼. */
 	onEditMinutes?: () => void;
+	/** 주제 링크 클릭 → Topic Page. */
+	onOpenTopic?: (topicId: string) => void;
 }
 
 export function MeetingPageView({
 	data,
-	onBack,
+	onBackToCalendar,
+	onBackToHome,
 	onGenerateTopics,
 	onEditMinutes,
+	onOpenTopic,
 }: MeetingPageViewProps) {
+	const navItems: BackNavItem[] = [];
+	if (onBackToCalendar)
+		navItems.push({
+			icon: "calendar",
+			label: "캘린더로",
+			onClick: onBackToCalendar,
+		});
+	if (onBackToHome)
+		navItems.push({ icon: "home", label: "홈으로", onClick: onBackToHome });
+
 	return (
 		<div className="pharos-root min-h-full w-full overflow-y-auto bg-bg-primary p-6">
 			<div className="mx-auto max-w-3xl space-y-6">
-				{onBack && (
-					<div
-						onClick={onBack}
-						role="button"
-						tabIndex={0}
-						onKeyDown={(e) => {
-							if (e.key === "Enter" || e.key === " ") {
-								e.preventDefault();
-								onBack();
-							}
-						}}
-						className="inline-flex cursor-pointer items-center gap-1 text-xs text-text-muted hover:text-text-normal"
-					>
-						<ArrowLeft className="h-3.5 w-3.5" />
-						<span>캘린더로 돌아가기</span>
-					</div>
-				)}
+				{navItems.length > 0 && <BackNav items={navItems} />}
 
 				<Header data={data} />
 
@@ -85,19 +84,27 @@ export function MeetingPageView({
 					topics={data.topics}
 					status={data.status}
 					onGenerateTopics={onGenerateTopics}
-				/>
-
-				<ResourcesSection
-					resources={data.resources}
-					topics={data.topics}
+					onOpenTopic={onOpenTopic}
+					resourceCountByTopic={countResourcesByTopic(data)}
 				/>
 
 				<MinutesSection minutes={data.minutes} onEditMinutes={onEditMinutes} />
 
-				<AnalysisSection analysis={data.analysis} hasMinutes={data.minutes !== null} />
+				<AnalysisSection
+					analysis={data.analysis}
+					hasMinutes={data.minutes !== null}
+				/>
 			</div>
 		</div>
 	);
+}
+
+function countResourcesByTopic(data: MeetingPageData): Record<string, number> {
+	const map: Record<string, number> = {};
+	for (const r of data.resources) {
+		if (r.topicId) map[r.topicId] = (map[r.topicId] ?? 0) + 1;
+	}
+	return map;
 }
 
 // ───────────────────────── Header ─────────────────────────
@@ -236,10 +243,14 @@ function TopicsSection({
 	topics,
 	status,
 	onGenerateTopics,
+	onOpenTopic,
+	resourceCountByTopic,
 }: {
 	topics: MeetingTopic[];
 	status: MeetingStatus;
 	onGenerateTopics?: () => void;
+	onOpenTopic?: (topicId: string) => void;
+	resourceCountByTopic: Record<string, number>;
 }) {
 	return (
 		<Card>
@@ -249,7 +260,7 @@ function TopicsSection({
 						<CardTitle>🎯 회의 주제</CardTitle>
 						<CardDescription>
 							{topics.length > 0
-								? `${topics.length}개 주제 준비됨`
+								? `${topics.length}개 주제 · 클릭하면 관련 자료·결정사항·회의록 발췌가 열립니다`
 								: "아직 주제가 없습니다"}
 						</CardDescription>
 					</div>
@@ -267,125 +278,78 @@ function TopicsSection({
 						"AI로 주제 생성" 버튼을 눌러 주제를 받거나, 직접 추가하세요.
 					</div>
 				) : (
-					<ol className="space-y-3">
+					<ul className="space-y-1.5">
 						{topics
 							.sort((a, b) => a.priority - b.priority)
 							.map((t, i) => (
-								<TopicRow key={t.id} topic={t} index={i + 1} />
+								<TopicLinkRow
+									key={t.id}
+									topic={t}
+									index={i + 1}
+									resourceCount={resourceCountByTopic[t.id] ?? 0}
+									onOpenTopic={onOpenTopic}
+								/>
 							))}
-					</ol>
+					</ul>
 				)}
 			</CardContent>
 		</Card>
 	);
 }
 
-function TopicRow({ topic, index }: { topic: MeetingTopic; index: number }) {
+function TopicLinkRow({
+	topic,
+	index,
+	resourceCount,
+	onOpenTopic,
+}: {
+	topic: MeetingTopic;
+	index: number;
+	resourceCount: number;
+	onOpenTopic?: (topicId: string) => void;
+}) {
 	return (
-		<li className="flex gap-3">
-			<span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-bg-modifier text-[11px] font-bold text-text-muted">
-				{index}
-			</span>
-			<div className="flex-1 space-y-1">
-				<div className="flex items-start justify-between gap-2">
-					<p className="text-sm font-medium text-text-normal">{topic.title}</p>
-					{topic.source === "AI" && (
-						<span className="flex shrink-0 items-center gap-0.5 rounded-full bg-[color:var(--interactive-accent)]/10 px-1.5 py-0.5 text-[10px] font-medium text-[color:var(--interactive-accent)]">
-							<Sparkles className="h-2.5 w-2.5" />
-							AI 제안
-						</span>
-					)}
+		<li>
+			<div
+				onClick={() => onOpenTopic?.(topic.id)}
+				role="button"
+				tabIndex={0}
+				onKeyDown={(e) => {
+					if (e.key === "Enter" || e.key === " ") {
+						e.preventDefault();
+						onOpenTopic?.(topic.id);
+					}
+				}}
+				className="group flex cursor-pointer items-center gap-3 rounded-md border border-bg-modifier bg-bg-secondary p-3 transition-colors hover:border-[color:var(--interactive-accent)]/50 hover:bg-[color:var(--background-modifier-hover)]"
+			>
+				<span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-bg-modifier text-[11px] font-bold text-text-muted">
+					{index}
+				</span>
+				<div className="flex-1 min-w-0">
+					<div className="flex flex-wrap items-center gap-2">
+						<p className="text-sm font-medium text-text-normal">
+							{topic.title}
+						</p>
+						{topic.source === "AI" && (
+							<span className="inline-flex items-center gap-0.5 rounded-full bg-[color:var(--interactive-accent)]/10 px-1.5 py-0.5 text-[10px] font-medium text-[color:var(--interactive-accent)]">
+								<Sparkles className="h-2.5 w-2.5" />
+								AI
+							</span>
+						)}
+						{resourceCount > 0 && (
+							<span className="inline-flex items-center gap-1 rounded-full bg-[color:var(--color-blue)]/15 px-2 py-0.5 text-[10px] font-medium text-[color:var(--color-blue)]">
+								<Paperclip className="h-2.5 w-2.5" />
+								자료 {resourceCount}건
+							</span>
+						)}
+					</div>
+					<div className="mt-0.5 flex items-center gap-3 text-[11px] text-text-faint">
+						<span>우선순위 P{topic.priority}</span>
+					</div>
 				</div>
-				{topic.description && (
-					<p className="text-xs text-text-muted">{topic.description}</p>
-				)}
-				{topic.reason && (
-					<p className="text-[11px] italic text-text-faint">
-						💭 {topic.reason}
-					</p>
-				)}
+				<ChevronRight className="h-4 w-4 shrink-0 text-text-faint transition-transform group-hover:translate-x-0.5 group-hover:text-text-muted" />
 			</div>
 		</li>
-	);
-}
-
-// ───────────────────────── Resources Section ─────────────────────────
-
-function ResourcesSection({
-	resources,
-	topics,
-}: {
-	resources: MeetingResource[];
-	topics: MeetingTopic[];
-}) {
-	const topicTitle = (id: string | null): string =>
-		id ? (topics.find((t) => t.id === id)?.title ?? "기타") : "전체 공용";
-
-	// 주제별로 그룹핑
-	const grouped = resources.reduce<Record<string, MeetingResource[]>>(
-		(acc, r) => {
-			const key = r.topicId ?? "__general__";
-			if (!acc[key]) acc[key] = [];
-			acc[key]!.push(r);
-			return acc;
-		},
-		{},
-	);
-
-	return (
-		<Card>
-			<CardHeader>
-				<CardTitle>📎 수집 자료</CardTitle>
-				<CardDescription>
-					{resources.length > 0
-						? `${resources.length}건 수집됨 · AI가 각 주제별로 자동 조사`
-						: "아직 자료가 없습니다"}
-				</CardDescription>
-			</CardHeader>
-			<CardContent className="space-y-5">
-				{resources.length === 0 ? (
-					<div className="py-6 text-center text-xs text-text-muted">
-						주제가 확정되면 AI가 자동으로 자료를 수집합니다.
-					</div>
-				) : (
-					Object.entries(grouped).map(([topicId, items]) => (
-						<div key={topicId} className="space-y-2">
-							<p className="text-[11px] font-semibold uppercase tracking-wide text-text-faint">
-								{topicTitle(topicId === "__general__" ? null : topicId)}
-							</p>
-							<div className="space-y-2">
-								{items.map((r) => (
-									<ResourceRow key={r.id} resource={r} />
-								))}
-							</div>
-						</div>
-					))
-				)}
-			</CardContent>
-		</Card>
-	);
-}
-
-function ResourceRow({ resource }: { resource: MeetingResource }) {
-	return (
-		<div className="rounded-md border border-bg-modifier p-3">
-			<div className="flex items-start justify-between gap-2">
-				<p className="text-sm font-medium text-text-normal">{resource.title}</p>
-				<a
-					href={resource.sourceUrl}
-					target="_blank"
-					rel="noopener noreferrer"
-					className="flex shrink-0 items-center gap-0.5 text-[11px] text-[color:var(--interactive-accent)] hover:underline"
-					onClick={(e) => e.stopPropagation()}
-				>
-					원문
-					<ExternalLink className="h-3 w-3" />
-				</a>
-			</div>
-			<p className="mt-1 text-xs leading-relaxed text-text-muted">
-				{resource.summary}
-			</p>
-		</div>
 	);
 }
 

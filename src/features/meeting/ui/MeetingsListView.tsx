@@ -15,6 +15,7 @@ import {
 	FileText,
 	Users,
 } from "lucide-react";
+import { BackNav, type BackNavItem } from "shared/ui/BackNav";
 import { Button } from "shared/ui/Button";
 import { Card, CardContent } from "shared/ui/Card";
 import { cn } from "shared/ui/utils";
@@ -38,6 +39,7 @@ export interface MeetingsListViewProps {
 	onOpenMinutesArchive?: () => void;
 	/** "캘린더로 보기" 링크 클릭 (편의 뷰 전환). */
 	onOpenCalendar?: () => void;
+	onBackToHome?: () => void;
 }
 
 export function MeetingsListView({
@@ -46,6 +48,7 @@ export function MeetingsListView({
 	onOpenMeeting,
 	onOpenMinutesArchive,
 	onOpenCalendar,
+	onBackToHome,
 }: MeetingsListViewProps) {
 	const [filter, setFilter] = useState<Filter>("all");
 	const [typeFilter, setTypeFilter] = useState<TypeFilter>("all");
@@ -72,9 +75,14 @@ export function MeetingsListView({
 	// 날짜별 그룹핑
 	const grouped = useMemo(() => groupByDate(filtered), [filtered]);
 
+	const navItems: BackNavItem[] = [];
+	if (onBackToHome)
+		navItems.push({ icon: "home", label: "홈으로", onClick: onBackToHome });
+
 	return (
 		<div className="pharos-root min-h-full w-full overflow-y-auto bg-bg-primary p-6">
 			<div className="mx-auto max-w-4xl space-y-6">
+				{navItems.length > 0 && <BackNav items={navItems} />}
 				<Header
 					onAddAdhocMeeting={onAddAdhocMeeting}
 					onOpenCalendar={onOpenCalendar}

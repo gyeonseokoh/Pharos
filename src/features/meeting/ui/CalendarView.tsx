@@ -12,6 +12,7 @@
 
 import { useMemo, useState } from "react";
 import { ChevronLeft, ChevronRight, Plus } from "lucide-react";
+import { BackNav, type BackNavItem } from "shared/ui/BackNav";
 import { Button } from "shared/ui/Button";
 import { cn } from "shared/ui/utils";
 import type {
@@ -28,12 +29,14 @@ export interface CalendarViewProps {
 	onOpenMeeting?: (meetingId: string) => void;
 	/** 임시 회의 추가. 날짜가 지정되면 해당 날짜로 초기값 세팅. */
 	onAddAdhocMeeting?: (date?: string) => void;
+	onBackToHome?: () => void;
 }
 
 export function CalendarView({
 	data,
 	onOpenMeeting,
 	onAddAdhocMeeting,
+	onBackToHome,
 }: CalendarViewProps) {
 	// 오늘이 포함된 월로 시작
 	const [cursor, setCursor] = useState<Date>(() => {
@@ -74,9 +77,14 @@ export function CalendarView({
 		setCursor(d);
 	};
 
+	const navItems: BackNavItem[] = [];
+	if (onBackToHome)
+		navItems.push({ icon: "home", label: "홈으로", onClick: onBackToHome });
+
 	return (
 		<div className="pharos-root min-h-full w-full overflow-y-auto bg-bg-primary p-6">
 			<div className="mx-auto max-w-5xl space-y-4">
+				{navItems.length > 0 && <BackNav items={navItems} />}
 				<Header
 					year={year}
 					month={month}

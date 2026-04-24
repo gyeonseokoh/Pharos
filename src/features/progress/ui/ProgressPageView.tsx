@@ -14,6 +14,7 @@ import {
 	Sparkles,
 	Users2,
 } from "lucide-react";
+import { BackNav, type BackNavItem } from "shared/ui/BackNav";
 import { Button } from "shared/ui/Button";
 import {
 	Card,
@@ -57,14 +58,24 @@ export interface ProgressPageViewProps {
 	data: ProgressPageData;
 	/** 수동 새로고침 버튼 핸들러. */
 	onRefresh?: () => void;
+	onBackToHome?: () => void;
 }
 
-export function ProgressPageView({ data, onRefresh }: ProgressPageViewProps) {
+export function ProgressPageView({
+	data,
+	onRefresh,
+	onBackToHome,
+}: ProgressPageViewProps) {
 	const [period, setPeriod] = useState<PeriodFilter>("today");
+
+	const navItems: BackNavItem[] = [];
+	if (onBackToHome)
+		navItems.push({ icon: "home", label: "홈으로", onClick: onBackToHome });
 
 	return (
 		<div className="pharos-root min-h-full w-full overflow-y-auto bg-bg-primary p-6">
 			<div className="mx-auto max-w-5xl space-y-6">
+				{navItems.length > 0 && <BackNav items={navItems} />}
 				<Header
 					projectName={data.projectName}
 					lastUpdated={data.lastUpdated}

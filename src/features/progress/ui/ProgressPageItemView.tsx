@@ -10,6 +10,7 @@ import { ItemView, WorkspaceLeaf } from "obsidian";
 import { createRoot, type Root } from "react-dom/client";
 import { ProgressPageView } from "./ProgressPageView";
 import { mockProgressPageData } from "./progressPageMock";
+import { VIEW_TYPE_PHAROS_DASHBOARD } from "./DashboardItemView";
 
 export const VIEW_TYPE_PHAROS_PROGRESS = "pharos-progress-page-view";
 
@@ -44,6 +45,7 @@ export class ProgressPageItemView extends ItemView {
 					// MVP에서는 수동 새로고침 시 그냥 알림만.
 					// 미래: progressService.refresh() 후 데이터 재로드.
 				}}
+				onBackToHome={() => void this.openView(VIEW_TYPE_PHAROS_DASHBOARD)}
 			/>,
 		);
 	}
@@ -51,5 +53,16 @@ export class ProgressPageItemView extends ItemView {
 	async onClose(): Promise<void> {
 		this.root?.unmount();
 		this.root = null;
+	}
+
+	private async openView(viewType: string): Promise<void> {
+		const { workspace } = this.app;
+		const [existing] = workspace.getLeavesOfType(viewType);
+		if (existing) {
+			workspace.revealLeaf(existing);
+			return;
+		}
+		const leaf = workspace.getLeaf("tab");
+		await leaf.setViewState({ type: viewType, active: true });
 	}
 }

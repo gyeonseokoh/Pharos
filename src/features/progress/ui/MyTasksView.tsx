@@ -19,6 +19,7 @@ import {
 	ListChecks,
 	Timer,
 } from "lucide-react";
+import { BackNav, type BackNavItem } from "shared/ui/BackNav";
 import { Button } from "shared/ui/Button";
 import { Card, CardContent } from "shared/ui/Card";
 import { cn } from "shared/ui/utils";
@@ -42,9 +43,17 @@ export interface MyTasksViewProps {
 	 * 실제 구현에선 `checklistService.toggle(taskId, itemId)` 호출.
 	 */
 	onToggleCheck?: (taskId: string, itemId: string, nextChecked: boolean) => void;
+	/** Task 제목 클릭 시 상세 페이지 이동. */
+	onOpenTaskDetail?: (taskId: string) => void;
+	onBackToHome?: () => void;
 }
 
-export function MyTasksView({ data, onToggleCheck }: MyTasksViewProps) {
+export function MyTasksView({
+	data,
+	onToggleCheck,
+	onOpenTaskDetail,
+	onBackToHome,
+}: MyTasksViewProps) {
 	const [filter, setFilter] = useState<StatusFilter>("all");
 
 	// UI 전용 체크 상태 (콜백 없을 때만 사용)
@@ -86,9 +95,14 @@ export function MyTasksView({ data, onToggleCheck }: MyTasksViewProps) {
 		return data.tasks.filter((t) => t.status === filter);
 	}, [data.tasks, filter]);
 
+	const navItems: BackNavItem[] = [];
+	if (onBackToHome)
+		navItems.push({ icon: "home", label: "홈으로", onClick: onBackToHome });
+
 	return (
 		<div className="pharos-root min-h-full w-full overflow-y-auto bg-bg-primary p-6">
 			<div className="mx-auto max-w-4xl space-y-6">
+				{navItems.length > 0 && <BackNav items={navItems} />}
 				<Header profile={data.profile} />
 				<StatsBar stats={data.stats} />
 				<FilterTabs active={filter} onChange={setFilter} data={data} />
@@ -103,6 +117,7 @@ export function MyTasksView({ data, onToggleCheck }: MyTasksViewProps) {
 								task={task}
 								isChecked={isChecked}
 								onToggle={handleToggle}
+								onOpenDetail={onOpenTaskDetail}
 							/>
 						))}
 					</div>
@@ -309,10 +324,12 @@ function TaskCard({
 	task,
 	isChecked,
 	onToggle,
+	onOpenDetail,
 }: {
 	task: MyTask;
 	isChecked: (taskId: string, itemId: string) => boolean;
 	onToggle: (taskId: string, itemId: string) => void;
+	onOpenDetail?: (taskId: string) => void;
 }) {
 	// 기본 상태: 진행 중이면 펼침, 나머지는 접힘
 	const [expanded, setExpanded] = useState<boolean>(task.status === "in-progress");
@@ -356,9 +373,24 @@ function TaskCard({
 
 				<div className="flex-1 min-w-0 space-y-2">
 					<div className="flex flex-wrap items-center gap-2">
-						<p className="text-sm font-semibold leading-none text-text-normal">
+						<p
+							className="text-sm font-semibold leading-none text-text-normal"
+							onClick={(e) => {
+								if (onOpenDetail) {
+									e.stopPropagation();
+									onOpenDetail(task.id);
+								}
+							}}
+						>
 							<span className="font-mono text-text-accent">{task.id}</span>{" "}
-							<span className="ml-1">{task.title}</span>
+							<span
+								className={cn(
+									"ml-1",
+									onOpenDetail && "hover:underline",
+								)}
+							>
+								{task.title}
+							</span>
 						</p>
 						<StatusBadge status={task.status} />
 						<PriorityBadge priority={task.priority} />

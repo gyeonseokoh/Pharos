@@ -18,6 +18,9 @@ import {
 } from "./meetingPageMock";
 import { mockCalendarData } from "./calendarMock";
 import { VIEW_TYPE_PHAROS_CALENDAR } from "./CalendarItemView";
+import { VIEW_TYPE_PHAROS_TOPIC_PAGE } from "./TopicPageItemView";
+import { VIEW_TYPE_PHAROS_DASHBOARD } from "../../progress/ui/DashboardItemView";
+import { AiTopicModal } from "./AiTopicModal";
 
 export const VIEW_TYPE_PHAROS_MEETING_PAGE = "pharos-meeting-page-view";
 
@@ -100,13 +103,15 @@ export class MeetingPageItemView extends ItemView {
 		this.root.render(
 			<MeetingPageView
 				data={data}
-				onBack={() => void this.openCalendar()}
-				onGenerateTopics={() =>
-					new Notice("[미구현] AI 주제 생성 Modal이 열릴 예정")
-				}
+				onBackToCalendar={() => void this.openView(VIEW_TYPE_PHAROS_CALENDAR)}
+				onBackToHome={() => void this.openView(VIEW_TYPE_PHAROS_DASHBOARD)}
+				onGenerateTopics={() => new AiTopicModal(this.app).open()}
 				onEditMinutes={() =>
-					new Notice("[미구현] 회의록 편집 화면이 열릴 예정")
+					new Notice(
+						"[미구현] 회의록 편집은 Obsidian 네이티브 에디터로 열 예정",
+					)
 				}
+				onOpenTopic={(topicId) => void this.openTopic(topicId)}
 			/>,
 		);
 	}
@@ -124,15 +129,38 @@ export class MeetingPageItemView extends ItemView {
 		return { title: m.title, date: m.date, time: m.time, type: m.type };
 	}
 
-	private async openCalendar(): Promise<void> {
+	private async openView(viewType: string): Promise<void> {
 		const { workspace } = this.app;
-		const [existing] = workspace.getLeavesOfType(VIEW_TYPE_PHAROS_CALENDAR);
+		const [existing] = workspace.getLeavesOfType(viewType);
 		if (existing) {
 			workspace.revealLeaf(existing);
 			return;
 		}
 		const leaf = workspace.getLeaf("tab");
-		await leaf.setViewState({ type: VIEW_TYPE_PHAROS_CALENDAR, active: true });
+		await leaf.setViewState({ type: viewType, active: true });
+	}
+
+	private async openTopic(topicId: string): Promise<void> {
+		if (!this.meetingId) return;
+		const { workspace } = this.app;
+		const existing = workspace
+			.getLeavesOfType(VIEW_TYPE_PHAROS_TOPIC_PAGE)
+			.find((leaf) => {
+				const s = leaf.getViewState().state as
+					| { meetingId?: string; topicId?: string }
+					| undefined;
+				return s?.meetingId === this.meetingId && s?.topicId === topicId;
+			});
+		if (existing) {
+			workspace.revealLeaf(existing);
+			return;
+		}
+		const leaf = workspace.getLeaf("tab");
+		await leaf.setViewState({
+			type: VIEW_TYPE_PHAROS_TOPIC_PAGE,
+			state: { meetingId: this.meetingId, topicId },
+			active: true,
+		});
 	}
 }
 

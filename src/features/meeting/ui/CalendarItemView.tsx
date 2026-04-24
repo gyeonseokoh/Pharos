@@ -5,11 +5,13 @@
  * 미래: meetingService.listAll() 주입, 실제 회의 페이지(MD 파일)로 이동.
  */
 
-import { ItemView, WorkspaceLeaf, Notice } from "obsidian";
+import { ItemView, WorkspaceLeaf } from "obsidian";
 import { createRoot, type Root } from "react-dom/client";
 import { CalendarView } from "./CalendarView";
 import { mockCalendarData } from "./calendarMock";
 import { VIEW_TYPE_PHAROS_MEETING_PAGE } from "./MeetingPageItemView";
+import { VIEW_TYPE_PHAROS_DASHBOARD } from "../../progress/ui/DashboardItemView";
+import { AdhocMeetingModal } from "./AdhocMeetingModal";
 
 export const VIEW_TYPE_PHAROS_CALENDAR = "pharos-calendar-view";
 
@@ -42,8 +44,20 @@ export class CalendarItemView extends ItemView {
 				data={mockCalendarData}
 				onOpenMeeting={(id) => void this.handleOpenMeeting(id)}
 				onAddAdhocMeeting={(date) => this.handleAddAdhocMeeting(date)}
+				onBackToHome={() => void this.openView(VIEW_TYPE_PHAROS_DASHBOARD)}
 			/>,
 		);
+	}
+
+	private async openView(viewType: string): Promise<void> {
+		const { workspace } = this.app;
+		const [existing] = workspace.getLeavesOfType(viewType);
+		if (existing) {
+			workspace.revealLeaf(existing);
+			return;
+		}
+		const leaf = workspace.getLeaf("tab");
+		await leaf.setViewState({ type: viewType, active: true });
 	}
 
 	async onClose(): Promise<void> {
@@ -80,11 +94,6 @@ export class CalendarItemView extends ItemView {
 	}
 
 	private handleAddAdhocMeeting(date?: string): void {
-		// MVP: 실제 Modal 열리기 전까지 자리표시만
-		new Notice(
-			date
-				? `[미구현] ${date} 에 임시 회의 추가 Modal이 열릴 예정`
-				: "[미구현] 임시 회의 추가 Modal이 열릴 예정",
-		);
+		new AdhocMeetingModal(this.app, date).open();
 	}
 }

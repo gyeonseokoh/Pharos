@@ -1,20 +1,14 @@
-/**
- * MyTasksItemView — MyTasksView(개인 타임라인 + 체크리스트)를 Obsidian ItemView로 감싸는 어댑터.
- *
- * 오늘: mockMyTasksData 주입. 체크박스는 View 내부 state로 토글만 (저장 안 됨).
- * 미래: taskService.getMine() 결과 주입 + onToggleCheck 콜백으로 checklistService 호출.
- */
-
 import { ItemView, WorkspaceLeaf } from "obsidian";
 import { createRoot, type Root } from "react-dom/client";
-import { MyTasksView } from "./MyTasksView";
-import { mockMyTasksData } from "./myTasksMock";
-import { VIEW_TYPE_PHAROS_TASK_DETAIL } from "../../task/ui/TaskDetailItemView";
-import { VIEW_TYPE_PHAROS_DASHBOARD } from "./DashboardItemView";
+import { MinutesArchiveView } from "./MinutesArchiveView";
+import { mockMinutesArchiveData } from "./minutesArchiveMock";
+import { VIEW_TYPE_PHAROS_MEETING_PAGE } from "./MeetingPageItemView";
+import { VIEW_TYPE_PHAROS_MEETINGS_LIST } from "./MeetingsListItemView";
+import { VIEW_TYPE_PHAROS_DASHBOARD } from "../../progress/ui/DashboardItemView";
 
-export const VIEW_TYPE_PHAROS_MY_TASKS = "pharos-my-tasks-view";
+export const VIEW_TYPE_PHAROS_MINUTES_ARCHIVE = "pharos-minutes-archive-view";
 
-export class MyTasksItemView extends ItemView {
+export class MinutesArchiveItemView extends ItemView {
 	private root: Root | null = null;
 
 	constructor(leaf: WorkspaceLeaf) {
@@ -22,15 +16,15 @@ export class MyTasksItemView extends ItemView {
 	}
 
 	getViewType(): string {
-		return VIEW_TYPE_PHAROS_MY_TASKS;
+		return VIEW_TYPE_PHAROS_MINUTES_ARCHIVE;
 	}
 
 	getDisplayText(): string {
-		return "내 업무";
+		return "회의록 모음";
 	}
 
 	getIcon(): string {
-		return "list-checks";
+		return "library";
 	}
 
 	async onOpen(): Promise<void> {
@@ -39,12 +33,20 @@ export class MyTasksItemView extends ItemView {
 		container.addClass("pharos-root");
 		this.root = createRoot(container);
 		this.root.render(
-			<MyTasksView
-				data={mockMyTasksData}
-				onOpenTaskDetail={(taskId) => void this.openTaskDetail(taskId)}
+			<MinutesArchiveView
+				data={mockMinutesArchiveData}
+				onOpenMeeting={(id) => void this.openMeeting(id)}
+				onBackToMeetingsList={() =>
+					void this.openView(VIEW_TYPE_PHAROS_MEETINGS_LIST)
+				}
 				onBackToHome={() => void this.openView(VIEW_TYPE_PHAROS_DASHBOARD)}
 			/>,
 		);
+	}
+
+	async onClose(): Promise<void> {
+		this.root?.unmount();
+		this.root = null;
 	}
 
 	private async openView(viewType: string): Promise<void> {
@@ -58,15 +60,15 @@ export class MyTasksItemView extends ItemView {
 		await leaf.setViewState({ type: viewType, active: true });
 	}
 
-	private async openTaskDetail(taskId: string): Promise<void> {
+	private async openMeeting(meetingId: string): Promise<void> {
 		const { workspace } = this.app;
 		const existing = workspace
-			.getLeavesOfType(VIEW_TYPE_PHAROS_TASK_DETAIL)
+			.getLeavesOfType(VIEW_TYPE_PHAROS_MEETING_PAGE)
 			.find((leaf) => {
 				const s = leaf.getViewState().state as
-					| { taskId?: string }
+					| { meetingId?: string }
 					| undefined;
-				return s?.taskId === taskId;
+				return s?.meetingId === meetingId;
 			});
 		if (existing) {
 			workspace.revealLeaf(existing);
@@ -74,14 +76,9 @@ export class MyTasksItemView extends ItemView {
 		}
 		const leaf = workspace.getLeaf("tab");
 		await leaf.setViewState({
-			type: VIEW_TYPE_PHAROS_TASK_DETAIL,
-			state: { taskId },
+			type: VIEW_TYPE_PHAROS_MEETING_PAGE,
+			state: { meetingId },
 			active: true,
 		});
-	}
-
-	async onClose(): Promise<void> {
-		this.root?.unmount();
-		this.root = null;
 	}
 }

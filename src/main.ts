@@ -1,5 +1,10 @@
 import { Plugin } from "obsidian";
 import {
+	DEFAULT_SETTINGS,
+	PharosSettingsTab,
+	type PharosSettings,
+} from "./app/settings";
+import {
 	DashboardItemView,
 	VIEW_TYPE_PHAROS_DASHBOARD,
 } from "./features/progress/ui/DashboardItemView";
@@ -24,12 +29,32 @@ import {
 	VIEW_TYPE_PHAROS_MEETINGS_LIST,
 } from "./features/meeting/ui/MeetingsListItemView";
 import {
+	MinutesArchiveItemView,
+	VIEW_TYPE_PHAROS_MINUTES_ARCHIVE,
+} from "./features/meeting/ui/MinutesArchiveItemView";
+import {
+	TopicPageItemView,
+	VIEW_TYPE_PHAROS_TOPIC_PAGE,
+} from "./features/meeting/ui/TopicPageItemView";
+import {
+	TaskDetailItemView,
+	VIEW_TYPE_PHAROS_TASK_DETAIL,
+} from "./features/task/ui/TaskDetailItemView";
+import {
+	TeamListItemView,
+	VIEW_TYPE_PHAROS_TEAM_LIST,
+} from "./features/team/ui/TeamListItemView";
+import {
 	RoadmapItemView,
 	VIEW_TYPE_PHAROS_ROADMAP,
 } from "./features/roadmap/ui/RoadmapItemView";
 
 export default class PharosPlugin extends Plugin {
+	settings: PharosSettings = { ...DEFAULT_SETTINGS };
+
 	async onload(): Promise<void> {
+		await this.loadSettings();
+
 		// 뷰 타입 등록
 		this.registerView(
 			VIEW_TYPE_PHAROS_DASHBOARD,
@@ -58,6 +83,22 @@ export default class PharosPlugin extends Plugin {
 		this.registerView(
 			VIEW_TYPE_PHAROS_MEETINGS_LIST,
 			(leaf) => new MeetingsListItemView(leaf),
+		);
+		this.registerView(
+			VIEW_TYPE_PHAROS_TOPIC_PAGE,
+			(leaf) => new TopicPageItemView(leaf),
+		);
+		this.registerView(
+			VIEW_TYPE_PHAROS_MINUTES_ARCHIVE,
+			(leaf) => new MinutesArchiveItemView(leaf),
+		);
+		this.registerView(
+			VIEW_TYPE_PHAROS_TEAM_LIST,
+			(leaf) => new TeamListItemView(leaf),
+		);
+		this.registerView(
+			VIEW_TYPE_PHAROS_TASK_DETAIL,
+			(leaf) => new TaskDetailItemView(leaf),
 		);
 
 		// Ribbon 아이콘
@@ -96,10 +137,33 @@ export default class PharosPlugin extends Plugin {
 			name: "Open Meetings List",
 			callback: () => void this.activateView(VIEW_TYPE_PHAROS_MEETINGS_LIST),
 		});
+		this.addCommand({
+			id: "open-team-list",
+			name: "Open Team List",
+			callback: () => void this.activateView(VIEW_TYPE_PHAROS_TEAM_LIST),
+		});
+		this.addCommand({
+			id: "open-minutes-archive",
+			name: "Open Minutes Archive",
+			callback: () =>
+				void this.activateView(VIEW_TYPE_PHAROS_MINUTES_ARCHIVE),
+		});
+
+		// 설정 탭 등록
+		this.addSettingTab(new PharosSettingsTab(this.app, this));
 	}
 
 	async onunload(): Promise<void> {
 		// 플러그인 비활성 시 열린 탭 정리 (선택)
+	}
+
+	async loadSettings(): Promise<void> {
+		const stored = (await this.loadData()) as Partial<PharosSettings> | null;
+		this.settings = { ...DEFAULT_SETTINGS, ...(stored ?? {}) };
+	}
+
+	async saveSettings(): Promise<void> {
+		await this.saveData(this.settings);
 	}
 
 	/**

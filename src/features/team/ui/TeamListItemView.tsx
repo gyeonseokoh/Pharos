@@ -1,20 +1,13 @@
-/**
- * RoadmapItemView — RoadmapView(React 컴포넌트)를 Obsidian ItemView 탭으로 감싸는 어댑터.
- *
- * 이 어댑터가 "데이터 공급책" 역할도 함:
- *   - 오늘: `mockRoadmapData`를 props로 주입
- *   - 미래: `roadmapService.generate()` 결과를 주입 (RoadmapView 자체는 무변경)
- */
-
-import { ItemView, WorkspaceLeaf } from "obsidian";
+import { ItemView, Notice, WorkspaceLeaf } from "obsidian";
 import { createRoot, type Root } from "react-dom/client";
-import { RoadmapView } from "./RoadmapView";
-import { mockRoadmapData } from "./mock";
+import { TeamListView } from "./TeamListView";
+import { mockTeamListData } from "./teamListMock";
+import { InviteMemberModal } from "./InviteMemberModal";
 import { VIEW_TYPE_PHAROS_DASHBOARD } from "../../progress/ui/DashboardItemView";
 
-export const VIEW_TYPE_PHAROS_ROADMAP = "pharos-roadmap-view";
+export const VIEW_TYPE_PHAROS_TEAM_LIST = "pharos-team-list-view";
 
-export class RoadmapItemView extends ItemView {
+export class TeamListItemView extends ItemView {
 	private root: Root | null = null;
 
 	constructor(leaf: WorkspaceLeaf) {
@@ -22,15 +15,15 @@ export class RoadmapItemView extends ItemView {
 	}
 
 	getViewType(): string {
-		return VIEW_TYPE_PHAROS_ROADMAP;
+		return VIEW_TYPE_PHAROS_TEAM_LIST;
 	}
 
 	getDisplayText(): string {
-		return "Pharos Roadmap";
+		return "팀원 목록";
 	}
 
 	getIcon(): string {
-		return "calendar-range";
+		return "users";
 	}
 
 	async onOpen(): Promise<void> {
@@ -39,8 +32,15 @@ export class RoadmapItemView extends ItemView {
 		container.addClass("pharos-root");
 		this.root = createRoot(container);
 		this.root.render(
-			<RoadmapView
-				data={mockRoadmapData}
+			<TeamListView
+				data={mockTeamListData}
+				onInvite={() => new InviteMemberModal(this.app).open()}
+				onChangePermission={(id) =>
+					new Notice(`[미구현] ${id} 권한 변경 Modal 예정`)
+				}
+				onDeactivate={(id) =>
+					new Notice(`[미구현] ${id} 이탈 처리 확인 Modal 예정 (PO-14, v2)`)
+				}
 				onBackToHome={() => void this.openView(VIEW_TYPE_PHAROS_DASHBOARD)}
 			/>,
 		);

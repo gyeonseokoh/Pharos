@@ -47,6 +47,7 @@ export interface DashboardViewProps {
 	onOpenMeetings?: () => void;
 	onOpenMyTasks?: () => void;
 	onOpenProgress?: () => void;
+	onOpenTeam?: () => void;
 	onOpenSettings?: () => void;
 	onGenerateMeetingTopics?: () => void;
 }
@@ -58,6 +59,7 @@ export function DashboardView({
 	onOpenMeetings,
 	onOpenMyTasks,
 	onOpenProgress,
+	onOpenTeam,
 	onOpenSettings,
 	onGenerateMeetingTopics,
 }: DashboardViewProps) {
@@ -104,6 +106,7 @@ export function DashboardView({
 					onOpenMeetings={onOpenMeetings}
 					onOpenMyTasks={onOpenMyTasks}
 					onOpenProgress={onOpenProgress}
+					onOpenTeam={onOpenTeam}
 					onOpenSettings={onOpenSettings}
 					onGenerateMeetingTopics={onGenerateMeetingTopics}
 				/>
@@ -429,6 +432,7 @@ function QuickActions({
 	onOpenMeetings,
 	onOpenMyTasks,
 	onOpenProgress,
+	onOpenTeam,
 	onOpenSettings,
 	onGenerateMeetingTopics,
 }: {
@@ -437,6 +441,7 @@ function QuickActions({
 	onOpenMeetings?: () => void;
 	onOpenMyTasks?: () => void;
 	onOpenProgress?: () => void;
+	onOpenTeam?: () => void;
 	onOpenSettings?: () => void;
 	onGenerateMeetingTopics?: () => void;
 }) {
@@ -454,6 +459,9 @@ function QuickActions({
 			</Button>
 			<Button variant="secondary" onClick={onOpenProgress}>
 				📈 진행도 확인
+			</Button>
+			<Button variant="secondary" onClick={onOpenTeam}>
+				👥 팀원 보기
 			</Button>
 			<Button variant="outline" onClick={onGenerateMeetingTopics}>
 				🤖 AI 회의 주제 생성
