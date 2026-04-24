@@ -33,6 +33,16 @@ export interface TaskAssignee {
 	role: "PO" | "PM";
 }
 
+/**
+ * 이 Task가 추출된 출처 회의 링크.
+ * 회의록(PO-5) ↔ Task(PO-6) 역추적용 — PO-6 자동 생성 시 기록됨.
+ */
+export interface TaskSourceMeeting {
+	meetingId: string;
+	title: string;
+	date: string; // ISO date
+}
+
 export interface TaskDetailData {
 	/** TASK-XXX. */
 	id: string;
@@ -48,4 +58,6 @@ export interface TaskDetailData {
 	checklist: TaskChecklistItem[];
 	/** PM-4 커밋 검증 결과로 찾은 연결 커밋들. */
 	linkedCommits: TaskLinkedCommit[];
+	/** PO-6 생성 시 기록된 출처 회의록들. */
+	sourceMeetings?: TaskSourceMeeting[];
 }

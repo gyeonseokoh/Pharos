@@ -5,6 +5,8 @@ import { getTaskDetailMock } from "./taskDetailMock";
 import { ChecklistSplitModal } from "./ChecklistSplitModal";
 import { VIEW_TYPE_PHAROS_MY_TASKS } from "../../progress/ui/MyTasksItemView";
 import { VIEW_TYPE_PHAROS_DASHBOARD } from "../../progress/ui/DashboardItemView";
+import { VIEW_TYPE_PHAROS_MEETING_PAGE } from "../../meeting/ui/MeetingPageItemView";
+import type { PharosPluginLike } from "../../../app/settings";
 
 export const VIEW_TYPE_PHAROS_TASK_DETAIL = "pharos-task-detail-view";
 
@@ -16,7 +18,10 @@ export class TaskDetailItemView extends ItemView {
 	private root: Root | null = null;
 	private taskId: string | null = null;
 
-	constructor(leaf: WorkspaceLeaf) {
+	constructor(
+		leaf: WorkspaceLeaf,
+		private readonly plugin: PharosPluginLike,
+	) {
 		super(leaf);
 	}
 
@@ -85,6 +90,9 @@ export class TaskDetailItemView extends ItemView {
 				}
 				onBackToMyTasks={() => void this.openView(VIEW_TYPE_PHAROS_MY_TASKS)}
 				onBackToHome={() => void this.openView(VIEW_TYPE_PHAROS_DASHBOARD)}
+				onOpenSourceMeeting={(meetingId) =>
+					void this.openMeetingPage(meetingId)
+				}
 			/>,
 		);
 	}
@@ -98,6 +106,28 @@ export class TaskDetailItemView extends ItemView {
 		}
 		const leaf = workspace.getLeaf("tab");
 		await leaf.setViewState({ type: viewType, active: true });
+	}
+
+	private async openMeetingPage(meetingId: string): Promise<void> {
+		const { workspace } = this.app;
+		const existing = workspace
+			.getLeavesOfType(VIEW_TYPE_PHAROS_MEETING_PAGE)
+			.find((leaf) => {
+				const s = leaf.getViewState().state as
+					| { meetingId?: string }
+					| undefined;
+				return s?.meetingId === meetingId;
+			});
+		if (existing) {
+			workspace.revealLeaf(existing);
+			return;
+		}
+		const leaf = workspace.getLeaf("tab");
+		await leaf.setViewState({
+			type: VIEW_TYPE_PHAROS_MEETING_PAGE,
+			state: { meetingId },
+			active: true,
+		});
 	}
 }
 

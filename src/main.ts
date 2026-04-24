@@ -55,50 +55,51 @@ export default class PharosPlugin extends Plugin {
 	async onload(): Promise<void> {
 		await this.loadSettings();
 
-		// 뷰 타입 등록
+		// 뷰 타입 등록 — 모든 ItemView에 plugin 인스턴스 주입해서
+		// this.plugin.settings 읽고 saveSettings() 호출 가능하게 함.
 		this.registerView(
 			VIEW_TYPE_PHAROS_DASHBOARD,
-			(leaf) => new DashboardItemView(leaf),
+			(leaf) => new DashboardItemView(leaf, this),
 		);
 		this.registerView(
 			VIEW_TYPE_PHAROS_ROADMAP,
-			(leaf) => new RoadmapItemView(leaf),
+			(leaf) => new RoadmapItemView(leaf, this),
 		);
 		this.registerView(
 			VIEW_TYPE_PHAROS_PROGRESS,
-			(leaf) => new ProgressPageItemView(leaf),
+			(leaf) => new ProgressPageItemView(leaf, this),
 		);
 		this.registerView(
 			VIEW_TYPE_PHAROS_MY_TASKS,
-			(leaf) => new MyTasksItemView(leaf),
+			(leaf) => new MyTasksItemView(leaf, this),
 		);
 		this.registerView(
 			VIEW_TYPE_PHAROS_CALENDAR,
-			(leaf) => new CalendarItemView(leaf),
+			(leaf) => new CalendarItemView(leaf, this),
 		);
 		this.registerView(
 			VIEW_TYPE_PHAROS_MEETING_PAGE,
-			(leaf) => new MeetingPageItemView(leaf),
+			(leaf) => new MeetingPageItemView(leaf, this),
 		);
 		this.registerView(
 			VIEW_TYPE_PHAROS_MEETINGS_LIST,
-			(leaf) => new MeetingsListItemView(leaf),
+			(leaf) => new MeetingsListItemView(leaf, this),
 		);
 		this.registerView(
 			VIEW_TYPE_PHAROS_TOPIC_PAGE,
-			(leaf) => new TopicPageItemView(leaf),
+			(leaf) => new TopicPageItemView(leaf, this),
 		);
 		this.registerView(
 			VIEW_TYPE_PHAROS_MINUTES_ARCHIVE,
-			(leaf) => new MinutesArchiveItemView(leaf),
+			(leaf) => new MinutesArchiveItemView(leaf, this),
 		);
 		this.registerView(
 			VIEW_TYPE_PHAROS_TEAM_LIST,
-			(leaf) => new TeamListItemView(leaf),
+			(leaf) => new TeamListItemView(leaf, this),
 		);
 		this.registerView(
 			VIEW_TYPE_PHAROS_TASK_DETAIL,
-			(leaf) => new TaskDetailItemView(leaf),
+			(leaf) => new TaskDetailItemView(leaf, this),
 		);
 
 		// Ribbon 아이콘
@@ -144,9 +145,16 @@ export default class PharosPlugin extends Plugin {
 		});
 		this.addCommand({
 			id: "open-minutes-archive",
-			name: "Open Minutes Archive",
+			name: "Open Minutes Management",
 			callback: () =>
 				void this.activateView(VIEW_TYPE_PHAROS_MINUTES_ARCHIVE),
+		});
+
+		// 시연/테스트용 초기화 — projectReport·로드맵 플래그 전부 리셋
+		this.addCommand({
+			id: "reset-project",
+			name: "Pharos: Reset Project (test)",
+			callback: () => void this.resetProject(),
 		});
 
 		// 설정 탭 등록
@@ -164,6 +172,21 @@ export default class PharosPlugin extends Plugin {
 
 	async saveSettings(): Promise<void> {
 		await this.saveData(this.settings);
+		// 열려있는 모든 뷰가 상태 변화 감지해서 리렌더하도록 이벤트 발행
+		this.app.workspace.trigger("pharos:state-changed");
+	}
+
+	/**
+	 * 시연/테스트용. projectReport·로드맵 플래그를 초기 상태로 리셋.
+	 * 모든 뷰가 "프로젝트 없음" empty state로 돌아감.
+	 */
+	async resetProject(): Promise<void> {
+		this.settings.projectReport = null;
+		this.settings.planningRoadmapGenerated = false;
+		this.settings.developmentRoadmapGenerated = false;
+		this.settings.developmentRoadmap = null;
+		this.settings.attachedMinutes = {};
+		await this.saveSettings();
 	}
 
 	/**

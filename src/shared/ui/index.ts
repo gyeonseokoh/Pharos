@@ -16,3 +16,7 @@ export {
 	textareaClass,
 } from "./ModalLayout";
 export { BackNav, type BackNavItem, type BackNavProps } from "./BackNav";
+export {
+	ProjectRequiredEmpty,
+	type ProjectRequiredEmptyProps,
+} from "./ProjectRequiredEmpty";

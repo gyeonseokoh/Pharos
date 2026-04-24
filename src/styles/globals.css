@@ -17,3 +17,12 @@
 .pharos-root *::after {
 	box-sizing: border-box;
 }
+
+/* Pharos 모달은 ModalLayout에서 자체 헤더·취소 버튼을 렌더하므로
+   Obsidian 기본 타이틀/X 버튼은 숨긴다 (중복 방지). */
+.pharos-modal .modal-close-button {
+	display: none;
+}
+.pharos-modal .modal-title:empty {
+	display: none;
+}

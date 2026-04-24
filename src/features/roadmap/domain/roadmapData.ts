@@ -23,6 +23,11 @@ export interface RoadmapTask {
 	assignee?: string;
 	/** 선행 작업 ID. */
 	dependsOn?: string[];
+	/**
+	 * 이 Task가 추출된 출처 회의록 ID들 (PO-6 자동 생성 시 기록).
+	 * PO-5 회의록 → Task 역추적 가능하게.
+	 */
+	sourceMeetings?: string[];
 }
 
 /**

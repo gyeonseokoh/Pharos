@@ -96,6 +96,18 @@ export const mockTaskDetails: Record<string, TaskDetailData> = {
 				linesRemoved: 45,
 			},
 		],
+		sourceMeetings: [
+			{
+				meetingId: "mtg-0422-adhoc",
+				title: "UI/UX 초안 리뷰",
+				date: "2026-04-22",
+			},
+			{
+				meetingId: "mtg-0424-adhoc",
+				title: "UI/UX 레이아웃 중간 리뷰",
+				date: "2026-04-24",
+			},
+		],
 	},
 	"TASK-012": {
 		id: "TASK-012",
@@ -173,6 +185,13 @@ export const mockTaskDetails: Record<string, TaskDetailData> = {
 				filesChanged: 6,
 				linesAdded: 245,
 				linesRemoved: 0,
+			},
+		],
+		sourceMeetings: [
+			{
+				meetingId: "mtg-0420",
+				title: "주간 정기 회의",
+				date: "2026-04-20",
 			},
 		],
 	},

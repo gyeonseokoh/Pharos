@@ -58,43 +58,204 @@ const diffDays = (a: Date, b: Date): number =>
 // ───────────────────────── Component ─────────────────────────
 
 type Mode = "flow" | "gantt";
+type RoadmapKind = "planning" | "development";
 
 export interface RoadmapViewProps {
-	data: RoadmapData;
-	/** "AI 재생성" 버튼 클릭 핸들러. 미구현이면 버튼 숨김. */
+	/** 기획 로드맵 — 항상 전달됨 (이 View가 렌더되는 시점엔 PO-1 완료). */
+	planning: RoadmapData;
+	/** 개발 로드맵 — PO-6 미완료면 null. */
+	development: RoadmapData | null;
+	/** 개발 로드맵 미생성 시 개발 탭에서 "생성" 버튼 눌렀을 때. */
+	onGenerateDevelopment?: () => void;
+	/**
+	 * 테스트 전용 개발 로드맵 삭제 핸들러.
+	 * 제공되면 개발 탭 상단에 "🗑️ 로드맵 삭제" 배너가 표시됨.
+	 * 프로덕션(v2) 에서는 제공 X.
+	 */
+	onDeleteDevelopment?: () => void;
+	/** "AI 재생성" 버튼 클릭 핸들러. */
 	onRegenerate?: () => void;
 	onBackToHome?: () => void;
 }
 
 export function RoadmapView({
-	data,
+	planning,
+	development,
+	onGenerateDevelopment,
+	onDeleteDevelopment,
 	onRegenerate,
 	onBackToHome,
 }: RoadmapViewProps) {
+	// 개발 로드맵이 있으면 기본 선택을 개발, 없으면 기획
+	const [kind, setKind] = useState<RoadmapKind>(
+		development !== null ? "development" : "planning",
+	);
 	const [mode, setMode] = useState<Mode>("flow");
 
 	const navItems: BackNavItem[] = [];
 	if (onBackToHome)
 		navItems.push({ icon: "home", label: "홈으로", onClick: onBackToHome });
 
+	// 선택된 탭의 data
+	const activeData: RoadmapData | null =
+		kind === "planning" ? planning : development;
+
 	return (
 		<div className="pharos-root min-h-full w-full overflow-auto bg-bg-primary p-6">
 			<div className="mx-auto max-w-6xl space-y-6">
 				{navItems.length > 0 && <BackNav items={navItems} />}
 				<Header
-					project={data.project}
+					project={planning.project}
 					mode={mode}
 					onModeChange={setMode}
 					onRegenerate={onRegenerate}
 				/>
 
-				{mode === "flow" ? (
-					<FlowView project={data.project} phases={data.phases} />
+				<KindTabs
+					kind={kind}
+					onKindChange={setKind}
+					developmentUnlocked={development !== null}
+				/>
+
+				{kind === "development" &&
+					development !== null &&
+					onDeleteDevelopment && (
+						<DevRoadmapTestBanner onDelete={onDeleteDevelopment} />
+					)}
+
+				{activeData ? (
+					mode === "flow" ? (
+						<FlowView project={activeData.project} phases={activeData.phases} />
+					) : (
+						<GanttViewInline
+							project={activeData.project}
+							tasks={activeData.tasks}
+						/>
+					)
 				) : (
-					<GanttViewInline project={data.project} tasks={data.tasks} />
+					<DevelopmentLocked onGenerate={onGenerateDevelopment} />
 				)}
 			</div>
 		</div>
+	);
+}
+
+/**
+ * 개발 로드맵 탭 상단 "테스트 전용 · 로드맵 삭제" 배너.
+ * 시연용으로 생성된 개발 로드맵을 빠르게 제거해 🔒 상태로 돌아가게 함.
+ * 프로덕션(v2) 에서는 렌더되지 않음 (onDeleteDevelopment prop 없으면 숨김).
+ */
+function DevRoadmapTestBanner({ onDelete }: { onDelete: () => void }) {
+	const handleClick = () => {
+		const ok = window.confirm(
+			"개발 로드맵을 삭제하시겠습니까?\n\n" +
+				"• 생성된 로드맵 데이터가 사라지고 🔒 잠금 상태로 돌아갑니다.\n" +
+				"• 기획 로드맵은 영향을 받지 않습니다.\n" +
+				"• 시연·테스트 목적으로만 사용하세요.",
+		);
+		if (ok) onDelete();
+	};
+	return (
+		<div className="flex items-center justify-between rounded-md border border-dashed border-[color:var(--color-orange)]/50 bg-[color:var(--color-orange)]/5 px-3 py-2 text-xs">
+			<span className="text-text-muted">
+				🧪 <span className="font-semibold">테스트 전용</span> · 개발 로드맵을 리셋해 생성 화면으로 되돌립니다
+			</span>
+			<Button
+				variant="outline"
+				size="sm"
+				onClick={handleClick}
+				className="border-[color:var(--color-red)]/50 text-[color:var(--color-red)] hover:bg-[color:var(--color-red)]/10"
+			>
+				🗑️ 로드맵 삭제
+			</Button>
+		</div>
+	);
+}
+
+/** 기획 / 개발 탭 네비게이션. */
+function KindTabs({
+	kind,
+	onKindChange,
+	developmentUnlocked,
+}: {
+	kind: RoadmapKind;
+	onKindChange: (k: RoadmapKind) => void;
+	developmentUnlocked: boolean;
+}) {
+	return (
+		<div className="inline-flex rounded-md border border-bg-modifier bg-bg-secondary p-1">
+			<KindButton
+				active={kind === "planning"}
+				label="🎯 기획 로드맵"
+				onClick={() => onKindChange("planning")}
+			/>
+			<KindButton
+				active={kind === "development"}
+				label={developmentUnlocked ? "💻 개발 로드맵" : "🔒 개발 로드맵"}
+				onClick={() => onKindChange("development")}
+			/>
+		</div>
+	);
+}
+
+function KindButton({
+	active,
+	label,
+	onClick,
+	disabled,
+}: {
+	active: boolean;
+	label: string;
+	onClick: () => void;
+	disabled?: boolean;
+}) {
+	const handle = () => {
+		if (!disabled) onClick();
+	};
+	return (
+		<div
+			onClick={handle}
+			role="button"
+			tabIndex={disabled ? -1 : 0}
+			onKeyDown={(e) => {
+				if (!disabled && (e.key === "Enter" || e.key === " ")) {
+					e.preventDefault();
+					handle();
+				}
+			}}
+			className={cn(
+				"rounded px-4 py-1.5 text-xs font-medium transition-colors",
+				disabled
+					? "cursor-not-allowed text-text-faint"
+					: active
+						? "cursor-pointer bg-[color:var(--interactive-accent)] text-[color:var(--text-on-accent)]"
+						: "cursor-pointer text-text-muted hover:text-text-normal",
+			)}
+		>
+			{label}
+		</div>
+	);
+}
+
+/** 개발 탭 선택했는데 아직 생성 안 됐을 때 표시. */
+function DevelopmentLocked({ onGenerate }: { onGenerate?: () => void }) {
+	return (
+		<Card>
+			<CardContent className="flex flex-col items-center gap-3 py-12 text-center">
+				<p className="text-sm text-text-muted">
+					🔒 개발 로드맵이 아직 생성되지 않았습니다
+				</p>
+				<p className="max-w-md text-xs text-text-faint">
+					기획 주간이 마무리되면 "개발 단계로 전환" 버튼을 눌러 AI가 팀원
+					기술스택 기반으로 Task를 자동 할당하도록 할 수 있어요.
+				</p>
+				{onGenerate && (
+					<Button onClick={onGenerate} className="mt-2">
+						🔄 개발 단계로 전환하기
+					</Button>
+				)}
+			</CardContent>
+		</Card>
 	);
 }
 
@@ -514,7 +675,7 @@ function GanttChart({
 }: GanttChartProps) {
 	const chartWidth = totalDays * dayWidth;
 	const rowHeight = 36;
-	const labelWidth = 240;
+	const labelWidth = 320;
 
 	return (
 		<div className="relative overflow-x-auto">
@@ -625,12 +786,12 @@ function GanttRow({
 				) : (
 					<span className="h-2 w-2 rounded-full bg-bg-modifier" />
 				)}
-				<div className="flex-1 truncate">
-					<p className="truncate text-text-normal font-medium">{task.name}</p>
+				<div className="flex-1 min-w-0 truncate">
+					<span className="text-text-normal font-medium">{task.name}</span>
 					{task.assignee && (
-						<p className="truncate text-[10px] text-text-faint">
+						<span className="ml-2 text-[10px] font-normal text-text-faint">
 							@{task.assignee}
-						</p>
+						</span>
 					)}
 				</div>
 			</div>

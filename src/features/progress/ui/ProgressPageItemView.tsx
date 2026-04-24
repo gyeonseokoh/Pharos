@@ -8,16 +8,21 @@
 
 import { ItemView, WorkspaceLeaf } from "obsidian";
 import { createRoot, type Root } from "react-dom/client";
+import { ProjectRequiredEmpty } from "shared/ui";
 import { ProgressPageView } from "./ProgressPageView";
 import { mockProgressPageData } from "./progressPageMock";
 import { VIEW_TYPE_PHAROS_DASHBOARD } from "./DashboardItemView";
+import type { PharosPluginLike } from "../../../app/settings";
 
 export const VIEW_TYPE_PHAROS_PROGRESS = "pharos-progress-page-view";
 
 export class ProgressPageItemView extends ItemView {
 	private root: Root | null = null;
 
-	constructor(leaf: WorkspaceLeaf) {
+	constructor(
+		leaf: WorkspaceLeaf,
+		private readonly plugin: PharosPluginLike,
+	) {
 		super(leaf);
 	}
 
@@ -38,13 +43,32 @@ export class ProgressPageItemView extends ItemView {
 		container.empty();
 		container.addClass("pharos-root");
 		this.root = createRoot(container);
+		this.render();
+
+		this.registerEvent(
+			this.app.workspace.on("pharos:state-changed" as never, () =>
+				this.render(),
+			),
+		);
+	}
+
+	private render(): void {
+		if (!this.root) return;
+		if (!this.plugin.settings.projectReport) {
+			this.root.render(
+				<ProjectRequiredEmpty
+					viewName="팀 진행도"
+					onOpenDashboard={() =>
+						void this.openView(VIEW_TYPE_PHAROS_DASHBOARD)
+					}
+				/>,
+			);
+			return;
+		}
 		this.root.render(
 			<ProgressPageView
 				data={mockProgressPageData}
-				onRefresh={() => {
-					// MVP에서는 수동 새로고침 시 그냥 알림만.
-					// 미래: progressService.refresh() 후 데이터 재로드.
-				}}
+				onRefresh={() => {}}
 				onBackToHome={() => void this.openView(VIEW_TYPE_PHAROS_DASHBOARD)}
 			/>,
 		);

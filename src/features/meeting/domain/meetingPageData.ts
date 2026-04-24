@@ -57,12 +57,22 @@ export interface MeetingMinutes {
 	writtenAt: string;
 }
 
+/**
+ * 회의록 자동 분류 카테고리. 다중 분류 허용.
+ *   - "feature": UI/기능/요구사항/스펙 관련
+ *   - "progress": Task/진행상황/블로커/일정 관련
+ * 빈 배열 = 기타 (어느 분류에도 속하지 않음).
+ */
+export type MeetingCategory = "feature" | "progress";
+
 export interface MeetingAnalysis {
 	keywords: string[];
 	techStacks: string[];
 	decisions: string[];
 	/** AI가 생성한 한 문단 요약. */
 	summary: string;
+	/** 자동 분류 결과 (0~2개). */
+	categories: MeetingCategory[];
 	/** ISO datetime. */
 	analyzedAt: string;
 }

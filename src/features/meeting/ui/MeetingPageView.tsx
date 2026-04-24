@@ -41,8 +41,12 @@ import type {
 
 export interface MeetingPageViewProps {
 	data: MeetingPageData;
-	/** 캘린더로 돌아가기. */
+	/** 캘린더로 돌아가기 (source=calendar). */
 	onBackToCalendar?: () => void;
+	/** 회의 목록으로 돌아가기 (source=meetings-list). */
+	onBackToMeetingsList?: () => void;
+	/** 회의록 관리로 돌아가기 (source=minutes-archive). */
+	onBackToMinutesArchive?: () => void;
 	/** 홈(Dashboard)으로 돌아가기. */
 	onBackToHome?: () => void;
 	/** "AI 주제 생성" 버튼. */
@@ -56,12 +60,26 @@ export interface MeetingPageViewProps {
 export function MeetingPageView({
 	data,
 	onBackToCalendar,
+	onBackToMeetingsList,
+	onBackToMinutesArchive,
 	onBackToHome,
 	onGenerateTopics,
 	onEditMinutes,
 	onOpenTopic,
 }: MeetingPageViewProps) {
 	const navItems: BackNavItem[] = [];
+	if (onBackToMeetingsList)
+		navItems.push({
+			icon: "list",
+			label: "회의 목록으로",
+			onClick: onBackToMeetingsList,
+		});
+	if (onBackToMinutesArchive)
+		navItems.push({
+			icon: "list",
+			label: "회의록 관리로",
+			onClick: onBackToMinutesArchive,
+		});
 	if (onBackToCalendar)
 		navItems.push({
 			icon: "calendar",

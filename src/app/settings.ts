@@ -6,6 +6,34 @@
 
 import { App, PluginSettingTab, Setting } from "obsidian";
 import type { Plugin } from "obsidian";
+import type { RoadmapData } from "../features/roadmap/domain/roadmapData";
+import type {
+	MeetingAnalysis,
+	MeetingMinutes,
+} from "../features/meeting/domain/meetingPageData";
+
+/**
+ * PO-5 업로드로 저장된 회의록 + 분석 결과.
+ * key = meetingId (meetingPageMocks의 id). mock 회의에 덧씌워 렌더됨.
+ */
+export interface AttachedMinute {
+	minutes: MeetingMinutes;
+	analysis: MeetingAnalysis;
+}
+
+/**
+ * NewProjectModal이 제출한 프로젝트 보고서.
+ * 나중에 실제 AI가 생기면 이걸 입력으로 받아 로드맵·Task 등을 생성.
+ */
+export interface ProjectReport {
+	name: string;
+	description: string;
+	deadline: string; // ISO date
+	fixedMeetingMode: "auto" | "manual";
+	fixedMeetingDay?: number; // 0-6, manual일 때
+	fixedMeetingTime?: string; // HH:MM, manual일 때
+	createdAt: string; // ISO timestamp
+}
 
 export interface PharosSettings {
 	/** Vault 내 프로젝트 루트 경로. 기본 "Pharos". */
@@ -27,6 +55,25 @@ export interface PharosSettings {
 	weeklyReminderTime: string;
 	/** 서버 연결 (v2). 비어있으면 로컬 전용. */
 	hocuspocusServerUrl: string;
+
+	// ─── 프로젝트 상태 (시나리오 플로우) ───
+	/** NewProjectModal 제출 결과. null = 초기 빈 상태. */
+	projectReport: ProjectReport | null;
+	/** PO-1 기획 로드맵 생성 여부. 탭·mock 활성화 트리거. */
+	planningRoadmapGenerated: boolean;
+	/** PO-6 개발 로드맵 생성 여부. 개발 탭 활성화 + 기본 탭 전환. */
+	developmentRoadmapGenerated: boolean;
+	/**
+	 * PO-6 자동 생성 모달에서 승인된 개발 로드맵 데이터.
+	 * developmentRoadmapGenerated === true 일 때만 사용.
+	 * null이면 render 시 mock으로 fallback.
+	 */
+	developmentRoadmap: RoadmapData | null;
+	/**
+	 * PO-5 업로드된 회의록 + 분석 결과.
+	 * key = meetingId. mock 회의에 minutes가 없을 때 덧씌워 렌더.
+	 */
+	attachedMinutes: Record<string, AttachedMinute>;
 }
 
 export const DEFAULT_SETTINGS: PharosSettings = {
@@ -40,9 +87,18 @@ export const DEFAULT_SETTINGS: PharosSettings = {
 	weeklyReminderDay: 6, // 토요일
 	weeklyReminderTime: "09:00",
 	hocuspocusServerUrl: "",
+	projectReport: null,
+	planningRoadmapGenerated: false,
+	developmentRoadmapGenerated: false,
+	developmentRoadmap: null,
+	attachedMinutes: {},
 };
 
-interface PharosPluginLike extends Plugin {
+/**
+ * ItemView·Modal이 플러그인 인스턴스에 접근할 때 쓰는 최소 타입.
+ * main.ts의 PharosPlugin과 순환 참조 방지용.
+ */
+export interface PharosPluginLike extends Plugin {
 	settings: PharosSettings;
 	saveSettings(): Promise<void>;
 }

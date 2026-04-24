@@ -94,7 +94,10 @@ export function DashboardView({
 						<MemberActivityCard members={data.members} />
 					</div>
 					<div className="space-y-6">
-						<UpcomingMeetingsCard meetings={data.meetings} />
+						<UpcomingMeetingsCard
+							meetings={data.meetings}
+							onOpenMeetings={onOpenMeetings}
+						/>
 						<ImportantDatesCard dates={data.importantDates} />
 						<AlertsCard alerts={data.alerts} />
 					</div>
@@ -328,7 +331,13 @@ function MemberActivityCard({ members }: { members: MemberActivity[] }) {
 	);
 }
 
-function UpcomingMeetingsCard({ meetings }: { meetings: UpcomingMeeting[] }) {
+function UpcomingMeetingsCard({
+	meetings,
+	onOpenMeetings,
+}: {
+	meetings: UpcomingMeeting[];
+	onOpenMeetings?: () => void;
+}) {
 	return (
 		<Card>
 			<CardHeader>
@@ -349,7 +358,12 @@ function UpcomingMeetingsCard({ meetings }: { meetings: UpcomingMeeting[] }) {
 						<p className="flex-1 text-sm text-text-normal">{m.title}</p>
 					</div>
 				))}
-				<Button variant="ghost" size="sm" className="w-full">
+				<Button
+					variant="ghost"
+					size="sm"
+					className="w-full"
+					onClick={onOpenMeetings}
+				>
 					전체 일정 →
 				</Button>
 			</CardContent>

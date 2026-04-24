@@ -1,16 +1,21 @@
 import { ItemView, Notice, WorkspaceLeaf } from "obsidian";
 import { createRoot, type Root } from "react-dom/client";
+import { ProjectRequiredEmpty } from "shared/ui";
 import { TeamListView } from "./TeamListView";
 import { mockTeamListData } from "./teamListMock";
 import { InviteMemberModal } from "./InviteMemberModal";
 import { VIEW_TYPE_PHAROS_DASHBOARD } from "../../progress/ui/DashboardItemView";
+import type { PharosPluginLike } from "../../../app/settings";
 
 export const VIEW_TYPE_PHAROS_TEAM_LIST = "pharos-team-list-view";
 
 export class TeamListItemView extends ItemView {
 	private root: Root | null = null;
 
-	constructor(leaf: WorkspaceLeaf) {
+	constructor(
+		leaf: WorkspaceLeaf,
+		private readonly plugin: PharosPluginLike,
+	) {
 		super(leaf);
 	}
 
@@ -31,6 +36,28 @@ export class TeamListItemView extends ItemView {
 		container.empty();
 		container.addClass("pharos-root");
 		this.root = createRoot(container);
+		this.render();
+
+		this.registerEvent(
+			this.app.workspace.on("pharos:state-changed" as never, () =>
+				this.render(),
+			),
+		);
+	}
+
+	private render(): void {
+		if (!this.root) return;
+		if (!this.plugin.settings.projectReport) {
+			this.root.render(
+				<ProjectRequiredEmpty
+					viewName="팀원 목록"
+					onOpenDashboard={() =>
+						void this.openView(VIEW_TYPE_PHAROS_DASHBOARD)
+					}
+				/>,
+			);
+			return;
+		}
 		this.root.render(
 			<TeamListView
 				data={mockTeamListData}

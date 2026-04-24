@@ -10,6 +10,7 @@ import { TopicPageView } from "./TopicPageView";
 import { getTopicPageMock } from "./topicPageMock";
 import { VIEW_TYPE_PHAROS_MEETING_PAGE } from "./MeetingPageItemView";
 import { VIEW_TYPE_PHAROS_DASHBOARD } from "../../progress/ui/DashboardItemView";
+import type { PharosPluginLike } from "../../../app/settings";
 
 export const VIEW_TYPE_PHAROS_TOPIC_PAGE = "pharos-topic-page-view";
 
@@ -23,7 +24,10 @@ export class TopicPageItemView extends ItemView {
 	private meetingId: string | null = null;
 	private topicId: string | null = null;
 
-	constructor(leaf: WorkspaceLeaf) {
+	constructor(
+		leaf: WorkspaceLeaf,
+		private readonly plugin: PharosPluginLike,
+	) {
 		super(leaf);
 	}
 

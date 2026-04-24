@@ -6,6 +6,7 @@
 
 import { ItemView, WorkspaceLeaf } from "obsidian";
 import { createRoot, type Root } from "react-dom/client";
+import { ProjectRequiredEmpty } from "shared/ui";
 import { MeetingsListView } from "./MeetingsListView";
 import { mockMeetingsListData } from "./meetingsListMock";
 import { VIEW_TYPE_PHAROS_CALENDAR } from "./CalendarItemView";
@@ -13,13 +14,17 @@ import { VIEW_TYPE_PHAROS_MEETING_PAGE } from "./MeetingPageItemView";
 import { VIEW_TYPE_PHAROS_MINUTES_ARCHIVE } from "./MinutesArchiveItemView";
 import { VIEW_TYPE_PHAROS_DASHBOARD } from "../../progress/ui/DashboardItemView";
 import { AdhocMeetingModal } from "./AdhocMeetingModal";
+import type { PharosPluginLike } from "../../../app/settings";
 
 export const VIEW_TYPE_PHAROS_MEETINGS_LIST = "pharos-meetings-list-view";
 
 export class MeetingsListItemView extends ItemView {
 	private root: Root | null = null;
 
-	constructor(leaf: WorkspaceLeaf) {
+	constructor(
+		leaf: WorkspaceLeaf,
+		private readonly plugin: PharosPluginLike,
+	) {
 		super(leaf);
 	}
 
@@ -40,21 +45,45 @@ export class MeetingsListItemView extends ItemView {
 		container.empty();
 		container.addClass("pharos-root");
 		this.root = createRoot(container);
-		this.root.render(
-			<MeetingsListView
-				data={mockMeetingsListData}
-				onOpenMeeting={(id) => void this.openMeetingPage(id)}
-				onOpenCalendar={() => void this.openCalendar()}
-				onAddAdhocMeeting={() => new AdhocMeetingModal(this.app).open()}
-				onOpenMinutesArchive={() => void this.openView(VIEW_TYPE_PHAROS_MINUTES_ARCHIVE)}
-				onBackToHome={() => void this.openView(VIEW_TYPE_PHAROS_DASHBOARD)}
-			/>,
+		this.render();
+
+		this.registerEvent(
+			this.app.workspace.on("pharos:state-changed" as never, () =>
+				this.render(),
+			),
 		);
 	}
 
 	async onClose(): Promise<void> {
 		this.root?.unmount();
 		this.root = null;
+	}
+
+	private render(): void {
+		if (!this.root) return;
+		if (!this.plugin.settings.projectReport) {
+			this.root.render(
+				<ProjectRequiredEmpty
+					viewName="회의 목록"
+					onOpenDashboard={() =>
+						void this.openView(VIEW_TYPE_PHAROS_DASHBOARD)
+					}
+				/>,
+			);
+			return;
+		}
+		this.root.render(
+			<MeetingsListView
+				data={mockMeetingsListData}
+				onOpenMeeting={(id) => void this.openMeetingPage(id)}
+				onOpenCalendar={() => void this.openCalendar()}
+				onAddAdhocMeeting={() => new AdhocMeetingModal(this.app).open()}
+				onOpenMinutesArchive={() =>
+					void this.openView(VIEW_TYPE_PHAROS_MINUTES_ARCHIVE)
+				}
+				onBackToHome={() => void this.openView(VIEW_TYPE_PHAROS_DASHBOARD)}
+			/>,
+		);
 	}
 
 	private async openMeetingPage(meetingId: string): Promise<void> {
@@ -74,7 +103,7 @@ export class MeetingsListItemView extends ItemView {
 		const leaf = workspace.getLeaf("tab");
 		await leaf.setViewState({
 			type: VIEW_TYPE_PHAROS_MEETING_PAGE,
-			state: { meetingId },
+			state: { meetingId, source: "meetings-list" },
 			active: true,
 		});
 	}

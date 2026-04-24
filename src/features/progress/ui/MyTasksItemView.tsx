@@ -7,17 +7,22 @@
 
 import { ItemView, WorkspaceLeaf } from "obsidian";
 import { createRoot, type Root } from "react-dom/client";
+import { ProjectRequiredEmpty } from "shared/ui";
 import { MyTasksView } from "./MyTasksView";
 import { mockMyTasksData } from "./myTasksMock";
 import { VIEW_TYPE_PHAROS_TASK_DETAIL } from "../../task/ui/TaskDetailItemView";
 import { VIEW_TYPE_PHAROS_DASHBOARD } from "./DashboardItemView";
+import type { PharosPluginLike } from "../../../app/settings";
 
 export const VIEW_TYPE_PHAROS_MY_TASKS = "pharos-my-tasks-view";
 
 export class MyTasksItemView extends ItemView {
 	private root: Root | null = null;
 
-	constructor(leaf: WorkspaceLeaf) {
+	constructor(
+		leaf: WorkspaceLeaf,
+		private readonly plugin: PharosPluginLike,
+	) {
 		super(leaf);
 	}
 
@@ -38,6 +43,28 @@ export class MyTasksItemView extends ItemView {
 		container.empty();
 		container.addClass("pharos-root");
 		this.root = createRoot(container);
+		this.render();
+
+		this.registerEvent(
+			this.app.workspace.on("pharos:state-changed" as never, () =>
+				this.render(),
+			),
+		);
+	}
+
+	private render(): void {
+		if (!this.root) return;
+		if (!this.plugin.settings.projectReport) {
+			this.root.render(
+				<ProjectRequiredEmpty
+					viewName="내 업무"
+					onOpenDashboard={() =>
+						void this.openView(VIEW_TYPE_PHAROS_DASHBOARD)
+					}
+				/>,
+			);
+			return;
+		}
 		this.root.render(
 			<MyTasksView
 				data={mockMyTasksData}

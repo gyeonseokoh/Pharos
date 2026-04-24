@@ -7,18 +7,23 @@
 
 import { ItemView, WorkspaceLeaf } from "obsidian";
 import { createRoot, type Root } from "react-dom/client";
+import { ProjectRequiredEmpty } from "shared/ui";
 import { CalendarView } from "./CalendarView";
 import { mockCalendarData } from "./calendarMock";
 import { VIEW_TYPE_PHAROS_MEETING_PAGE } from "./MeetingPageItemView";
 import { VIEW_TYPE_PHAROS_DASHBOARD } from "../../progress/ui/DashboardItemView";
 import { AdhocMeetingModal } from "./AdhocMeetingModal";
+import type { PharosPluginLike } from "../../../app/settings";
 
 export const VIEW_TYPE_PHAROS_CALENDAR = "pharos-calendar-view";
 
 export class CalendarItemView extends ItemView {
 	private root: Root | null = null;
 
-	constructor(leaf: WorkspaceLeaf) {
+	constructor(
+		leaf: WorkspaceLeaf,
+		private readonly plugin: PharosPluginLike,
+	) {
 		super(leaf);
 	}
 
@@ -39,6 +44,28 @@ export class CalendarItemView extends ItemView {
 		container.empty();
 		container.addClass("pharos-root");
 		this.root = createRoot(container);
+		this.render();
+
+		this.registerEvent(
+			this.app.workspace.on("pharos:state-changed" as never, () =>
+				this.render(),
+			),
+		);
+	}
+
+	private render(): void {
+		if (!this.root) return;
+		if (!this.plugin.settings.projectReport) {
+			this.root.render(
+				<ProjectRequiredEmpty
+					viewName="캘린더"
+					onOpenDashboard={() =>
+						void this.openView(VIEW_TYPE_PHAROS_DASHBOARD)
+					}
+				/>,
+			);
+			return;
+		}
 		this.root.render(
 			<CalendarView
 				data={mockCalendarData}
@@ -88,7 +115,7 @@ export class CalendarItemView extends ItemView {
 		const leaf = workspace.getLeaf("tab");
 		await leaf.setViewState({
 			type: VIEW_TYPE_PHAROS_MEETING_PAGE,
-			state: { meetingId },
+			state: { meetingId, source: "calendar" },
 			active: true,
 		});
 	}

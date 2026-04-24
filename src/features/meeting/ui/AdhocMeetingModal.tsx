@@ -107,9 +107,17 @@ function Content({
 								className={cn(
 									"flex w-full cursor-pointer items-center justify-between rounded-md border p-3 text-left transition-colors",
 									selected
-										? "border-[color:var(--interactive-accent)] bg-[color:var(--interactive-accent)]/10"
+										? "border-[color:var(--interactive-accent)]"
 										: "border-bg-modifier bg-bg-secondary hover:bg-[color:var(--background-modifier-hover)]",
 								)}
+								style={
+									selected
+										? {
+												backgroundColor:
+													"color-mix(in srgb, var(--interactive-accent) 10%, transparent)",
+											}
+										: undefined
+								}
 							>
 								<div className="flex-1 min-w-0">
 									<p className="text-sm font-medium text-text-normal">

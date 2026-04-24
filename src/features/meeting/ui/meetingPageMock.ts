@@ -5,6 +5,7 @@
  * 미리 정의된 회의만 풀 데이터가 있고, 나머지는 fallback 생성됨.
  */
 
+import type { AttachedMinute } from "../../../app/settings";
 import type { MeetingPageData } from "../domain/meetingPageData";
 
 export const meetingPageMocks: Record<string, MeetingPageData> = {
@@ -157,6 +158,7 @@ export const meetingPageMocks: Record<string, MeetingPageData> = {
 			],
 			summary:
 				"UI/UX 레이아웃 주요 결정: Dashboard와 공개 진행도 2페이지 분리, Roadmap 흐름·간트 토글, 아바타 색상 규칙 확정. MVP 스코프 좁게 유지.",
+			categories: ["feature"],
 			analyzedAt: "2026-04-22T17:35:00+09:00",
 		},
 	},
@@ -262,10 +264,39 @@ export const meetingPageMocks: Record<string, MeetingPageData> = {
 			],
 			summary:
 				"아키텍처·서버 스택·MVP 범위·역할 분담 확정 회의. Feature-based + Yjs 기반 Hocuspocus 서버로 최종 결정.",
+			categories: ["feature", "progress"],
 			analyzedAt: "2026-04-20T15:20:00+09:00",
 		},
 	},
 };
+
+/**
+ * mock 회의의 minutes가 없을 때 settings.attachedMinutes로 덮어써 반환.
+ * mock minutes가 이미 있으면 그대로 반환 (덮어쓰기 방지).
+ */
+export function applyAttachedMinutes(
+	data: MeetingPageData,
+	attachedMinutes: Record<string, AttachedMinute>,
+): MeetingPageData {
+	if (data.minutes !== null) return data;
+	const attached = attachedMinutes[data.id];
+	if (!attached) return data;
+	return {
+		...data,
+		minutes: attached.minutes,
+		analysis: attached.analysis,
+		status: "completed",
+	};
+}
+
+/** 회의록이 아직 없는 mock 회의 목록 (업로드 드롭다운용). */
+export function listMeetingsWithoutMinutes(
+	attachedMinutes: Record<string, AttachedMinute>,
+): MeetingPageData[] {
+	return Object.values(meetingPageMocks).filter(
+		(m) => m.minutes === null && !attachedMinutes[m.id],
+	);
+}
 
 /**
  * meetingId 로 MeetingPageData 조회. 없으면 최소 정보로 placeholder 생성.

@@ -5,6 +5,7 @@
  * 실제 데이터가 들어오면 이 파일은 삭제하거나 테스트용으로만 쓴다.
  */
 
+import type { ProjectReport } from "../../../app/settings";
 import type { RoadmapData } from "../domain/roadmapData";
 
 export const mockRoadmapData: RoadmapData = {
@@ -183,3 +184,48 @@ export const mockRoadmapData: RoadmapData = {
 		},
 	],
 };
+
+// ───────────────────────── Split Helpers ─────────────────────────
+
+/**
+ * 기획 로드맵 — 프로젝트 오버뷰용으로 5 phase 전체 표시.
+ *
+ * 사용자 요청 (2026-04): 기획 주간에도 전체 프로젝트 흐름(기획→개발→배포)을
+ * 한눈에 파악할 수 있어야 해서, pre-B 로드맵 뷰와 동일하게 5 phase 전부 반환.
+ * 개발 로드맵 탭은 기획 phase 제외한 4개만 별도로 보여줌.
+ *
+ * 나중에 llmClient.generatePlanningRoadmap(report) 호출로 교체될 자리.
+ */
+export function getPlanningRoadmap(report: ProjectReport): RoadmapData {
+	return {
+		project: overlayProject(report),
+		phases: mockRoadmapData.phases,
+		tasks: mockRoadmapData.tasks,
+	};
+}
+
+/**
+ * 개발 로드맵 — `phase-plan` 제외한 나머지 phase + 그 기간의 task들.
+ *
+ * PO-6 "개발 단계로 전환" 버튼이 호출.
+ */
+export function getDevelopmentRoadmap(report: ProjectReport): RoadmapData {
+	const phases = mockRoadmapData.phases.filter((p) => p.id !== "phase-plan");
+	const planPhase = mockRoadmapData.phases.find((p) => p.id === "phase-plan");
+	const planEnd = planPhase?.end ?? "";
+	const tasks = mockRoadmapData.tasks.filter((t) => t.end > planEnd);
+	return {
+		project: overlayProject(report),
+		phases,
+		tasks,
+	};
+}
+
+/** projectReport 기반으로 프로젝트명·마감을 덮어쓴 project 정보. */
+function overlayProject(report: ProjectReport): RoadmapData["project"] {
+	return {
+		name: report.name,
+		start: mockRoadmapData.project.start,
+		end: report.deadline,
+	};
+}

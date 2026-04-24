@@ -4,6 +4,7 @@
  */
 
 import type { MeetingType } from "./calendarData";
+import type { MeetingCategory } from "./meetingPageData";
 
 export interface MinutesArchiveItem {
 	meetingId: string;
@@ -21,6 +22,8 @@ export interface MinutesArchiveItem {
 	aiSummary: string | null;
 	/** 회의록 글자 수. */
 	length: number;
+	/** 자동 분류 결과 (다중 분류 허용). 빈 배열이면 "기타". */
+	categories: MeetingCategory[];
 }
 
 export interface MinutesArchiveData {

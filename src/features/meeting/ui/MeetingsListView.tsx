@@ -156,7 +156,7 @@ function Header({
 						className="inline-flex items-center gap-1 rounded-md border border-bg-modifier px-2.5 py-1 text-text-muted transition-colors hover:bg-[color:var(--background-modifier-hover)] hover:text-text-normal"
 					>
 						<FileText className="h-3 w-3" />
-						회의록 모음
+						회의록 관리
 					</button>
 				)}
 			</div>

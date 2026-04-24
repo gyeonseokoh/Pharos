@@ -12,6 +12,7 @@ import {
 	textareaClass,
 } from "shared/ui";
 import { cn } from "shared/ui/utils";
+import type { PharosPluginLike, ProjectReport } from "../../../app/settings";
 
 interface FormState {
 	topic: string;
@@ -41,7 +42,6 @@ function NewProjectModalContent({ onClose, onSubmit }: NewProjectModalProps) {
 
 	const handleSubmit = () => {
 		onSubmit?.(form);
-		new Notice(`[미구현] 프로젝트 "${form.topic}" 생성 예정`);
 		onClose();
 	};
 
@@ -167,19 +167,41 @@ function ToggleButton({
 }
 
 export class NewProjectModal extends BaseReactModal {
-	private readonly onSubmitCb?: (data: FormState) => void;
-
-	constructor(app: App, onSubmit?: (data: FormState) => void) {
+	constructor(
+		app: App,
+		private readonly plugin: PharosPluginLike,
+	) {
 		super(app);
-		this.onSubmitCb = onSubmit;
 	}
 
 	renderContent() {
 		return (
 			<NewProjectModalContent
 				onClose={() => this.close()}
-				onSubmit={this.onSubmitCb}
+				onSubmit={(data) => void this.handleSubmit(data)}
 			/>
 		);
+	}
+
+	private async handleSubmit(data: FormState): Promise<void> {
+		const report: ProjectReport = {
+			name: data.topic,
+			description: data.description,
+			deadline: data.deadline,
+			fixedMeetingMode: data.fixedMeetingToggle ? "auto" : "manual",
+			fixedMeetingDay: data.fixedMeetingToggle
+				? undefined
+				: data.fixedMeetingDay,
+			fixedMeetingTime: data.fixedMeetingToggle
+				? undefined
+				: data.fixedMeetingTime,
+			createdAt: new Date().toISOString(),
+		};
+		this.plugin.settings.projectReport = report;
+		this.plugin.settings.planningRoadmapGenerated = false;
+		this.plugin.settings.developmentRoadmapGenerated = false;
+		await this.plugin.saveSettings();
+		// saveSettings가 pharos:state-changed 발행 → 열린 뷰들 자동 리렌더
+		new Notice(`프로젝트 "${report.name}" 생성 완료`);
 	}
 }

@@ -6,7 +6,9 @@
 import { useMemo, useState } from "react";
 import {
 	CheckCircle2,
+	ChevronRight,
 	Circle,
+	FileText,
 	GitCommit,
 	Link2,
 	Sparkles,
@@ -17,6 +19,7 @@ import { Button } from "shared/ui/Button";
 import {
 	Card,
 	CardContent,
+	CardDescription,
 	CardHeader,
 	CardTitle,
 } from "shared/ui/Card";
@@ -27,6 +30,7 @@ import type {
 	TaskDetailData,
 	TaskLinkedCommit,
 	TaskPriority,
+	TaskSourceMeeting,
 	TaskStatus,
 } from "../domain/taskDetailData";
 
@@ -36,6 +40,8 @@ export interface TaskDetailViewProps {
 	onBackToHome?: () => void;
 	onGenerateChecklist?: () => void;
 	onToggleCheck?: (itemId: string, next: boolean) => void;
+	/** 출처 회의 섹션에서 회의 카드 클릭 시. PO-5 회의 페이지 열기. */
+	onOpenSourceMeeting?: (meetingId: string) => void;
 }
 
 export function TaskDetailView({
@@ -44,6 +50,7 @@ export function TaskDetailView({
 	onBackToHome,
 	onGenerateChecklist,
 	onToggleCheck,
+	onOpenSourceMeeting,
 }: TaskDetailViewProps) {
 	const [localChecks, setLocalChecks] = useState<Map<string, boolean>>(
 		() => new Map(data.checklist.map((c) => [c.id, c.checked])),
@@ -106,9 +113,68 @@ export function TaskDetailView({
 
 				<CommitsCard commits={data.linkedCommits} />
 
+				{data.sourceMeetings && data.sourceMeetings.length > 0 && (
+					<SourceMeetingsCard
+						meetings={data.sourceMeetings}
+						onOpenSourceMeeting={onOpenSourceMeeting}
+					/>
+				)}
+
 				{data.dependsOn.length > 0 && <DependenciesCard deps={data.dependsOn} />}
 			</div>
 		</div>
+	);
+}
+
+// ───────────────────────── Source Meetings ─────────────────────────
+
+function SourceMeetingsCard({
+	meetings,
+	onOpenSourceMeeting,
+}: {
+	meetings: TaskSourceMeeting[];
+	onOpenSourceMeeting?: (meetingId: string) => void;
+}) {
+	return (
+		<Card>
+			<CardHeader>
+				<CardTitle>📄 출처 회의</CardTitle>
+				<CardDescription>
+					이 Task가 추출된 회의록 — 배경·맥락을 확인하려면 클릭
+				</CardDescription>
+			</CardHeader>
+			<CardContent>
+				<ul className="space-y-1.5">
+					{meetings.map((m) => (
+						<li key={m.meetingId}>
+							<div
+								onClick={() => onOpenSourceMeeting?.(m.meetingId)}
+								role="button"
+								tabIndex={0}
+								onKeyDown={(e) => {
+									if (e.key === "Enter" || e.key === " ") {
+										e.preventDefault();
+										onOpenSourceMeeting?.(m.meetingId);
+									}
+								}}
+								className="group flex cursor-pointer items-center gap-3 rounded-md border border-bg-modifier bg-bg-secondary p-3 transition-colors hover:border-[color:var(--interactive-accent)]/50 hover:bg-[color:var(--background-modifier-hover)]"
+							>
+								<FileText className="h-4 w-4 shrink-0 text-[color:var(--interactive-accent)]" />
+								<div className="flex-1 min-w-0">
+									<p className="truncate text-sm font-medium text-text-normal">
+										{m.title}
+									</p>
+									<p className="mt-0.5 text-[11px] text-text-faint">
+										{m.date}
+									</p>
+								</div>
+								<ChevronRight className="h-4 w-4 shrink-0 text-text-faint transition-transform group-hover:translate-x-0.5 group-hover:text-text-muted" />
+							</div>
+						</li>
+					))}
+				</ul>
+			</CardContent>
+		</Card>
 	);
 }
 
