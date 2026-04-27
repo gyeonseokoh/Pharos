@@ -1,36 +1,39 @@
-import {App, PluginSettingTab, Setting} from "obsidian";
-import MyPlugin from "./main";
+import { App, PluginSettingTab, Setting } from "obsidian"
+import type PharosPlugin from "main"
 
-export interface MyPluginSettings {
-	mySetting: string;
+
+export interface PharosSettings {
+	serverUrl: string
 }
 
-export const DEFAULT_SETTINGS: MyPluginSettings = {
-	mySetting: 'default'
+export const DEFAULT_SETTINGS: PharosSettings = {
+	serverUrl: 'ws://localhost:1234'
 }
 
-export class SampleSettingTab extends PluginSettingTab {
-	plugin: MyPlugin;
+export class PharosSettingTab extends PluginSettingTab {
+	plugin: PharosPlugin
 
-	constructor(app: App, plugin: MyPlugin) {
-		super(app, plugin);
-		this.plugin = plugin;
+	constructor(app: App, plugin: PharosPlugin) {
+		super(app, plugin)
+		this.plugin = plugin
 	}
 
 	display(): void {
-		const {containerEl} = this;
-
-		containerEl.empty();
+		const { containerEl } = this
+		containerEl.empty()
+		containerEl.createEl('h2', { text: 'Pharos 설정' })
 
 		new Setting(containerEl)
-			.setName('Settings #1')
-			.setDesc('It\'s a secret')
-			.addText(text => text
-				.setPlaceholder('Enter your secret')
-				.setValue(this.plugin.settings.mySetting)
-				.onChange(async (value) => {
-					this.plugin.settings.mySetting = value;
-					await this.plugin.saveSettings();
-				}));
+			.setName("서버 URL")
+			.setDesc('Pharos 백엔드 서버 주소 (ex. ws://localhost:1234')
+			.addText((text) => 
+				text
+					.setPlaceholder('ws:localhost:1234')
+					.setValue(this.plugin.settings.serverUrl)
+					.onChange(async (value) => {
+						this.plugin.settings.serverUrl = value
+						await this.plugin.saveSettings()
+					})
+			)
 	}
 }
