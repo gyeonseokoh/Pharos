@@ -2,15 +2,14 @@ import { HocuspocusProvider } from "@hocuspocus/provider"
 import { ConnectionManager } from "core/sync/ConnectionManager"
 import { PharosSettingTab, DEFAULT_SETTINGS } from "./settings"
 import type { PharosSettings } from "./settings"
-import { Plugin } from "obsidian"
+import { Plugin, MarkdownView } from "obsidian"
 import * as Y from 'yjs'
+import { DocumentSync } from "core/sync/DocumentSync"
 
 export default class PharosPlugin extends Plugin {
 	settings!: PharosSettings
 	connectionManager!: ConnectionManager
-
-	// 검증용 임시
-	private _testProvider: HocuspocusProvider | null = null
+	private docSyncs = new Map<string, DocumentSync>()
 
 	async onload(): Promise<void> {
 		await this.loadSettings()
@@ -18,20 +17,35 @@ export default class PharosPlugin extends Plugin {
 		this.connectionManager = new ConnectionManager()
 		this.connectionManager.setServerUrl(this.settings.serverUrl)
 
-		// 검증용 임시 provider
-		// DocumentSync.open()으로 교체되면 제거
-		this._testProvider = this.connectionManager.acquire({
-			documentName: `${this.app.vault.getName()}-test`,
-			doc: new Y.Doc(),
-		})
+		// file-open 이벤트 발생 시 해당 마크다운 파일을 동기화하도록 지시
+		this.registerEvent(
+			this.app.workspace.on('file-open', (file) => {
+				if (!file || file.extension !== 'md') return
 
-		this._testProvider.on('connect', () => console.log('[Pharos] test provider connected'))
-		this._testProvider.on('synced',  () => console.log('[Pharos] test provider synced'))
+				const view = this.app.workspace.getActiveViewOfType(MarkdownView)
+				if (!view) return
+
+				// documentName: workspace 내에서 같은 파일 경로 -> 동기화 대상
+				const docName = `${this.settings.workspaceId}::${file.path}`
+
+				if (!this.docSyncs.has(docName)) {
+					const sync = new DocumentSync(docName, this.connectionManager)
+					this.docSyncs.set(docName, sync)
+				}
+
+				this.docSyncs.get(docName)!.bindEditor(view)
+			})
+		)
+
 
 		this.addSettingTab(new PharosSettingTab(this.app, this))
 	}
 
 	onunload(): void {
+		for(const sync of this.docSyncs.values())
+			sync.destroy()
+
+		this.docSyncs.clear()
 		this.connectionManager.destroyAll()
 	}
 

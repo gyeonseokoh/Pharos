@@ -3,11 +3,13 @@ import type PharosPlugin from "main"
 
 
 export interface PharosSettings {
-	serverUrl: string
+	serverUrl: string,
+	workspaceId: string
 }
 
 export const DEFAULT_SETTINGS: PharosSettings = {
-	serverUrl: 'ws://localhost:1234'
+	serverUrl: 'ws://localhost:1234',
+	workspaceId: ''
 }
 
 export class PharosSettingTab extends PluginSettingTab {
@@ -32,6 +34,19 @@ export class PharosSettingTab extends PluginSettingTab {
 					.setValue(this.plugin.settings.serverUrl)
 					.onChange(async (value) => {
 						this.plugin.settings.serverUrl = value
+						await this.plugin.saveSettings()
+					})
+			)
+
+		new Setting(containerEl)
+			.setName('워크스페이스 ID')
+			.setDesc('팀원 전원이 동일한 값을 입력해야 합니다. (예: pharos-team-01)')
+			.addText((text) =>
+				text
+					.setPlaceholder('pharos-team-01')
+					.setValue(this.plugin.settings.workspaceId)
+					.onChange(async (value) => {
+						this.plugin.settings.workspaceId = value
 						await this.plugin.saveSettings()
 					})
 			)
