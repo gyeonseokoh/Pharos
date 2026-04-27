@@ -5,17 +5,25 @@ import type { PharosSettings } from "./settings"
 import { Plugin, MarkdownView } from "obsidian"
 import * as Y from 'yjs'
 import { DocumentSync } from "core/sync/DocumentSync"
+import { StatusBar } from './ui/StatusBar'
 
 export default class PharosPlugin extends Plugin {
 	settings!: PharosSettings
 	connectionManager!: ConnectionManager
 	private docSyncs = new Map<string, DocumentSync>()
+	private statusBarEl!: StatusBar
 
 	async onload(): Promise<void> {
 		await this.loadSettings()
 
 		this.connectionManager = new ConnectionManager()
 		this.connectionManager.setServerUrl(this.settings.serverUrl)
+		
+		// StatusBar 초기화
+		this.statusBarEl = new StatusBar(this.addStatusBarItem())
+		this.connectionManager.onStatusChange((status) => {
+			this.statusBarEl.setStatus(status)
+		})
 
 		// file-open 이벤트 발생 시 해당 마크다운 파일을 동기화하도록 지시
 		this.registerEvent(
