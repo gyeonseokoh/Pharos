@@ -1,6 +1,5 @@
 {
 	"compilerOptions": {
-		"baseUrl": "src",
 		"inlineSourceMap": true,
 		"inlineSources": true,
 		"module": "ESNext",
@@ -9,7 +8,7 @@
 		"noImplicitAny": true,
 		"noImplicitThis": true,
 		"noImplicitReturns": true,
-		"moduleResolution": "node",
+		"moduleResolution": "bundler",
 		"importHelpers": true,
 		"noUncheckedIndexedAccess": true,
 		"isolatedModules": true,
@@ -22,9 +21,12 @@
 			"ES5",
 			"ES6",
 			"ES7"
+		],
+		"paths": {
+			"core/*": ["./src/core/*"]
+		}
+		},
+		"include": [
+			"src/**/*.ts"
 		]
-	},
-	"include": [
-		"src/**/*.ts"
-	]
 }
