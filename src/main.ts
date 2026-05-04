@@ -45,7 +45,6 @@ export default class PharosPlugin extends Plugin {
 			})
 		)
 
-
 		this.addSettingTab(new PharosSettingTab(this.app, this))
 	}
 
