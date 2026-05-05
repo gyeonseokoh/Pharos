@@ -97,10 +97,18 @@ export const DEFAULT_SETTINGS: PharosSettings = {
 /**
  * ItemView·Modal이 플러그인 인스턴스에 접근할 때 쓰는 최소 타입.
  * main.ts의 PharosPlugin과 순환 참조 방지용.
+ *
+ * Service·Repository 는 unknown 으로 노출 — 실제 타입은 main.ts에서 주입.
+ * 사용처에서 타입 단언으로 캐스팅 (예: `plugin.projectService as ProjectService`).
+ * 점진적으로 모든 feature에 Service 추가될 때 같이 업데이트.
  */
 export interface PharosPluginLike extends Plugin {
 	settings: PharosSettings;
 	saveSettings(): Promise<void>;
+	/** ProjectService — features/project/services/projectService.ts */
+	projectService: import("../features/project/services/projectService").ProjectService;
+	/** MeetingsService — features/meeting/services/meetingsService.ts */
+	meetingsService: import("../features/meeting/services/meetingsService").MeetingsService;
 }
 
 export class PharosSettingsTab extends PluginSettingTab {

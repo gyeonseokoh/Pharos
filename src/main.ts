@@ -48,12 +48,32 @@ import {
 	RoadmapItemView,
 	VIEW_TYPE_PHAROS_ROADMAP,
 } from "./features/roadmap/ui/RoadmapItemView";
+import { SettingsProjectRepository } from "./features/project/repositories/projectRepository.settings";
+import { ProjectService } from "./features/project/services/projectService";
+import type { ProjectRepository } from "./features/project/repositories/projectRepository";
+import { SettingsMeetingRepository } from "./features/meeting/repositories/meetingRepository.settings";
+import { MeetingsService } from "./features/meeting/services/meetingsService";
+import type { MeetingRepository } from "./features/meeting/repositories/meetingRepository";
 
 export default class PharosPlugin extends Plugin {
 	settings: PharosSettings = { ...DEFAULT_SETTINGS };
 
+	// ─── Repositories ───
+	projectRepository!: ProjectRepository;
+	meetingRepository!: MeetingRepository;
+
+	// ─── Services ───
+	projectService!: ProjectService;
+	meetingsService!: MeetingsService;
+
 	async onload(): Promise<void> {
 		await this.loadSettings();
+
+		// Repository·Service 레이어 초기화 (UI 등록 전)
+		this.projectRepository = new SettingsProjectRepository(this);
+		this.projectService = new ProjectService(this.projectRepository);
+		this.meetingRepository = new SettingsMeetingRepository(this);
+		this.meetingsService = new MeetingsService(this.meetingRepository);
 
 		// 뷰 타입 등록 — 모든 ItemView에 plugin 인스턴스 주입해서
 		// this.plugin.settings 읽고 saveSettings() 호출 가능하게 함.

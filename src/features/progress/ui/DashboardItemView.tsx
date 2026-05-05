@@ -86,7 +86,10 @@ export class DashboardItemView extends ItemView {
 			this.root.render(
 				<EmptyDashboardView
 					onCreateProject={() =>
-						new NewProjectModal(this.app, this.plugin).open()
+						new NewProjectModal(
+							this.app,
+							this.plugin.projectService,
+						).open()
 					}
 				/>,
 			);

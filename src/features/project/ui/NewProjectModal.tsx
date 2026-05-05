@@ -12,7 +12,7 @@ import {
 	textareaClass,
 } from "shared/ui";
 import { cn } from "shared/ui/utils";
-import type { PharosPluginLike, ProjectReport } from "../../../app/settings";
+import type { ProjectService } from "../services/projectService";
 
 interface FormState {
 	topic: string;
@@ -169,7 +169,7 @@ function ToggleButton({
 export class NewProjectModal extends BaseReactModal {
 	constructor(
 		app: App,
-		private readonly plugin: PharosPluginLike,
+		private readonly projectService: ProjectService,
 	) {
 		super(app);
 	}
@@ -184,7 +184,7 @@ export class NewProjectModal extends BaseReactModal {
 	}
 
 	private async handleSubmit(data: FormState): Promise<void> {
-		const report: ProjectReport = {
+		const project = await this.projectService.create({
 			name: data.topic,
 			description: data.description,
 			deadline: data.deadline,
@@ -195,13 +195,7 @@ export class NewProjectModal extends BaseReactModal {
 			fixedMeetingTime: data.fixedMeetingToggle
 				? undefined
 				: data.fixedMeetingTime,
-			createdAt: new Date().toISOString(),
-		};
-		this.plugin.settings.projectReport = report;
-		this.plugin.settings.planningRoadmapGenerated = false;
-		this.plugin.settings.developmentRoadmapGenerated = false;
-		await this.plugin.saveSettings();
-		// saveSettings가 pharos:state-changed 발행 → 열린 뷰들 자동 리렌더
-		new Notice(`프로젝트 "${report.name}" 생성 완료`);
+		});
+		new Notice(`프로젝트 "${project.name}" 생성 완료`);
 	}
 }
