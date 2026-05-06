@@ -7,10 +7,15 @@
 import { App, PluginSettingTab, Setting } from "obsidian";
 import type { Plugin } from "obsidian";
 import type { RoadmapData } from "../features/roadmap/domain/roadmapData";
+import type { Roadmap } from "../features/roadmap/domain/roadmapSchema";
+import type { Task, ChecklistItem } from "../features/task/domain/taskSchema";
+import type { Member, Invite } from "../features/team/domain/teamSchema";
 import type {
 	MeetingAnalysis,
 	MeetingMinutes,
 } from "../features/meeting/domain/meetingPageData";
+import type { Availability } from "../features/availability/domain/availabilitySchema";
+import type { CommitBatch } from "../features/commit/domain/commitSchema";
 
 /**
  * PO-5 업로드로 저장된 회의록 + 분석 결과.
@@ -67,6 +72,7 @@ export interface PharosSettings {
 	 * PO-6 자동 생성 모달에서 승인된 개발 로드맵 데이터.
 	 * developmentRoadmapGenerated === true 일 때만 사용.
 	 * null이면 render 시 mock으로 fallback.
+	 * @deprecated RoadmapRepository.getByType("DEVELOPMENT") 로 대체 예정
 	 */
 	developmentRoadmap: RoadmapData | null;
 	/**
@@ -74,6 +80,24 @@ export interface PharosSettings {
 	 * key = meetingId. mock 회의에 minutes가 없을 때 덧씌워 렌더.
 	 */
 	attachedMinutes: Record<string, AttachedMinute>;
+
+	// ─── 엔티티 저장소 (SettingsRepository 1단계) ───
+	/** Task 엔티티 목록. TaskRepository 1단계 저장소. */
+	tasks: Task[];
+	/** ChecklistItem 엔티티 목록. ChecklistRepository 1단계 저장소. */
+	checklistItems: ChecklistItem[];
+	/** 다음 Task 번호 (TASK-<n> 자동 증가). */
+	taskNextId: number;
+	/** 로드맵 엔티티. key = "PLANNING" | "DEVELOPMENT". RoadmapRepository 1단계 저장소. */
+	roadmaps: Record<string, Roadmap>;
+	/** 팀원 엔티티 목록. TeamRepository 1단계 저장소. */
+	members: Member[];
+	/** 초대 엔티티 목록. InviteRepository 1단계 저장소. */
+	invites: Invite[];
+	/** 주간 가용시간 엔티티 목록. AvailabilityRepository 1단계 저장소. */
+	availabilities: Availability[];
+	/** GitHub 커밋 배치 목록 (월별). CommitRepository 1단계 저장소. */
+	commitBatches: CommitBatch[];
 }
 
 export const DEFAULT_SETTINGS: PharosSettings = {
@@ -92,6 +116,14 @@ export const DEFAULT_SETTINGS: PharosSettings = {
 	developmentRoadmapGenerated: false,
 	developmentRoadmap: null,
 	attachedMinutes: {},
+	tasks: [],
+	checklistItems: [],
+	taskNextId: 1,
+	roadmaps: {},
+	members: [],
+	invites: [],
+	availabilities: [],
+	commitBatches: [],
 };
 
 /**
@@ -109,6 +141,16 @@ export interface PharosPluginLike extends Plugin {
 	projectService: import("../features/project/services/projectService").ProjectService;
 	/** MeetingsService — features/meeting/services/meetingsService.ts */
 	meetingsService: import("../features/meeting/services/meetingsService").MeetingsService;
+	/** TaskService — features/task/services/taskService.ts */
+	taskService: import("../features/task/services/taskService").TaskService;
+	/** RoadmapService — features/roadmap/services/roadmapService.ts */
+	roadmapService: import("../features/roadmap/services/roadmapService").RoadmapService;
+	/** TeamService — features/team/services/teamService.ts */
+	teamService: import("../features/team/services/teamService").TeamService;
+	/** AvailabilityService — features/availability/services/availabilityService.ts */
+	availabilityService: import("../features/availability/services/availabilityService").AvailabilityService;
+	/** CommitService — features/commit/services/commitService.ts */
+	commitService: import("../features/commit/services/commitService").CommitService;
 }
 
 export class PharosSettingsTab extends PluginSettingTab {

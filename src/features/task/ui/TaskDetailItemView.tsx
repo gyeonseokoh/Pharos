@@ -1,12 +1,12 @@
 import { ItemView, type ViewStateResult, WorkspaceLeaf } from "obsidian";
 import { createRoot, type Root } from "react-dom/client";
 import { TaskDetailView } from "./TaskDetailView";
-import { getTaskDetailMock } from "./taskDetailMock";
 import { ChecklistSplitModal } from "./ChecklistSplitModal";
 import { VIEW_TYPE_PHAROS_MY_TASKS } from "../../progress/ui/MyTasksItemView";
 import { VIEW_TYPE_PHAROS_DASHBOARD } from "../../progress/ui/DashboardItemView";
 import { VIEW_TYPE_PHAROS_MEETING_PAGE } from "../../meeting/ui/MeetingPageItemView";
 import type { PharosPluginLike } from "../../../app/settings";
+import type { TaskDetailData } from "../domain/taskDetailData";
 
 export const VIEW_TYPE_PHAROS_TASK_DETAIL = "pharos-task-detail-view";
 
@@ -17,6 +17,7 @@ interface TaskDetailViewState {
 export class TaskDetailItemView extends ItemView {
 	private root: Root | null = null;
 	private taskId: string | null = null;
+	private taskData: TaskDetailData | null = null;
 
 	constructor(
 		leaf: WorkspaceLeaf,
@@ -31,8 +32,8 @@ export class TaskDetailItemView extends ItemView {
 
 	getDisplayText(): string {
 		if (!this.taskId) return "Task 상세";
-		const data = getTaskDetailMock(this.taskId);
-		return data ? `${data.id} ${data.title}` : "Task 상세";
+		if (this.taskData) return `${this.taskData.id} ${this.taskData.title}`;
+		return this.taskId;
 	}
 
 	getIcon(): string {
@@ -41,7 +42,7 @@ export class TaskDetailItemView extends ItemView {
 
 	async onOpen(): Promise<void> {
 		this.ensureRoot();
-		this.render();
+		await this.loadAndRender();
 	}
 
 	async onClose(): Promise<void> {
@@ -54,7 +55,7 @@ export class TaskDetailItemView extends ItemView {
 		if (s?.taskId) {
 			this.taskId = s.taskId;
 			this.ensureRoot();
-			this.render();
+			await this.loadAndRender();
 		}
 		return super.setState(state, result);
 	}
@@ -71,22 +72,64 @@ export class TaskDetailItemView extends ItemView {
 		this.root = createRoot(container);
 	}
 
+	private async loadAndRender(): Promise<void> {
+		if (!this.taskId) {
+			this.render();
+			return;
+		}
+		const task = await this.plugin.taskService.getById(this.taskId);
+		if (!task) {
+			this.taskData = null;
+			this.render();
+			return;
+		}
+		const [checklist, assignee] = await Promise.all([
+			this.plugin.taskService.listChecklist(this.taskId),
+			task.assigneeId
+				? this.plugin.teamService.getById(task.assigneeId)
+				: Promise.resolve(null),
+		]);
+		this.taskData = {
+			id: task.id,
+			title: task.title,
+			description: task.description,
+			startDate: task.startDate,
+			endDate: task.endDate,
+			status: task.status === "blocked" ? "todo" : task.status,
+			priority: task.priority,
+			phase: task.phase,
+			assignee: assignee
+				? { id: assignee.id, name: assignee.name, role: assignee.role }
+				: null,
+			dependsOn: task.dependsOn.map((id) => ({ id, title: id })),
+			checklist: checklist.map((c) => ({
+				id: c.id,
+				text: c.text,
+				checked: c.checked,
+				checkedAt: c.checkedAt,
+				checkedBy: c.checkedBy,
+			})),
+			linkedCommits: [],
+			sourceMeetings: [],
+		};
+		this.render();
+	}
+
 	private render(): void {
 		if (!this.root) return;
 		if (!this.taskId) {
 			this.root.render(<Empty text="Task ID가 지정되지 않았습니다." />);
 			return;
 		}
-		const data = getTaskDetailMock(this.taskId);
-		if (!data) {
+		if (!this.taskData) {
 			this.root.render(<Empty text={`${this.taskId}를 찾을 수 없습니다.`} />);
 			return;
 		}
 		this.root.render(
 			<TaskDetailView
-				data={data}
+				data={this.taskData}
 				onGenerateChecklist={() =>
-					new ChecklistSplitModal(this.app, data.title).open()
+					new ChecklistSplitModal(this.app, this.taskData!.title).open()
 				}
 				onBackToMyTasks={() => void this.openView(VIEW_TYPE_PHAROS_MY_TASKS)}
 				onBackToHome={() => void this.openView(VIEW_TYPE_PHAROS_DASHBOARD)}

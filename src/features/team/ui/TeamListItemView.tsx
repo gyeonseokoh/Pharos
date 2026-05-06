@@ -2,15 +2,16 @@ import { ItemView, Notice, WorkspaceLeaf } from "obsidian";
 import { createRoot, type Root } from "react-dom/client";
 import { ProjectRequiredEmpty } from "shared/ui";
 import { TeamListView } from "./TeamListView";
-import { mockTeamListData } from "./teamListMock";
 import { InviteMemberModal } from "./InviteMemberModal";
 import { VIEW_TYPE_PHAROS_DASHBOARD } from "../../progress/ui/DashboardItemView";
 import type { PharosPluginLike } from "../../../app/settings";
+import type { TeamListData } from "../domain/teamListData";
 
 export const VIEW_TYPE_PHAROS_TEAM_LIST = "pharos-team-list-view";
 
 export class TeamListItemView extends ItemView {
 	private root: Root | null = null;
+	private teamData: TeamListData | null = null;
 
 	constructor(
 		leaf: WorkspaceLeaf,
@@ -36,13 +37,47 @@ export class TeamListItemView extends ItemView {
 		container.empty();
 		container.addClass("pharos-root");
 		this.root = createRoot(container);
-		this.render();
+		await this.loadAndRender();
 
 		this.registerEvent(
 			this.app.workspace.on("pharos:state-changed" as never, () =>
-				this.render(),
+				void this.loadAndRender(),
 			),
 		);
+	}
+
+	private async loadAndRender(): Promise<void> {
+		if (!this.plugin.settings.projectReport) {
+			this.teamData = null;
+			this.render();
+			return;
+		}
+		const [members, invites] = await Promise.all([
+			this.plugin.teamService.list(),
+			this.plugin.teamService.listInvites(),
+		]);
+		this.teamData = {
+			currentUserId: "",
+			members: members.map((m) => ({
+				id: m.id,
+				name: m.name,
+				email: m.email,
+				role: m.role,
+				permission: m.permission,
+				techStacks: m.techStacks,
+				isActive: m.status === "active",
+				joinedAt: m.joinedAt,
+				hasFilledAvailability: false,
+			})),
+			pendingInvites: invites.map((inv) => ({
+				id: inv.id,
+				email: inv.email,
+				permission: inv.permission,
+				invitedAt: inv.invitedAt,
+				expiresAt: inv.expiresAt,
+			})),
+		};
+		this.render();
 	}
 
 	private render(): void {
@@ -58,9 +93,10 @@ export class TeamListItemView extends ItemView {
 			);
 			return;
 		}
+		if (!this.teamData) return;
 		this.root.render(
 			<TeamListView
-				data={mockTeamListData}
+				data={this.teamData}
 				onInvite={() => new InviteMemberModal(this.app).open()}
 				onChangePermission={(id) =>
 					new Notice(`[미구현] ${id} 권한 변경 Modal 예정`)

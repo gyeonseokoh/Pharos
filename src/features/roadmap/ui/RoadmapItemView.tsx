@@ -18,8 +18,6 @@ import {
 	getPlanningRoadmap,
 } from "./mock";
 import { DevRoadmapGenerateModal } from "./DevRoadmapGenerateModal";
-import { meetingPageMocks } from "../../meeting/ui/meetingPageMock";
-import { mockTeamListData } from "../../team/ui/teamListMock";
 import { VIEW_TYPE_PHAROS_DASHBOARD } from "../../progress/ui/DashboardItemView";
 import type { PharosPluginLike } from "../../../app/settings";
 import type { RoadmapData } from "../domain/roadmapData";
@@ -149,23 +147,33 @@ export class RoadmapItemView extends ItemView {
 	/**
 	 * PO-6 개발 로드맵 생성 — DevRoadmapGenerateModal 열고
 	 * 승인 시 settings.developmentRoadmap 에 저장.
+	 * TeamService에서 실제 팀원 목록을 가져와 시뮬레이터에 전달.
 	 */
-	private openDevRoadmapGenerator(): void {
+	private async openDevRoadmapGenerator(): Promise<void> {
 		const { projectReport } = this.plugin.settings;
 		if (!projectReport) return;
 
-		// 기획 phase 마지막 종료일을 개발 시작 기준으로 사용
 		const planning = getPlanningRoadmap(projectReport);
 		const planningEndIso =
 			planning.phases.find((p) => p.id === "phase-plan")?.end ??
 			new Date().toISOString().slice(0, 10);
 
-		const meetings = Object.values(meetingPageMocks);
-		const members = mockTeamListData.members;
+		const memberEntities = await this.plugin.teamService.list();
+		const members = memberEntities.map((m) => ({
+			id: m.id,
+			name: m.name,
+			email: m.email,
+			role: m.role,
+			permission: m.permission,
+			techStacks: m.techStacks,
+			isActive: m.status === "active",
+			joinedAt: m.joinedAt,
+			hasFilledAvailability: false,
+		}));
 
 		new DevRoadmapGenerateModal(this.app, {
 			report: projectReport,
-			meetings,
+			meetings: [], // AI 연동 시 meetingsService → MeetingPageData 변환 예정
 			members,
 			planningEndIso,
 			onApprove: (roadmap: RoadmapData) =>

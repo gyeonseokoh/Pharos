@@ -1,56 +1,22 @@
 # shared/types/
 
-전역 공유 타입 및 상수. 의존성 최소 (Zod만 허용).
+전역 공유 상수. 의존성 최소 (외부 라이브러리 금지).
 
-## 파일 (예정)
+## 파일
 
 | 파일 | 역할 |
 |---|---|
-| `entities.ts` | 엔티티 타입 (Project, Member, Task, Meeting, Checklist, Commit 등) |
-| `schemas.ts` | Zod 스키마 (런타임 검증용, `entities.ts`와 쌍) |
-| `constants.ts` | 공유 상수 (포트, 권한 레벨, UC ID, 이벤트 이름) |
-| `roles.ts` | Role 타입 + 권한 체크 유틸 |
+| `constants.ts` | 공유 상수 — 패턴, UC ID, 스케줄러 이름 |
 
 ## 관례
 
-- **Obsidian/React/외부 SDK 의존성 금지** — 타입 정의만
-- feature 자체 타입(예: `features/meeting/domain/Meeting.ts`)과 겹치면:
-  - 여러 feature가 쓰는 것 → `shared/types/`
-  - 한 feature만 쓰는 것 → feature 내부에 유지
-- v2에서 서버와 공유할 때 이 폴더를 참조점으로
+- **Obsidian/React/Zod/외부 SDK 의존성 금지** — 순수 상수만
+- 엔티티 타입·Zod 스키마는 각 feature 도메인 폴더에 위치:
+  `features/<feature>/domain/<feature>Schema.ts`
+- 여러 feature에서 공통으로 참조하는 **상수**만 이 폴더에 둠
 
-## 예시
+## 변경 이력
 
-```ts
-// shared/types/entities.ts
-export interface Project {
-  id: string;
-  topic: string;
-  description?: string;
-  deadline: string; // ISO date
-  createdAt: string;
-  fixedMeetingToggle: boolean;
-}
-
-export interface Member {
-  id: string;
-  name: string;
-  email: string;
-  techStacks: string[];
-  role: Role;
-  isActive: boolean;
-}
-
-export type Role = 'READ' | 'WRITE' | 'ADMIN';
-
-export interface Task {
-  id: string; // TASK-XXX
-  title: string;
-  assigneeId: string;
-  startDate: string;
-  endDate: string;
-  priority: 'HIGH' | 'MEDIUM' | 'LOW';
-  dependsOn: string[];
-  checklistIds: string[];
-}
-```
+- v0.1: `entities.ts`, `schemas.ts` 존재 (전역 타입 집중식)
+- v0.2: `repository-design.md` 재설계 후 feature별 스키마로 분산.
+  `entities.ts`, `schemas.ts` 삭제. `constants.ts`만 유지.

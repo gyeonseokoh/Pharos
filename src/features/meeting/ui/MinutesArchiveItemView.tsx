@@ -91,11 +91,22 @@ export class MinutesArchiveItemView extends ItemView {
 		meetingId: string,
 		attached: AttachedMinute,
 	): Promise<void> {
-		this.plugin.settings.attachedMinutes = {
-			...this.plugin.settings.attachedMinutes,
-			[meetingId]: attached,
-		};
-		await this.plugin.saveSettings();
+		// 미팅 레포지토리에 실제 회의가 있으면 Service 레이어를 통해 저장 (설계 의도).
+		// 아직 레포지토리에 없는 mock 회의는 settings 폴백 (migration 완료 전 과도기).
+		const existing = await this.plugin.meetingsService.getById(meetingId);
+		if (existing) {
+			await this.plugin.meetingsService.attachMinutes({
+				meetingId,
+				content: attached.minutes.content,
+				authorName: attached.minutes.authorName,
+			});
+		} else {
+			this.plugin.settings.attachedMinutes = {
+				...this.plugin.settings.attachedMinutes,
+				[meetingId]: attached,
+			};
+			await this.plugin.saveSettings();
+		}
 	}
 
 	async onClose(): Promise<void> {

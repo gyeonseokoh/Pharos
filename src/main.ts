@@ -54,6 +54,22 @@ import type { ProjectRepository } from "./features/project/repositories/projectR
 import { SettingsMeetingRepository } from "./features/meeting/repositories/meetingRepository.settings";
 import { MeetingsService } from "./features/meeting/services/meetingsService";
 import type { MeetingRepository } from "./features/meeting/repositories/meetingRepository";
+import { SettingsTaskRepository, SettingsChecklistRepository } from "./features/task/repositories/taskRepository.settings";
+import type { TaskRepository, ChecklistRepository } from "./features/task/repositories/taskRepository";
+import { TaskService } from "./features/task/services/taskService";
+import { SettingsRoadmapRepository } from "./features/roadmap/repositories/roadmapRepository.settings";
+import type { RoadmapRepository } from "./features/roadmap/repositories/roadmapRepository";
+import { RoadmapService } from "./features/roadmap/services/roadmapService";
+import { SettingsTeamRepository, SettingsInviteRepository } from "./features/team/repositories/teamRepository.settings";
+import type { TeamRepository, InviteRepository } from "./features/team/repositories/teamRepository";
+import { TeamService } from "./features/team/services/teamService";
+import { ProgressService } from "./features/progress/services/progressService";
+import { SettingsAvailabilityRepository } from "./features/availability/repositories/availabilityRepository.settings";
+import type { AvailabilityRepository } from "./features/availability/repositories/availabilityRepository";
+import { AvailabilityService } from "./features/availability/services/availabilityService";
+import { SettingsCommitRepository } from "./features/commit/repositories/commitRepository.settings";
+import type { CommitRepository } from "./features/commit/repositories/commitRepository";
+import { CommitService } from "./features/commit/services/commitService";
 
 export default class PharosPlugin extends Plugin {
 	settings: PharosSettings = { ...DEFAULT_SETTINGS };
@@ -61,10 +77,23 @@ export default class PharosPlugin extends Plugin {
 	// ─── Repositories ───
 	projectRepository!: ProjectRepository;
 	meetingRepository!: MeetingRepository;
+	taskRepository!: TaskRepository;
+	checklistRepository!: ChecklistRepository;
+	roadmapRepository!: RoadmapRepository;
+	teamRepository!: TeamRepository;
+	inviteRepository!: InviteRepository;
+	availabilityRepository!: AvailabilityRepository;
+	commitRepository!: CommitRepository;
 
 	// ─── Services ───
 	projectService!: ProjectService;
 	meetingsService!: MeetingsService;
+	taskService!: TaskService;
+	roadmapService!: RoadmapService;
+	teamService!: TeamService;
+	progressService!: ProgressService;
+	availabilityService!: AvailabilityService;
+	commitService!: CommitService;
 
 	async onload(): Promise<void> {
 		await this.loadSettings();
@@ -74,6 +103,19 @@ export default class PharosPlugin extends Plugin {
 		this.projectService = new ProjectService(this.projectRepository);
 		this.meetingRepository = new SettingsMeetingRepository(this);
 		this.meetingsService = new MeetingsService(this.meetingRepository);
+		this.taskRepository = new SettingsTaskRepository(this);
+		this.checklistRepository = new SettingsChecklistRepository(this);
+		this.roadmapRepository = new SettingsRoadmapRepository(this);
+		this.teamRepository = new SettingsTeamRepository(this);
+		this.inviteRepository = new SettingsInviteRepository(this);
+		this.availabilityRepository = new SettingsAvailabilityRepository(this);
+		this.commitRepository = new SettingsCommitRepository(this);
+		this.taskService = new TaskService(this.taskRepository, this.checklistRepository);
+		this.availabilityService = new AvailabilityService(this.availabilityRepository);
+		this.commitService = new CommitService(this.commitRepository);
+		this.roadmapService = new RoadmapService(this.roadmapRepository);
+		this.teamService = new TeamService(this.teamRepository, this.inviteRepository);
+		this.progressService = new ProgressService(this.taskRepository);
 
 		// 뷰 타입 등록 — 모든 ItemView에 plugin 인스턴스 주입해서
 		// this.plugin.settings 읽고 saveSettings() 호출 가능하게 함.
