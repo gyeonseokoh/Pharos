@@ -48,28 +48,29 @@ import {
 	RoadmapItemView,
 	VIEW_TYPE_PHAROS_ROADMAP,
 } from "./features/roadmap/ui/RoadmapItemView";
-import { SettingsProjectRepository } from "./features/project/repositories/projectRepository.settings";
+import { VaultProjectRepository } from "./features/project/repositories/projectRepository.vault";
 import { ProjectService } from "./features/project/services/projectService";
 import type { ProjectRepository } from "./features/project/repositories/projectRepository";
-import { SettingsMeetingRepository } from "./features/meeting/repositories/meetingRepository.settings";
+import { VaultMeetingRepository } from "./features/meeting/repositories/meetingRepository.vault";
 import { MeetingsService } from "./features/meeting/services/meetingsService";
 import type { MeetingRepository } from "./features/meeting/repositories/meetingRepository";
-import { SettingsTaskRepository, SettingsChecklistRepository } from "./features/task/repositories/taskRepository.settings";
-import type { TaskRepository, ChecklistRepository } from "./features/task/repositories/taskRepository";
+import { VaultTaskRepository } from "./features/task/repositories/taskRepository.vault";
+import type { TaskRepository } from "./features/task/repositories/taskRepository";
 import { TaskService } from "./features/task/services/taskService";
-import { SettingsRoadmapRepository } from "./features/roadmap/repositories/roadmapRepository.settings";
+import { VaultRoadmapRepository } from "./features/roadmap/repositories/roadmapRepository.vault";
 import type { RoadmapRepository } from "./features/roadmap/repositories/roadmapRepository";
 import { RoadmapService } from "./features/roadmap/services/roadmapService";
-import { SettingsTeamRepository, SettingsInviteRepository } from "./features/team/repositories/teamRepository.settings";
+import { VaultTeamRepository, VaultInviteRepository } from "./features/team/repositories/teamRepository.vault";
 import type { TeamRepository, InviteRepository } from "./features/team/repositories/teamRepository";
 import { TeamService } from "./features/team/services/teamService";
 import { ProgressService } from "./features/progress/services/progressService";
-import { SettingsAvailabilityRepository } from "./features/availability/repositories/availabilityRepository.settings";
+import { VaultAvailabilityRepository } from "./features/availability/repositories/availabilityRepository.vault";
 import type { AvailabilityRepository } from "./features/availability/repositories/availabilityRepository";
 import { AvailabilityService } from "./features/availability/services/availabilityService";
-import { SettingsCommitRepository } from "./features/commit/repositories/commitRepository.settings";
+import { VaultCommitRepository } from "./features/commit/repositories/commitRepository.vault";
 import type { CommitRepository } from "./features/commit/repositories/commitRepository";
 import { CommitService } from "./features/commit/services/commitService";
+import { runMigrationIfNeeded } from "./app/migration";
 
 export default class PharosPlugin extends Plugin {
 	settings: PharosSettings = { ...DEFAULT_SETTINGS };
@@ -78,7 +79,6 @@ export default class PharosPlugin extends Plugin {
 	projectRepository!: ProjectRepository;
 	meetingRepository!: MeetingRepository;
 	taskRepository!: TaskRepository;
-	checklistRepository!: ChecklistRepository;
 	roadmapRepository!: RoadmapRepository;
 	teamRepository!: TeamRepository;
 	inviteRepository!: InviteRepository;
@@ -99,23 +99,27 @@ export default class PharosPlugin extends Plugin {
 		await this.loadSettings();
 
 		// Repository·Service 레이어 초기화 (UI 등록 전)
-		this.projectRepository = new SettingsProjectRepository(this);
+		// 2단계: VaultRepository — .md 파일 기반 저장
+		// 3단계 교체 시: Vault → Hocuspocus 구현체로 한 줄만 바꾸면 됨
+		this.projectRepository = new VaultProjectRepository(this);
 		this.projectService = new ProjectService(this.projectRepository);
-		this.meetingRepository = new SettingsMeetingRepository(this);
+		this.meetingRepository = new VaultMeetingRepository(this);
 		this.meetingsService = new MeetingsService(this.meetingRepository);
-		this.taskRepository = new SettingsTaskRepository(this);
-		this.checklistRepository = new SettingsChecklistRepository(this);
-		this.roadmapRepository = new SettingsRoadmapRepository(this);
-		this.teamRepository = new SettingsTeamRepository(this);
-		this.inviteRepository = new SettingsInviteRepository(this);
-		this.availabilityRepository = new SettingsAvailabilityRepository(this);
-		this.commitRepository = new SettingsCommitRepository(this);
-		this.taskService = new TaskService(this.taskRepository, this.checklistRepository);
+		this.taskRepository = new VaultTaskRepository(this);
+		this.roadmapRepository = new VaultRoadmapRepository(this);
+		this.teamRepository = new VaultTeamRepository(this);
+		this.inviteRepository = new VaultInviteRepository(this);
+		this.availabilityRepository = new VaultAvailabilityRepository(this);
+		this.commitRepository = new VaultCommitRepository(this);
+		this.taskService = new TaskService(this.taskRepository);
 		this.availabilityService = new AvailabilityService(this.availabilityRepository);
 		this.commitService = new CommitService(this.commitRepository);
 		this.roadmapService = new RoadmapService(this.roadmapRepository);
 		this.teamService = new TeamService(this.teamRepository, this.inviteRepository);
 		this.progressService = new ProgressService(this.taskRepository);
+
+		// 마이그레이션: data.json → .md (최초 1회, 사용자 동의 후 실행)
+		await runMigrationIfNeeded(this);
 
 		// 뷰 타입 등록 — 모든 ItemView에 plugin 인스턴스 주입해서
 		// this.plugin.settings 읽고 saveSettings() 호출 가능하게 함.
@@ -248,6 +252,7 @@ export default class PharosPlugin extends Plugin {
 		this.settings.developmentRoadmapGenerated = false;
 		this.settings.developmentRoadmap = null;
 		this.settings.attachedMinutes = {};
+		this.settings.roadmaps = {};
 		await this.saveSettings();
 	}
 

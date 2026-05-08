@@ -8,8 +8,8 @@
 import type { PharosPluginLike } from "../../../app/settings";
 import type { ChangeEvent, Disposable } from "../../../shared/repo/types";
 import { withUpdatedMeta } from "../../../shared/repo/types";
-import type { ChecklistItem, Task, TaskStatus } from "../domain/taskSchema";
-import type { ChecklistRepository, LinkedCommit, TaskRepository } from "./taskRepository";
+import type { Task, TaskStatus } from "../domain/taskSchema";
+import type { LinkedCommit, TaskRepository } from "./taskRepository";
 
 export class SettingsTaskRepository implements TaskRepository {
 	private listeners = new Set<(event: ChangeEvent<Task>) => void>();
@@ -36,7 +36,7 @@ export class SettingsTaskRepository implements TaskRepository {
 		const idx = tasks.findIndex((t) => t.id === next.id);
 
 		if (idx >= 0) {
-			const before = tasks[idx];
+			const before = tasks[idx]!;
 			tasks[idx] = next;
 			this.plugin.settings.tasks = tasks;
 			await this.plugin.saveSettings();
@@ -63,7 +63,7 @@ export class SettingsTaskRepository implements TaskRepository {
 
 	async listByAssignee(memberId: string): Promise<Task[]> {
 		return (this.plugin.settings.tasks ?? []).filter(
-			(t) => t.assigneeId === memberId,
+			(t) => t.assignee?.id === memberId,
 		);
 	}
 
@@ -78,16 +78,12 @@ export class SettingsTaskRepository implements TaskRepository {
 	}
 
 	async appendCommit(taskId: string, commit: LinkedCommit): Promise<void> {
-		const tasks = [...(this.plugin.settings.tasks ?? [])];
-		const idx = tasks.findIndex((t) => t.id === taskId);
-		if (idx < 0) return;
-		const task = tasks[idx];
-		tasks[idx] = {
+		const task = await this.getById(taskId);
+		if (!task) return;
+		await this.save({
 			...task,
-			updatedAt: new Date().toISOString(),
-		};
-		this.plugin.settings.tasks = tasks;
-		await this.plugin.saveSettings();
+			linkedCommits: [...(task.linkedCommits ?? []), commit],
+		});
 	}
 
 	async nextId(): Promise<string> {
@@ -116,64 +112,6 @@ export class SettingsTaskRepository implements TaskRepository {
 		const tasks = await this.list();
 		for (const task of tasks) {
 			this.emit({ kind: "updated", entity: task, before: task });
-		}
-	}
-}
-
-export class SettingsChecklistRepository implements ChecklistRepository {
-	private listeners = new Set<(event: ChangeEvent<ChecklistItem>) => void>();
-
-	constructor(private readonly plugin: PharosPluginLike) {
-		plugin.registerEvent(
-			plugin.app.workspace.on("pharos:state-changed" as never, () => {}),
-		);
-	}
-
-	async listByTask(taskId: string): Promise<ChecklistItem[]> {
-		return (this.plugin.settings.checklistItems ?? []).filter(
-			(c) => c.taskId === taskId,
-		);
-	}
-
-	async save(item: ChecklistItem): Promise<void> {
-		const next = withUpdatedMeta(item);
-		const items = [...(this.plugin.settings.checklistItems ?? [])];
-		const idx = items.findIndex((c) => c.id === next.id);
-
-		if (idx >= 0) {
-			const before = items[idx];
-			items[idx] = next;
-			this.plugin.settings.checklistItems = items;
-			await this.plugin.saveSettings();
-			this.emit({ kind: "updated", entity: next, before });
-		} else {
-			items.push(next);
-			this.plugin.settings.checklistItems = items;
-			await this.plugin.saveSettings();
-			this.emit({ kind: "created", entity: next });
-		}
-	}
-
-	async delete(id: string): Promise<void> {
-		this.plugin.settings.checklistItems = (
-			this.plugin.settings.checklistItems ?? []
-		).filter((c) => c.id !== id);
-		await this.plugin.saveSettings();
-		this.emit({ kind: "deleted", id });
-	}
-
-	watch(callback: (event: ChangeEvent<ChecklistItem>) => void): Disposable {
-		this.listeners.add(callback);
-		return { dispose: () => this.listeners.delete(callback) };
-	}
-
-	private emit(event: ChangeEvent<ChecklistItem>): void {
-		for (const listener of this.listeners) {
-			try {
-				listener(event);
-			} catch (err) {
-				console.error("[Pharos] ChecklistRepository listener error:", err);
-			}
 		}
 	}
 }

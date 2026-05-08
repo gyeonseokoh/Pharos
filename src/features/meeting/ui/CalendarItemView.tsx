@@ -1,24 +1,22 @@
 /**
  * CalendarItemView — CalendarView(회의 캘린더)를 Obsidian ItemView로 감싸는 어댑터.
- *
- * 오늘: mockCalendarData 주입, 회의 클릭 시 MeetingPageView 탭 열기.
- * 미래: meetingService.listAll() 주입, 실제 회의 페이지(MD 파일)로 이동.
  */
 
 import { ItemView, WorkspaceLeaf } from "obsidian";
 import { createRoot, type Root } from "react-dom/client";
 import { ProjectRequiredEmpty } from "shared/ui";
 import { CalendarView } from "./CalendarView";
-import { mockCalendarData } from "./calendarMock";
 import { VIEW_TYPE_PHAROS_MEETING_PAGE } from "./MeetingPageItemView";
 import { VIEW_TYPE_PHAROS_DASHBOARD } from "../../progress/ui/DashboardItemView";
 import { AdhocMeetingModal } from "./AdhocMeetingModal";
+import type { CalendarData } from "../domain/calendarData";
 import type { PharosPluginLike } from "../../../app/settings";
 
 export const VIEW_TYPE_PHAROS_CALENDAR = "pharos-calendar-view";
 
 export class CalendarItemView extends ItemView {
 	private root: Root | null = null;
+	private calendarData: CalendarData = { meetings: [] };
 
 	constructor(
 		leaf: WorkspaceLeaf,
@@ -44,13 +42,34 @@ export class CalendarItemView extends ItemView {
 		container.empty();
 		container.addClass("pharos-root");
 		this.root = createRoot(container);
-		this.render();
+		void this.loadAndRender();
 
 		this.registerEvent(
 			this.app.workspace.on("pharos:state-changed" as never, () =>
-				this.render(),
+				void this.loadAndRender(),
 			),
 		);
+	}
+
+	async onClose(): Promise<void> {
+		this.root?.unmount();
+		this.root = null;
+	}
+
+	private async loadAndRender(): Promise<void> {
+		const meetings = await this.plugin.meetingsService.list();
+		this.calendarData = {
+			meetings: meetings.map((m) => ({
+				id: m.id,
+				title: m.title,
+				date: m.date,
+				time: m.time,
+				durationMinutes: m.durationMinutes,
+				type: m.meetingType,
+				topicCount: m.topics.length,
+			})),
+		};
+		this.render();
 	}
 
 	private render(): void {
@@ -68,7 +87,7 @@ export class CalendarItemView extends ItemView {
 		}
 		this.root.render(
 			<CalendarView
-				data={mockCalendarData}
+				data={this.calendarData}
 				onOpenMeeting={(id) => void this.handleOpenMeeting(id)}
 				onAddAdhocMeeting={(date) => this.handleAddAdhocMeeting(date)}
 				onBackToHome={() => void this.openView(VIEW_TYPE_PHAROS_DASHBOARD)}
@@ -87,17 +106,8 @@ export class CalendarItemView extends ItemView {
 		await leaf.setViewState({ type: viewType, active: true });
 	}
 
-	async onClose(): Promise<void> {
-		this.root?.unmount();
-		this.root = null;
-	}
-
-	// ───────────────────────── Handlers ─────────────────────────
-
 	private async handleOpenMeeting(meetingId: string): Promise<void> {
 		const { workspace } = this.app;
-
-		// 이미 같은 meetingId로 열린 탭이 있으면 그쪽으로 포커스
 		const existing = workspace
 			.getLeavesOfType(VIEW_TYPE_PHAROS_MEETING_PAGE)
 			.find((leaf) => {

@@ -2,14 +2,15 @@
  * TopicPageItemView — Topic Page를 Obsidian ItemView로 감싸는 어댑터.
  *
  * state: { meetingId, topicId }
+ * meetingId → meetingsService.getById() → topics에서 topicId 추출 → TopicPageData 렌더.
  */
 
 import { ItemView, type ViewStateResult, WorkspaceLeaf } from "obsidian";
 import { createRoot, type Root } from "react-dom/client";
 import { TopicPageView } from "./TopicPageView";
-import { getTopicPageMock } from "./topicPageMock";
 import { VIEW_TYPE_PHAROS_MEETING_PAGE } from "./MeetingPageItemView";
 import { VIEW_TYPE_PHAROS_DASHBOARD } from "../../progress/ui/DashboardItemView";
+import type { TopicPageData } from "../domain/topicPageData";
 import type { PharosPluginLike } from "../../../app/settings";
 
 export const VIEW_TYPE_PHAROS_TOPIC_PAGE = "pharos-topic-page-view";
@@ -23,6 +24,7 @@ export class TopicPageItemView extends ItemView {
 	private root: Root | null = null;
 	private meetingId: string | null = null;
 	private topicId: string | null = null;
+	private topicData: TopicPageData | null = null;
 
 	constructor(
 		leaf: WorkspaceLeaf,
@@ -36,9 +38,7 @@ export class TopicPageItemView extends ItemView {
 	}
 
 	getDisplayText(): string {
-		if (!this.meetingId || !this.topicId) return "회의 주제";
-		const data = getTopicPageMock(this.meetingId, this.topicId);
-		return data ? `주제: ${data.topic.title}` : "회의 주제";
+		return this.topicData ? `주제: ${this.topicData.topic.title}` : "회의 주제";
 	}
 
 	getIcon(): string {
@@ -47,7 +47,7 @@ export class TopicPageItemView extends ItemView {
 
 	async onOpen(): Promise<void> {
 		this.ensureRoot();
-		this.render();
+		void this.loadAndRender();
 	}
 
 	async onClose(): Promise<void> {
@@ -61,7 +61,7 @@ export class TopicPageItemView extends ItemView {
 			this.meetingId = s.meetingId;
 			this.topicId = s.topicId;
 			this.ensureRoot();
-			this.render();
+			await this.loadAndRender();
 		}
 		return super.setState(state, result);
 	}
@@ -78,6 +78,37 @@ export class TopicPageItemView extends ItemView {
 		this.root = createRoot(container);
 	}
 
+	private async loadAndRender(): Promise<void> {
+		if (!this.meetingId || !this.topicId) {
+			this.topicData = null;
+			this.render();
+			return;
+		}
+
+		const meeting = await this.plugin.meetingsService.getById(this.meetingId);
+		const topic = meeting?.topics.find((t) => t.id === this.topicId) ?? null;
+
+		if (!meeting || !topic) {
+			this.topicData = null;
+			this.render();
+			return;
+		}
+
+		this.topicData = {
+			meeting: {
+				id: meeting.id,
+				title: meeting.title,
+				date: meeting.date,
+				time: meeting.time,
+			},
+			topic,
+			resources: meeting.resources.filter((r) => r.topicId === this.topicId),
+			decisions: meeting.analysis?.decisions ?? [],
+			minutesExcerpt: null,
+		};
+		this.render();
+	}
+
 	private render(): void {
 		if (!this.root) return;
 
@@ -85,16 +116,14 @@ export class TopicPageItemView extends ItemView {
 			this.root.render(<Empty text="주제 ID가 지정되지 않았습니다." />);
 			return;
 		}
-
-		const data = getTopicPageMock(this.meetingId, this.topicId);
-		if (!data) {
+		if (!this.topicData) {
 			this.root.render(<Empty text="주제를 찾을 수 없습니다." />);
 			return;
 		}
 
 		this.root.render(
 			<TopicPageView
-				data={data}
+				data={this.topicData}
 				onBackToMeeting={() => void this.openMeeting()}
 				onBackToHome={() => void this.openView(VIEW_TYPE_PHAROS_DASHBOARD)}
 			/>,

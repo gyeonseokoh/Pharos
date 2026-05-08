@@ -1,29 +1,20 @@
 /**
  * MeetingPageItemView — MeetingPageView를 Obsidian ItemView 탭으로 감싸는 어댑터.
  *
- * 이 뷰는 meetingId 파라미터가 필요하다. Obsidian의 ViewState.state 로 전달받음.
- *   - Calendar에서 회의 클릭 → `leaf.setViewState({ type, state: { meetingId } })`
- *   - setState가 불리면 새 meetingId로 재렌더.
- *
- * 오늘: meetingPageMocks[meetingId] 에서 조회 (없으면 fallback placeholder)
- * 미래: meetingService.get(meetingId) 결과 주입
+ * state: { meetingId, source? }
+ * meetingId → meetingsService.getById() → MeetingPageData 렌더.
  */
 
 import { ItemView, WorkspaceLeaf, type ViewStateResult, Notice } from "obsidian";
 import { createRoot, type Root } from "react-dom/client";
 import { MeetingPageView } from "./MeetingPageView";
-import {
-	applyAttachedMinutes,
-	getMeetingPageMock,
-	meetingPageMocks,
-} from "./meetingPageMock";
-import { mockCalendarData } from "./calendarMock";
 import { VIEW_TYPE_PHAROS_CALENDAR } from "./CalendarItemView";
 import { VIEW_TYPE_PHAROS_MEETINGS_LIST } from "./MeetingsListItemView";
 import { VIEW_TYPE_PHAROS_MINUTES_ARCHIVE } from "./MinutesArchiveItemView";
 import { VIEW_TYPE_PHAROS_TOPIC_PAGE } from "./TopicPageItemView";
 import { VIEW_TYPE_PHAROS_DASHBOARD } from "../../progress/ui/DashboardItemView";
 import { AiTopicModal } from "./AiTopicModal";
+import type { MeetingPageData } from "../domain/meetingPageData";
 import type { PharosPluginLike } from "../../../app/settings";
 
 export const VIEW_TYPE_PHAROS_MEETING_PAGE = "pharos-meeting-page-view";
@@ -35,7 +26,6 @@ export type MeetingPageSource =
 
 interface MeetingPageViewState {
 	meetingId: string;
-	/** 이 뷰를 연 상위 뷰. back 버튼 라벨·목적지가 여기에 따라 결정됨. */
 	source?: MeetingPageSource;
 }
 
@@ -43,6 +33,7 @@ export class MeetingPageItemView extends ItemView {
 	private root: Root | null = null;
 	private meetingId: string | null = null;
 	private source: MeetingPageSource = "calendar";
+	private meetingData: MeetingPageData | null = null;
 
 	constructor(
 		leaf: WorkspaceLeaf,
@@ -56,9 +47,7 @@ export class MeetingPageItemView extends ItemView {
 	}
 
 	getDisplayText(): string {
-		if (!this.meetingId) return "회의 페이지";
-		const data = meetingPageMocks[this.meetingId];
-		return data?.title ?? "회의 페이지";
+		return this.meetingData?.title ?? "회의 페이지";
 	}
 
 	getIcon(): string {
@@ -67,11 +56,11 @@ export class MeetingPageItemView extends ItemView {
 
 	async onOpen(): Promise<void> {
 		this.ensureRoot();
-		this.render();
+		void this.loadAndRender();
 
 		this.registerEvent(
 			this.app.workspace.on("pharos:state-changed" as never, () =>
-				this.render(),
+				void this.loadAndRender(),
 			),
 		);
 	}
@@ -90,7 +79,7 @@ export class MeetingPageItemView extends ItemView {
 			this.meetingId = s.meetingId;
 			if (s.source) this.source = s.source;
 			this.ensureRoot();
-			this.render();
+			await this.loadAndRender();
 		}
 		return super.setState(state, result);
 	}
@@ -98,8 +87,6 @@ export class MeetingPageItemView extends ItemView {
 	getState(): Record<string, unknown> {
 		return { meetingId: this.meetingId, source: this.source };
 	}
-
-	// ───────────────────────── internals ─────────────────────────
 
 	private ensureRoot(): void {
 		if (this.root) return;
@@ -109,26 +96,45 @@ export class MeetingPageItemView extends ItemView {
 		this.root = createRoot(container);
 	}
 
+	private async loadAndRender(): Promise<void> {
+		if (!this.meetingId) {
+			this.meetingData = null;
+			this.render();
+			return;
+		}
+
+		const meeting = await this.plugin.meetingsService.getById(this.meetingId);
+		if (!meeting) {
+			this.meetingData = null;
+			this.render();
+			return;
+		}
+
+		this.meetingData = {
+			id: meeting.id,
+			title: meeting.title,
+			date: meeting.date,
+			time: meeting.time,
+			durationMinutes: meeting.durationMinutes,
+			type: meeting.meetingType,
+			status: meeting.status,
+			attendees: meeting.attendees,
+			topics: meeting.topics,
+			resources: meeting.resources,
+			minutes: meeting.minutes,
+			analysis: meeting.analysis,
+		};
+		this.render();
+	}
+
 	private render(): void {
 		if (!this.root) return;
 
-		// meetingId 로 데이터 조회. 없으면 캘린더 목업에서 기본 정보라도 가져옴.
-		const mock = this.meetingId
-			? getMeetingPageMock(this.meetingId, this.fallbackFromCalendar(this.meetingId))
-			: null;
-
-		if (!mock) {
+		if (!this.meetingData) {
 			this.root.render(<EmptyState />);
 			return;
 		}
 
-		// 업로드된 회의록이 있으면 덮어써 반영
-		const data = applyAttachedMinutes(
-			mock,
-			this.plugin.settings.attachedMinutes,
-		);
-
-		// source에 따라 back 버튼 하나만 표시 (+ 홈으로는 항상)
 		const backProps = {
 			onBackToMeetingsList:
 				this.source === "meetings-list"
@@ -146,7 +152,7 @@ export class MeetingPageItemView extends ItemView {
 
 		this.root.render(
 			<MeetingPageView
-				data={data}
+				data={this.meetingData}
 				{...backProps}
 				onBackToHome={() => void this.openView(VIEW_TYPE_PHAROS_DASHBOARD)}
 				onGenerateTopics={() => new AiTopicModal(this.app).open()}
@@ -158,19 +164,6 @@ export class MeetingPageItemView extends ItemView {
 				onOpenTopic={(topicId) => void this.openTopic(topicId)}
 			/>,
 		);
-	}
-
-	private fallbackFromCalendar(meetingId: string):
-		| {
-				title: string;
-				date: string;
-				time: string;
-				type: "regular" | "adhoc";
-		  }
-		| undefined {
-		const m = mockCalendarData.meetings.find((m) => m.id === meetingId);
-		if (!m) return undefined;
-		return { title: m.title, date: m.date, time: m.time, type: m.type };
 	}
 
 	private async openView(viewType: string): Promise<void> {
@@ -212,7 +205,7 @@ function EmptyState() {
 	return (
 		<div className="pharos-root flex min-h-full w-full items-center justify-center p-6">
 			<p className="text-sm text-text-muted">
-				회의 ID가 지정되지 않았습니다.
+				회의를 찾을 수 없습니다.
 			</p>
 		</div>
 	);

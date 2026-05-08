@@ -7,6 +7,8 @@
  * 순수 타입. UI/React 의존 없음. 아이콘은 문자열 식별자로 두고 UI에서 해석한다.
  */
 
+import type { Roadmap } from "./roadmapSchema";
+
 export type TaskKind = "task" | "milestone";
 export type TaskStatus = "done" | "in-progress" | "todo";
 
@@ -66,4 +68,44 @@ export interface RoadmapData {
 	project: RoadmapProjectInfo;
 	phases: RoadmapPhase[];
 	tasks: RoadmapTask[];
+}
+
+/** phase.id → 기본 아이콘 매핑. 저장된 icon이 없을 때 fallback. */
+const DEFAULT_PHASE_ICONS: Record<string, PhaseIconName> = {
+	"phase-plan": "compass",
+	"phase-mvp": "code",
+	"phase-integration": "server",
+	"phase-test": "flask",
+	"phase-release": "rocket",
+};
+
+function resolveIcon(id: string): PhaseIconName {
+	return DEFAULT_PHASE_ICONS[id] ?? "code";
+}
+
+/**
+ * Roadmap 엔티티 + 프로젝트 정보 + Task 목록 → RoadmapData 뷰모델 변환.
+ *
+ * RoadmapService에서 반환된 엔티티를 RoadmapView에 전달할 때 사용.
+ * tasks는 TaskRepository에서 별도 조회해 전달해야 한다.
+ */
+export function roadmapToData(
+	roadmap: Roadmap,
+	project: RoadmapProjectInfo,
+	tasks: RoadmapTask[],
+): RoadmapData {
+	return {
+		project,
+		phases: roadmap.phases.map((p) => ({
+			id: p.id,
+			name: p.name,
+			start: p.start,
+			end: p.end,
+			status: p.status === "completed" ? "done" : p.status,
+			activities: p.activities,
+			color: p.color,
+			icon: resolveIcon(p.id),
+		})),
+		tasks,
+	};
 }

@@ -8,7 +8,7 @@ import { App, PluginSettingTab, Setting } from "obsidian";
 import type { Plugin } from "obsidian";
 import type { RoadmapData } from "../features/roadmap/domain/roadmapData";
 import type { Roadmap } from "../features/roadmap/domain/roadmapSchema";
-import type { Task, ChecklistItem } from "../features/task/domain/taskSchema";
+import type { Task } from "../features/task/domain/taskSchema";
 import type { Member, Invite } from "../features/team/domain/teamSchema";
 import type {
 	MeetingAnalysis,
@@ -84,8 +84,6 @@ export interface PharosSettings {
 	// ─── 엔티티 저장소 (SettingsRepository 1단계) ───
 	/** Task 엔티티 목록. TaskRepository 1단계 저장소. */
 	tasks: Task[];
-	/** ChecklistItem 엔티티 목록. ChecklistRepository 1단계 저장소. */
-	checklistItems: ChecklistItem[];
 	/** 다음 Task 번호 (TASK-<n> 자동 증가). */
 	taskNextId: number;
 	/** 로드맵 엔티티. key = "PLANNING" | "DEVELOPMENT". RoadmapRepository 1단계 저장소. */
@@ -98,6 +96,11 @@ export interface PharosSettings {
 	availabilities: Availability[];
 	/** GitHub 커밋 배치 목록 (월별). CommitRepository 1단계 저장소. */
 	commitBatches: CommitBatch[];
+	/**
+	 * data.json → Vault .md 마이그레이션 완료 여부.
+	 * true 이면 VaultRepository 사용 중. false/undefined 이면 SettingsRepository 사용.
+	 */
+	migrated: boolean;
 }
 
 export const DEFAULT_SETTINGS: PharosSettings = {
@@ -117,13 +120,13 @@ export const DEFAULT_SETTINGS: PharosSettings = {
 	developmentRoadmap: null,
 	attachedMinutes: {},
 	tasks: [],
-	checklistItems: [],
 	taskNextId: 1,
 	roadmaps: {},
 	members: [],
 	invites: [],
 	availabilities: [],
 	commitBatches: [],
+	migrated: false,
 };
 
 /**
@@ -151,6 +154,8 @@ export interface PharosPluginLike extends Plugin {
 	availabilityService: import("../features/availability/services/availabilityService").AvailabilityService;
 	/** CommitService — features/commit/services/commitService.ts */
 	commitService: import("../features/commit/services/commitService").CommitService;
+	/** ProgressService — features/progress/services/progressService.ts */
+	progressService: import("../features/progress/services/progressService").ProgressService;
 }
 
 export class PharosSettingsTab extends PluginSettingTab {

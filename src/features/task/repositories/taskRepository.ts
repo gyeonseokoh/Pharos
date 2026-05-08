@@ -1,7 +1,8 @@
 /**
- * TaskRepository / ChecklistRepository — Task·Checklist 엔티티 데이터 접근 인터페이스.
+ * TaskRepository — Task 엔티티 데이터 접근 인터페이스.
  *
  * docs/architecture/repository-design.md 5.2절 기준.
+ * 체크리스트는 Task에 내장(embedded)되므로 별도 ChecklistRepository 없음.
  *
  * 구현체:
  *   - SettingsTaskRepository     (1단계, data.json 기반, 현재 사용)
@@ -10,7 +11,7 @@
  */
 
 import type { ChangeEvent, Disposable } from "../../../shared/repo/types";
-import type { ChecklistItem, LinkedCommit, Task, TaskStatus } from "../domain/taskSchema";
+import type { LinkedCommit, Task, TaskStatus } from "../domain/taskSchema";
 
 export type { LinkedCommit };
 
@@ -37,15 +38,4 @@ export interface TaskRepository {
 	nextId(): Promise<string>;
 	/** 변경 구독. dispose()로 해제. */
 	watch(callback: (event: ChangeEvent<Task>) => void): Disposable;
-}
-
-export interface ChecklistRepository {
-	/** 특정 Task의 체크리스트 전체 조회. */
-	listByTask(taskId: string): Promise<ChecklistItem[]>;
-	/** 체크리스트 항목 저장 (신규·갱신). */
-	save(item: ChecklistItem): Promise<void>;
-	/** 체크리스트 항목 삭제. */
-	delete(id: string): Promise<void>;
-	/** 변경 구독. dispose()로 해제. */
-	watch(callback: (event: ChangeEvent<ChecklistItem>) => void): Disposable;
 }

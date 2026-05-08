@@ -1,9 +1,12 @@
 /**
- * Task / ChecklistItem 엔티티 스키마.
+ * Task 엔티티 스키마.
  *
  * docs/architecture/repository-design.md 4.4절 기준.
  * Repository·Service·UI 모두 이 타입을 참조.
  * taskDetailData.ts 는 화면 렌더링용 뷰모델 — 저장 단위는 이 스키마 기준.
+ *
+ * - assignee: 담당자 임베디드 객체 (id·name·role). null = 미배정.
+ * - checklist: Task에 내장된 체크리스트 배열 (별도 Repository 없음).
  */
 
 import { z } from "zod";
@@ -17,20 +20,7 @@ export type TaskPriority = z.infer<typeof TaskPrioritySchema>;
 export const TaskPhaseSchema = z.enum(["PLANNING", "DEVELOPMENT"]);
 export type TaskPhase = z.infer<typeof TaskPhaseSchema>;
 
-/**
- * Task v1 스키마.
- *
- * - id: `TASK-<number>` 형식.
- * - phase: 기획(PLANNING) / 개발(DEVELOPMENT) 로드맵 소속 구분.
- * - phaseId: 로드맵 내 특정 단계 ID (예: "dev-mvp").
- * - roadmapId: 소속 로드맵 ID (예: "roadmap-development").
- * - assigneeId: 미배정이면 null.
- * - userChecked: 담당자 본인 완료 체크 (GitHub 커밋과 별도).
- */
-/**
- * Task에 연결된 커밋 요약. PM-4 검증 결과.
- * docs/architecture/repository-design.md §4.5 기준.
- */
+/** Task에 연결된 커밋 요약. PM-4 검증 결과. */
 export const LinkedCommitSchema = z.object({
 	sha: z.string().min(1),
 	message: z.string(),
@@ -40,6 +30,35 @@ export const LinkedCommitSchema = z.object({
 });
 export type LinkedCommit = z.infer<typeof LinkedCommitSchema>;
 
+/** Task 내장 담당자 정보. */
+export const AssigneeSchema = z.object({
+	id: z.string().min(1),
+	name: z.string().min(1),
+	role: z.string().min(1),
+});
+export type Assignee = z.infer<typeof AssigneeSchema>;
+
+/** Task 내장 체크리스트 항목. 별도 Repository 없이 Task 안에 배열로 저장. */
+export const ChecklistItemSchema = z.object({
+	id: z.string().min(1),
+	text: z.string().min(1),
+	checked: z.boolean(),
+	checkedAt: z.string().nullable(),
+	checkedBy: z.string().nullable(),
+});
+export type ChecklistItem = z.infer<typeof ChecklistItemSchema>;
+
+/**
+ * Task v1 스키마.
+ *
+ * - id: `TASK-<number>` 형식.
+ * - phase: 기획(PLANNING) / 개발(DEVELOPMENT) 로드맵 소속 구분.
+ * - phaseId: 로드맵 내 특정 단계 ID (예: "dev-mvp").
+ * - roadmapId: 소속 로드맵 ID (예: "roadmap-development").
+ * - assignee: 담당자 임베디드 객체. null = 미배정.
+ * - userChecked: 담당자 본인 완료 체크 (GitHub 커밋과 별도).
+ * - checklist: Task 내장 체크리스트 (별도 Repository 없음).
+ */
 export const TaskV1 = z.object({
 	version: z.literal(1),
 	type: z.literal("task"),
@@ -52,38 +71,21 @@ export const TaskV1 = z.object({
 	userChecked: z.boolean().default(false),
 	priority: TaskPrioritySchema,
 	phase: TaskPhaseSchema,
-	assigneeId: z.string().nullable(),
+	/** 담당자 임베디드. null = 미배정. */
+	assignee: AssigneeSchema.nullable(),
 	startDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
 	endDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
 	dependsOn: z.array(z.string().regex(/^TASK-\d+$/)).default([]),
 	sourceMeetings: z.array(z.string()).default([]),
 	/** PM-4 커밋 검증 결과 목록. appendCommit()으로 추가. */
 	linkedCommits: z.array(LinkedCommitSchema).default([]),
+	/** Task 내장 체크리스트. */
+	checklist: z.array(ChecklistItemSchema).default([]),
 	createdAt: z.string(),
 	updatedAt: z.string(),
 });
 
 export type Task = z.infer<typeof TaskV1>;
-
-/**
- * ChecklistItem v1 스키마.
- *
- * Task 하위 항목. taskId로 소속 Task 참조.
- */
-export const ChecklistItemV1 = z.object({
-	version: z.literal(1),
-	type: z.literal("checklist-item"),
-	id: z.string().min(1),
-	taskId: z.string().regex(/^TASK-\d+$/),
-	text: z.string().min(1),
-	checked: z.boolean(),
-	checkedAt: z.string().nullable(),
-	checkedBy: z.string().nullable(),
-	createdAt: z.string(),
-	updatedAt: z.string(),
-});
-
-export type ChecklistItem = z.infer<typeof ChecklistItemV1>;
 
 /**
  * UI 폼 → Task 엔티티 변환용 입력 타입.
@@ -92,7 +94,8 @@ export type ChecklistItem = z.infer<typeof ChecklistItemV1>;
 export interface TaskInput {
 	title: string;
 	description?: string;
-	assigneeId: string | null;
+	/** null = 미배정. */
+	assignee: Assignee | null;
 	startDate: string;
 	endDate: string;
 	priority: TaskPriority;

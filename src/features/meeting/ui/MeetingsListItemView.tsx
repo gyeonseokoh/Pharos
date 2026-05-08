@@ -8,18 +8,19 @@ import { ItemView, WorkspaceLeaf } from "obsidian";
 import { createRoot, type Root } from "react-dom/client";
 import { ProjectRequiredEmpty } from "shared/ui";
 import { MeetingsListView } from "./MeetingsListView";
-import { mockMeetingsListData } from "./meetingsListMock";
 import { VIEW_TYPE_PHAROS_CALENDAR } from "./CalendarItemView";
 import { VIEW_TYPE_PHAROS_MEETING_PAGE } from "./MeetingPageItemView";
 import { VIEW_TYPE_PHAROS_MINUTES_ARCHIVE } from "./MinutesArchiveItemView";
 import { VIEW_TYPE_PHAROS_DASHBOARD } from "../../progress/ui/DashboardItemView";
 import { AdhocMeetingModal } from "./AdhocMeetingModal";
+import type { MeetingsListData } from "../domain/meetingsListData";
 import type { PharosPluginLike } from "../../../app/settings";
 
 export const VIEW_TYPE_PHAROS_MEETINGS_LIST = "pharos-meetings-list-view";
 
 export class MeetingsListItemView extends ItemView {
 	private root: Root | null = null;
+	private meetingsListData: MeetingsListData = { meetings: [] };
 
 	constructor(
 		leaf: WorkspaceLeaf,
@@ -45,11 +46,11 @@ export class MeetingsListItemView extends ItemView {
 		container.empty();
 		container.addClass("pharos-root");
 		this.root = createRoot(container);
-		this.render();
+		void this.loadAndRender();
 
 		this.registerEvent(
 			this.app.workspace.on("pharos:state-changed" as never, () =>
-				this.render(),
+				void this.loadAndRender(),
 			),
 		);
 	}
@@ -57,6 +58,25 @@ export class MeetingsListItemView extends ItemView {
 	async onClose(): Promise<void> {
 		this.root?.unmount();
 		this.root = null;
+	}
+
+	private async loadAndRender(): Promise<void> {
+		const meetings = await this.plugin.meetingsService.list();
+		this.meetingsListData = {
+			meetings: meetings.map((m) => ({
+				id: m.id,
+				title: m.title,
+				date: m.date,
+				time: m.time,
+				durationMinutes: m.durationMinutes,
+				type: m.meetingType,
+				status: m.status,
+				topicCount: m.topics.length,
+				attendeeCount: m.attendees.length,
+				hasMinutes: m.minutes !== null,
+			})),
+		};
+		this.render();
 	}
 
 	private render(): void {
@@ -74,7 +94,7 @@ export class MeetingsListItemView extends ItemView {
 		}
 		this.root.render(
 			<MeetingsListView
-				data={mockMeetingsListData}
+				data={this.meetingsListData}
 				onOpenMeeting={(id) => void this.openMeetingPage(id)}
 				onOpenCalendar={() => void this.openCalendar()}
 				onAddAdhocMeeting={() => new AdhocMeetingModal(this.app).open()}

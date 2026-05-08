@@ -24,3 +24,9 @@ data.json
 # env
 .env
 .env.local
+
+# Claude Code assistant memory (local only)
+.claude/
+
+# Obsidian vault plugin folder (installed plugin, not source)
+Pharos/

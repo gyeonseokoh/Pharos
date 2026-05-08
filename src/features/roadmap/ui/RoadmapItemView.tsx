@@ -13,14 +13,12 @@ import { createRoot, type Root } from "react-dom/client";
 import { RoadmapView } from "./RoadmapView";
 import { RoadmapEmptyView } from "./RoadmapEmptyView";
 import { RoadmapGenerateView } from "./RoadmapGenerateView";
-import {
-	getDevelopmentRoadmap,
-	getPlanningRoadmap,
-} from "./mock";
 import { DevRoadmapGenerateModal } from "./DevRoadmapGenerateModal";
 import { VIEW_TYPE_PHAROS_DASHBOARD } from "../../progress/ui/DashboardItemView";
+import { roadmapToData } from "../domain/roadmapData";
 import type { PharosPluginLike } from "../../../app/settings";
 import type { RoadmapData } from "../domain/roadmapData";
+import type { RoadmapInput } from "../domain/roadmapSchema";
 
 export const VIEW_TYPE_PHAROS_ROADMAP = "pharos-roadmap-view";
 
@@ -51,11 +49,11 @@ export class RoadmapItemView extends ItemView {
 		container.empty();
 		container.addClass("pharos-root");
 		this.root = createRoot(container);
-		this.render();
+		void this.loadAndRender();
 
 		this.registerEvent(
 			this.app.workspace.on("pharos:state-changed" as never, () =>
-				this.render(),
+				void this.loadAndRender(),
 			),
 		);
 	}
@@ -65,13 +63,9 @@ export class RoadmapItemView extends ItemView {
 		this.root = null;
 	}
 
-	private render(): void {
+	private async loadAndRender(): Promise<void> {
 		if (!this.root) return;
-		const {
-			projectReport,
-			planningRoadmapGenerated,
-			developmentRoadmapGenerated,
-		} = this.plugin.settings;
+		const { projectReport } = this.plugin.settings;
 
 		// 1. 프로젝트 없음
 		if (!projectReport) {
@@ -85,8 +79,23 @@ export class RoadmapItemView extends ItemView {
 			return;
 		}
 
+		// project.start는 기획 로드맵 첫 phase 시작일로 채운다 (ProjectReport에 없음).
+		// 아직 planningEntity가 없을 수도 있으므로 아래에서 실제 값으로 재설정.
+		const projectInfo = {
+			name: projectReport.name,
+			start: "",
+			end: projectReport.deadline,
+		};
+
+		// 로드맵 엔티티 조회
+		const [planningEntity, developmentEntity, tasks] = await Promise.all([
+			this.plugin.roadmapService.getPlanning(),
+			this.plugin.roadmapService.getDevelopment(),
+			this.plugin.taskService.list(),
+		]);
+
 		// 2. 기획 로드맵 미생성
-		if (!planningRoadmapGenerated) {
+		if (!planningEntity) {
 			this.root.render(
 				<RoadmapGenerateView
 					kind="planning"
@@ -99,12 +108,32 @@ export class RoadmapItemView extends ItemView {
 			return;
 		}
 
-		// 3/4. 로드맵 존재 — 탭 2개 있는 정상 RoadmapView
-		const planning = getPlanningRoadmap(projectReport);
-		// 승인 저장된 개발 로드맵이 있으면 그것, 없으면 mock fallback
-		const development = developmentRoadmapGenerated
-			? (this.plugin.settings.developmentRoadmap ??
-				getDevelopmentRoadmap(projectReport))
+		// task.phase로 기획/개발 분리 (§4.4 설계 기준)
+		const toRoadmapTask = (t: (typeof tasks)[number]) => ({
+			id: t.id,
+			name: t.title,
+			kind: "task" as const,
+			status: t.status === "done" ? "done" : t.status === "in-progress" ? "in-progress" : "todo",
+			start: t.startDate,
+			end: t.endDate,
+			progress: t.status === "done" ? 100 : t.status === "in-progress" ? 50 : 0,
+			assignee: t.assigneeId ?? undefined,
+			dependsOn: t.dependsOn,
+			sourceMeetings: t.sourceMeetings,
+		} satisfies RoadmapData["tasks"][number]);
+
+		const planTasks = tasks.filter((t) => t.phase === "PLANNING").map(toRoadmapTask);
+
+		// project.start = 기획 로드맵 첫 phase 시작일
+		projectInfo.start = planningEntity.phases[0]?.start ?? "";
+
+		// 3/4. 로드맵 렌더링
+		const planning = roadmapToData(planningEntity, projectInfo, planTasks);
+		// 개발 로드맵 task = task.phase === "DEVELOPMENT" (§4.4 설계 기준)
+		const devTasks = tasks.filter((t) => t.phase === "DEVELOPMENT").map(toRoadmapTask);
+
+		const development = developmentEntity
+			? roadmapToData(developmentEntity, projectInfo, devTasks)
 			: null;
 
 		this.root.render(
@@ -113,7 +142,7 @@ export class RoadmapItemView extends ItemView {
 				development={development}
 				onGenerateDevelopment={
 					development === null
-						? () => this.openDevRoadmapGenerator()
+						? () => void this.openDevRoadmapGenerator(planning)
 						: undefined
 				}
 				onDeleteDevelopment={
@@ -126,34 +155,46 @@ export class RoadmapItemView extends ItemView {
 		);
 	}
 
-	/** PO-1 기획 로드맵 생성 — 지금은 2.5초 가짜 로딩 후 플래그만 true. */
+	/** PO-1 기획 로드맵 생성 — 2.5초 가짜 로딩 후 service 저장. */
 	private async handleGeneratePlanning(): Promise<void> {
-		// 로딩 중 상태 표시
-		if (this.root) {
-			this.root.render(
-				<RoadmapGenerateView
-					kind="planning"
-					loading
-					onGenerate={() => {}}
-				/>,
-			);
-		}
+		const { projectReport } = this.plugin.settings;
+		if (!projectReport || !this.root) return;
+
+		this.root.render(
+			<RoadmapGenerateView
+				kind="planning"
+				loading
+				onGenerate={() => {}}
+			/>,
+		);
 		await sleep(2500);
-		this.plugin.settings.planningRoadmapGenerated = true;
-		await this.plugin.saveSettings();
-		// saveSettings가 pharos:state-changed 트리거 → render() 재실행됨
+
+		// mock 데이터로 기획 로드맵 구성 (AI 연동 전 임시)
+		const { mockRoadmapData } = await import("./mock");
+		const input: RoadmapInput = {
+			roadmapKind: "planning",
+			phases: mockRoadmapData.phases.map((p) => ({
+				id: p.id,
+				name: p.name,
+				start: p.start,
+				end: p.end,
+				status: p.status === "done" ? "completed" : p.status,
+				activities: p.activities,
+				color: p.color,
+			})),
+		};
+		await this.plugin.roadmapService.savePlanning(input);
+		// savePlanning → eventBus "roadmap:planning-generated" → pharos:state-changed → loadAndRender
 	}
 
 	/**
 	 * PO-6 개발 로드맵 생성 — DevRoadmapGenerateModal 열고
-	 * 승인 시 settings.developmentRoadmap 에 저장.
-	 * TeamService에서 실제 팀원 목록을 가져와 시뮬레이터에 전달.
+	 * 승인 시 roadmapService.saveDevelopment() 로 저장.
 	 */
-	private async openDevRoadmapGenerator(): Promise<void> {
+	private async openDevRoadmapGenerator(planning: RoadmapData): Promise<void> {
 		const { projectReport } = this.plugin.settings;
 		if (!projectReport) return;
 
-		const planning = getPlanningRoadmap(projectReport);
 		const planningEndIso =
 			planning.phases.find((p) => p.id === "phase-plan")?.end ??
 			new Date().toISOString().slice(0, 10);
@@ -173,30 +214,35 @@ export class RoadmapItemView extends ItemView {
 
 		new DevRoadmapGenerateModal(this.app, {
 			report: projectReport,
-			meetings: [], // AI 연동 시 meetingsService → MeetingPageData 변환 예정
+			meetings: [],
 			members,
 			planningEndIso,
 			onApprove: (roadmap: RoadmapData) =>
-				this.applyDevelopmentRoadmap(roadmap),
+				void this.applyDevelopmentRoadmap(roadmap),
 		}).open();
 	}
 
-	/**
-	 * 테스트 전용 — 개발 로드맵을 삭제하고 🔒 잠금 상태로 복귀.
-	 * 기획 로드맵 · 프로젝트 보고서는 그대로 유지.
-	 */
-	private async deleteDevelopmentRoadmap(): Promise<void> {
-		this.plugin.settings.developmentRoadmap = null;
-		this.plugin.settings.developmentRoadmapGenerated = false;
-		await this.plugin.saveSettings();
+	private async applyDevelopmentRoadmap(roadmap: RoadmapData): Promise<void> {
+		const input: RoadmapInput = {
+			roadmapKind: "development",
+			phases: roadmap.phases.map((p) => ({
+				id: p.id,
+				name: p.name,
+				start: p.start,
+				end: p.end,
+				status: p.status === "done" ? "completed" : p.status,
+				activities: p.activities,
+				color: p.color,
+			})),
+		};
+		await this.plugin.roadmapService.saveDevelopment(input);
+		// saveDevelopment → eventBus → pharos:state-changed → loadAndRender
 	}
 
-	private async applyDevelopmentRoadmap(
-		roadmap: RoadmapData,
-	): Promise<void> {
-		this.plugin.settings.developmentRoadmap = roadmap;
-		this.plugin.settings.developmentRoadmapGenerated = true;
-		await this.plugin.saveSettings();
+	/** 테스트 전용 — 개발 로드맵 삭제 후 🔒 잠금 상태 복귀. */
+	private async deleteDevelopmentRoadmap(): Promise<void> {
+		await this.plugin.roadmapService.deleteDevelopment();
+		// deleteDevelopment → eventBus → pharos:state-changed → loadAndRender
 	}
 
 	private async openView(viewType: string): Promise<void> {
