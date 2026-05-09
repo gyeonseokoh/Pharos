@@ -85,8 +85,8 @@ export class TaskDetailItemView extends ItemView {
 		}
 		const [checklist, assignee] = await Promise.all([
 			this.plugin.taskService.listChecklist(this.taskId),
-			task.assigneeId
-				? this.plugin.teamService.getById(task.assigneeId)
+			task.assignee?.id
+				? this.plugin.teamService.getById(task.assignee.id)
 				: Promise.resolve(null),
 		]);
 		this.taskData = {

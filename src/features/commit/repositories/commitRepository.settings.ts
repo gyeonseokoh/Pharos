@@ -48,9 +48,10 @@ export class SettingsCommitRepository implements CommitRepository {
 		for (const [month, newCommits] of byMonth) {
 			const idx = batches.findIndex((b) => b.month === month);
 
-			if (idx >= 0) {
+			const existingBatch = idx >= 0 ? batches[idx] : undefined;
+			if (idx >= 0 && existingBatch) {
 				// 기존 배치에 병합 — sha 기준 중복 제거 (신규가 기존을 덮어씀)
-				const merged = [...batches[idx].commits];
+				const merged = [...existingBatch.commits];
 				for (const c of newCommits) {
 					const existingIdx = merged.findIndex((e) => e.sha === c.sha);
 					if (existingIdx >= 0) {
@@ -60,7 +61,7 @@ export class SettingsCommitRepository implements CommitRepository {
 					}
 				}
 				batches[idx] = {
-					...batches[idx],
+					...existingBatch,
 					commits: merged,
 					syncedAt: now,
 					updatedAt: now,

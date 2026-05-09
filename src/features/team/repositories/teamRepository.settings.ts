@@ -46,7 +46,7 @@ export class SettingsTeamRepository implements TeamRepository {
 		const idx = members.findIndex((m) => m.id === next.id);
 
 		if (idx >= 0) {
-			const before = members[idx];
+			const before = members[idx]!;
 			members[idx] = next;
 			this.plugin.settings.members = members;
 			await this.plugin.saveSettings();
@@ -124,7 +124,7 @@ export class SettingsInviteRepository implements InviteRepository {
 		const idx = invites.findIndex((inv) => inv.id === next.id);
 
 		if (idx >= 0) {
-			const before = invites[idx];
+			const before = invites[idx]!;
 			invites[idx] = next;
 			this.plugin.settings.invites = invites;
 			await this.plugin.saveSettings();

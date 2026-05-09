@@ -167,8 +167,8 @@ function toISOWeekString(weekStart: string): string {
 function isoWeekStringToWeekStart(isoWeek: string): string | null {
 	const m = isoWeek.match(/^(\d{4})-W(\d{2})$/);
 	if (!m) return null;
-	const year = parseInt(m[1]);
-	const week = parseInt(m[2]);
+	const year = parseInt(m[1]!);
+	const week = parseInt(m[2]!);
 	// ISO 8601: 1월 4일은 반드시 1주차에 포함됨
 	const jan4 = new Date(year, 0, 4);
 	const jan4Day = jan4.getDay() || 7; // 1=Mon … 7=Sun

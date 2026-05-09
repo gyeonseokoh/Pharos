@@ -117,7 +117,7 @@ export class RoadmapItemView extends ItemView {
 			start: t.startDate,
 			end: t.endDate,
 			progress: t.status === "done" ? 100 : t.status === "in-progress" ? 50 : 0,
-			assignee: t.assigneeId ?? undefined,
+			assignee: t.assignee?.id ?? undefined,
 			dependsOn: t.dependsOn,
 			sourceMeetings: t.sourceMeetings,
 		} satisfies RoadmapData["tasks"][number]);

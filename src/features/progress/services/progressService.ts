@@ -52,9 +52,10 @@ export class ProgressService {
 		const map = new Map<string, MemberProgressSummary>();
 
 		for (const task of tasks) {
-			if (!task.assigneeId) continue;
-			const existing = map.get(task.assigneeId) ?? {
-				memberId: task.assigneeId,
+			if (!task.assignee) continue;
+			const id = task.assignee.id;
+			const existing = map.get(id) ?? {
+				memberId: id,
 				total: 0,
 				done: 0,
 				inProgress: 0,
@@ -62,7 +63,7 @@ export class ProgressService {
 			existing.total++;
 			if (task.status === "done") existing.done++;
 			if (task.status === "in-progress") existing.inProgress++;
-			map.set(task.assigneeId, existing);
+			map.set(id, existing);
 		}
 
 		return Array.from(map.values());

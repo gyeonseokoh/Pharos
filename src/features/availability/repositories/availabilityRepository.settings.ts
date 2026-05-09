@@ -34,13 +34,14 @@ export class SettingsAvailabilityRepository implements AvailabilityRepository {
 		const idx = availabilities.findIndex((a) => a.weekStart === weekStart);
 		const now = new Date().toISOString();
 
+		const existing = idx >= 0 ? availabilities[idx] : undefined;
 		const next: Availability = {
 			version: 1,
 			type: "availability",
 			id: `avail-${weekStart}`,
 			weekStart,
 			slots,
-			createdAt: idx >= 0 ? availabilities[idx].createdAt : now,
+			createdAt: existing?.createdAt ?? now,
 			updatedAt: now,
 		};
 
