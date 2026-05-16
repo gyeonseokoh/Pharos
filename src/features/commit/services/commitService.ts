@@ -28,6 +28,7 @@ export class CommitService {
 	 * 월 경계 무관하게 전체 배치를 탐색.
 	 */
 	async listByTask(taskId: string): Promise<CommitEntry[]> {
+		console.log("test")
 		return this.repo.listByTask(taskId);
 	}
 
