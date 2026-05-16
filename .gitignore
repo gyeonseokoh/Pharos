@@ -1,5 +1,5 @@
 # vscode
-.vscode 
+.vscode
 
 # Intellij
 *.iml
@@ -20,3 +20,13 @@ data.json
 
 # Exclude macOS Finder (System Explorer) View States
 .DS_Store
+
+# env
+.env
+.env.local
+
+# Claude Code assistant memory (local only)
+.claude/
+
+# Obsidian vault plugin folder (installed plugin, not source)
+Pharos/

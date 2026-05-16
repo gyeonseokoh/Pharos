@@ -1,7 +1,7 @@
 {
-	"name": "obsidian-sample-plugin",
-	"version": "1.0.0",
-	"description": "This is a sample plugin for Obsidian (https://obsidian.md)",
+	"name": "pharos",
+	"version": "0.1.0",
+	"description": "AI-powered project manager for Obsidian — roadmap automation, meeting intelligence, and real-time progress tracking.",
 	"main": "main.js",
 	"type": "module",
 	"scripts": {
@@ -10,28 +10,49 @@
 		"version": "node version-bump.mjs && git add manifest.json versions.json",
 		"lint": "eslint ."
 	},
-	"keywords": [],
+	"keywords": [
+		"obsidian",
+		"project-management",
+		"ai",
+		"roadmap",
+		"collaboration"
+	],
 	"license": "0-BSD",
 	"devDependencies": {
-		"@codemirror/state": "6.5.0",
-		"@codemirror/view": "6.5.0",
 		"@eslint/js": "9.30.1",
 		"@types/node": "^16.11.6",
-		"esbuild": "0.25.5",
+		"@types/react": "^18.3.12",
+		"@types/react-dom": "^18.3.1",
+		"autoprefixer": "^10.5.0",
+		"esbuild": "^0.25.5",
+		"esbuild-plugin-postcss2": "^0.1.2",
 		"eslint-plugin-obsidianmd": "0.1.9",
 		"globals": "14.0.0",
 		"jiti": "2.6.1",
+		"postcss": "^8.5.10",
+		"tailwindcss": "^3.4.19",
 		"tslib": "2.4.0",
 		"typescript": "^5.8.3",
 		"typescript-eslint": "8.35.1"
 	},
 	"dependencies": {
-		"@hocuspocus/provider": "^4.0.0",
+		"@fontsource/pretendard": "^5.2.5",
+		"@fullcalendar/core": "^6.1.15",
+		"@fullcalendar/daygrid": "^6.1.15",
+		"@fullcalendar/interaction": "^6.1.15",
+		"@fullcalendar/react": "^6.1.15",
+		"@fullcalendar/timegrid": "^6.1.15",
+		"@radix-ui/react-dialog": "^1.1.15",
+		"@radix-ui/react-slot": "^1.2.4",
+		"class-variance-authority": "^0.7.1",
+		"clsx": "^2.1.1",
+		"gantt-task-react": "^0.3.9",
+		"lucide-react": "^1.8.0",
 		"obsidian": "latest",
-		"y-codemirror.next": "^0.3.5"
-	},
-	"overrides": {
-		"@codemirror/state": "6.5.0",
-		"@codemirror/view": "6.5.0"
+		"openai": "^4.67.1",
+		"react": "^18.3.1",
+		"react-dom": "^18.3.1",
+		"tailwind-merge": "^3.5.0",
+		"zod": "^3.23.8"
 	}
 }

@@ -1,0 +1,137 @@
+/**
+ * 캘린더 뷰 목업 데이터.
+ * 시나리오: Pharos 프로젝트 (4월~5월 중심).
+ */
+
+import type { CalendarData } from "../domain/calendarData";
+
+export const mockCalendarData: CalendarData = {
+	meetings: [
+		// ─── 4월 ───
+		{
+			id: "mtg-0406",
+			title: "주간 정기 회의",
+			date: "2026-04-06",
+			time: "14:00",
+			durationMinutes: 60,
+			type: "regular",
+			filePath: "Meetings/2026-04-06 주간 정기 회의.md",
+			topicCount: 3,
+		},
+		{
+			id: "mtg-0413",
+			title: "주간 정기 회의",
+			date: "2026-04-13",
+			time: "14:00",
+			durationMinutes: 60,
+			type: "regular",
+			filePath: "Meetings/2026-04-13 주간 정기 회의.md",
+			topicCount: 4,
+		},
+		{
+			id: "mtg-0415-adhoc",
+			title: "기술 스택 긴급 논의",
+			date: "2026-04-15",
+			time: "19:00",
+			durationMinutes: 90,
+			type: "adhoc",
+			filePath: "Meetings/2026-04-15 기술 스택 긴급 논의.md",
+			topicCount: 2,
+		},
+		{
+			id: "mtg-0420",
+			title: "주간 정기 회의",
+			date: "2026-04-20",
+			time: "14:00",
+			durationMinutes: 60,
+			type: "regular",
+			filePath: "Meetings/2026-04-20 주간 정기 회의.md",
+			topicCount: 5,
+		},
+		{
+			id: "mtg-0422-adhoc",
+			title: "UI/UX 리뷰",
+			date: "2026-04-22",
+			time: "16:00",
+			durationMinutes: 60,
+			type: "adhoc",
+			filePath: "Meetings/2026-04-22 UI·UX 리뷰.md",
+			topicCount: 3,
+		},
+		{
+			id: "mtg-0424-adhoc",
+			title: "UI/UX 레이아웃 중간 리뷰",
+			date: "2026-04-24",
+			time: "16:00",
+			durationMinutes: 60,
+			type: "adhoc",
+			filePath: "Meetings/2026-04-24 UI·UX 레이아웃 중간 리뷰.md",
+			topicCount: 2,
+		},
+		{
+			id: "mtg-0426-adhoc",
+			title: "기술 스택 검토 (AI 모델)",
+			date: "2026-04-26",
+			time: "19:00",
+			durationMinutes: 60,
+			type: "adhoc",
+			topicCount: 0,
+		},
+		{
+			id: "mtg-0427",
+			title: "주간 정기 회의",
+			date: "2026-04-27",
+			time: "14:00",
+			durationMinutes: 60,
+			type: "regular",
+			topicCount: 0,
+		},
+		{
+			id: "mtg-0430-adhoc",
+			title: "중간발표 리허설",
+			date: "2026-04-30",
+			time: "10:00",
+			durationMinutes: 120,
+			type: "adhoc",
+			topicCount: 2,
+		},
+
+		// ─── 5월 ───
+		{
+			id: "mtg-0504",
+			title: "주간 정기 회의",
+			date: "2026-05-04",
+			time: "14:00",
+			durationMinutes: 60,
+			type: "regular",
+			topicCount: 0,
+		},
+		{
+			id: "mtg-0507-adhoc",
+			title: "프로토타입 검토",
+			date: "2026-05-07",
+			time: "15:00",
+			durationMinutes: 90,
+			type: "adhoc",
+			topicCount: 0,
+		},
+		{
+			id: "mtg-0511",
+			title: "주간 정기 회의",
+			date: "2026-05-11",
+			time: "14:00",
+			durationMinutes: 60,
+			type: "regular",
+			topicCount: 0,
+		},
+		{
+			id: "mtg-0514-adhoc",
+			title: "중간발표",
+			date: "2026-05-14",
+			time: "13:00",
+			durationMinutes: 180,
+			type: "adhoc",
+			topicCount: 0,
+		},
+	],
+};
