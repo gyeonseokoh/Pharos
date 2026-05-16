@@ -60,8 +60,14 @@ import { TaskService } from "./features/task/services/taskService";
 import { VaultRoadmapRepository } from "./features/roadmap/repositories/roadmapRepository.vault";
 import type { RoadmapRepository } from "./features/roadmap/repositories/roadmapRepository";
 import { RoadmapService } from "./features/roadmap/services/roadmapService";
-import { VaultTeamRepository, VaultInviteRepository } from "./features/team/repositories/teamRepository.vault";
-import type { TeamRepository, InviteRepository } from "./features/team/repositories/teamRepository";
+import {
+	VaultTeamRepository,
+	VaultInviteRepository,
+} from "./features/team/repositories/teamRepository.vault";
+import type {
+	TeamRepository,
+	InviteRepository,
+} from "./features/team/repositories/teamRepository";
 import { TeamService } from "./features/team/services/teamService";
 import { ProgressService } from "./features/progress/services/progressService";
 import { VaultAvailabilityRepository } from "./features/availability/repositories/availabilityRepository.vault";
@@ -112,10 +118,15 @@ export default class PharosPlugin extends Plugin {
 		this.availabilityRepository = new VaultAvailabilityRepository(this);
 		this.commitRepository = new VaultCommitRepository(this);
 		this.taskService = new TaskService(this.taskRepository);
-		this.availabilityService = new AvailabilityService(this.availabilityRepository);
+		this.availabilityService = new AvailabilityService(
+			this.availabilityRepository,
+		);
 		this.commitService = new CommitService(this.commitRepository);
 		this.roadmapService = new RoadmapService(this.roadmapRepository);
-		this.teamService = new TeamService(this.teamRepository, this.inviteRepository);
+		this.teamService = new TeamService(
+			this.teamRepository,
+			this.inviteRepository,
+		);
 		this.progressService = new ProgressService(this.taskRepository);
 
 		// 마이그레이션: data.json → .md (최초 1회, 사용자 동의 후 실행)
@@ -202,7 +213,8 @@ export default class PharosPlugin extends Plugin {
 		this.addCommand({
 			id: "open-meetings",
 			name: "Open Meetings List",
-			callback: () => void this.activateView(VIEW_TYPE_PHAROS_MEETINGS_LIST),
+			callback: () =>
+				void this.activateView(VIEW_TYPE_PHAROS_MEETINGS_LIST),
 		});
 		this.addCommand({
 			id: "open-team-list",
@@ -232,7 +244,8 @@ export default class PharosPlugin extends Plugin {
 	}
 
 	async loadSettings(): Promise<void> {
-		const stored = (await this.loadData()) as Partial<PharosSettings> | null;
+		const stored =
+			(await this.loadData()) as Partial<PharosSettings> | null;
 		this.settings = { ...DEFAULT_SETTINGS, ...(stored ?? {}) };
 	}
 
