@@ -42,6 +42,14 @@ interface CommitStats {
 	verifiedTasks: number;
 }
 
+/** PO-12 2축 데이터 — 팀원 1인당 효성도 + 완료체크 */
+interface MemberTwoAxisStats {
+	/** 효성도 축: verified 커밋이 연결된 Task 수 */
+	verifiedTaskCount: number;
+	/** 완료체크 축: userChecked=true 인 Task 수 */
+	userCheckedCount: number;
+}
+
 function buildProgressPrompt(
 	asOf: string,
 	taskSummary: TaskProgressSummary,
@@ -51,6 +59,7 @@ function buildProgressPrompt(
 	memberMap: Map<string, string>,
 	checklistStats: ChecklistStats,
 	commitStats: CommitStats,
+	memberStatsMap: Map<string, MemberTwoAxisStats>,
 ): string {
 	const lines: string[] = [
 		"당신은 소프트웨어 프로젝트의 진행 상황을 분석하는 PM 어시스턴트입니다.",
@@ -109,13 +118,17 @@ function buildProgressPrompt(
 	}
 
 	if (memberSummaries.length > 0) {
-		lines.push("## 팀원별 진행 현황");
+		lines.push("## 팀원별 진행 현황 (PO-12 2축: 효성도 + 완료체크)");
 		for (const m of memberSummaries) {
 			const name = memberMap.get(m.memberId) ?? m.memberId;
 			const rate =
 				m.total === 0 ? 0 : Math.round((m.done / m.total) * 100);
+			const stats = memberStatsMap.get(m.memberId);
+			const twoAxis = stats
+				? `, 검증커밋 Task ${stats.verifiedTaskCount}개(효성도), 완료체크 ${stats.userCheckedCount}개`
+				: "";
 			lines.push(
-				`- ${name}(${m.memberId}): ${m.done}/${m.total}개 완료 (${rate}%), 진행중 ${m.inProgress}개`,
+				`- ${name}(${m.memberId}): ${m.done}/${m.total}개 완료 (${rate}%), 진행중 ${m.inProgress}개${twoAxis}`,
 			);
 		}
 		lines.push("");
@@ -246,6 +259,20 @@ export class AgentService {
 		const members = await this.teamService.listActive();
 		const memberMap = new Map(members.map((m) => [m.id, m.name]));
 
+		// 8-1. PO-12 2축: 팀원별 효성도(검증커밋 Task) + 완료체크(userChecked) 집계
+		const memberStatsMap = new Map<string, MemberTwoAxisStats>();
+		for (const m of memberSummaries) {
+			const memberTasks = allTasks.filter(
+				(t) => t.assignee?.id === m.memberId,
+			);
+			memberStatsMap.set(m.memberId, {
+				verifiedTaskCount: memberTasks.filter((t) =>
+					t.linkedCommits.some((c) => c.verifyResult === "verified"),
+				).length,
+				userCheckedCount: memberTasks.filter((t) => t.userChecked).length,
+			});
+		}
+
 		// 9. OpenAI 호출
 		const prompt = buildProgressPrompt(
 			asOf,
@@ -256,6 +283,7 @@ export class AgentService {
 			memberMap,
 			checklistStats,
 			commitStats,
+			memberStatsMap,
 		);
 
 		const openai = new OpenAI({
@@ -308,12 +336,15 @@ export class AgentService {
 		).map((h) => {
 			const memberId = h.memberId ?? "";
 			const ms = memberSummaries.find((m) => m.memberId === memberId);
+			const stats = memberStatsMap.get(memberId);
 			const completionRate =
 				ms && ms.total > 0 ? Math.round((ms.done / ms.total) * 100) : 0;
 			return {
 				memberId,
 				memberName: memberMap.get(memberId) ?? memberId,
 				completionRate, // 실데이터 기반 계산 (PO-12: AI 추정 % 금지)
+				verifiedTaskCount: stats?.verifiedTaskCount ?? 0, // PO-12 효성도 축
+				userCheckedCount: stats?.userCheckedCount ?? 0, // PO-12 완료체크 축
 				highlight: h.highlight ?? "",
 			};
 		});

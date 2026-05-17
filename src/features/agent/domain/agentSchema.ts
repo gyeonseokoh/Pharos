@@ -27,8 +27,12 @@ export interface ProgressInsight {
 export interface MemberHighlight {
 	memberId: string;
 	memberName: string;
-	/** 완료율 0~100. */
+	/** Task 상태 기준 완료율 0~100. 실데이터 기반 (PO-12). */
 	completionRate: number;
+	/** PO-12 효성도 축: verified 커밋이 1개 이상 연결된 Task 수. */
+	verifiedTaskCount: number;
+	/** PO-12 완료체크 축: userChecked=true 인 Task 수. */
+	userCheckedCount: number;
 	/** AI가 생성한 팀원 현황 한 줄 요약. */
 	highlight: string;
 }
