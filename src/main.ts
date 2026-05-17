@@ -77,6 +77,7 @@ import { VaultCommitRepository } from "./features/commit/repositories/commitRepo
 import type { CommitRepository } from "./features/commit/repositories/commitRepository";
 import { CommitService } from "./features/commit/services/commitService";
 import { runMigrationIfNeeded } from "./app/migration";
+import { AgentService } from "features/agent/services/agentService";
 
 export default class PharosPlugin extends Plugin {
 	settings: PharosSettings = { ...DEFAULT_SETTINGS };
@@ -100,6 +101,7 @@ export default class PharosPlugin extends Plugin {
 	progressService!: ProgressService;
 	availabilityService!: AvailabilityService;
 	commitService!: CommitService;
+	agentService!: AgentService;
 
 	async onload(): Promise<void> {
 		await this.loadSettings();
