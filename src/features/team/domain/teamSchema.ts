@@ -28,7 +28,8 @@ export const MemberV1 = z.object({
 	type: z.literal("team-member"),
 	id: z.string().min(1),
 	name: z.string().min(1),
-	email: z.string().email(),
+	/** 옵셔널. GitHub OAuth 연동 시 자동 채워짐 (경석 sync 모듈). */
+	email: z.string().email().optional(),
 	role: MemberRoleSchema,
 	permission: MemberPermissionSchema,
 	techStacks: z.array(z.string()).default([]),
@@ -64,10 +65,11 @@ export type Invite = z.infer<typeof InviteV1>;
 /**
  * UI 폼 → Member 엔티티 변환용 입력 타입.
  * version·type·id·status·joinedAt·createdAt·updatedAt은 Service가 채움.
+ * email은 옵셔널 — GitHub OAuth 연동 시 별도 채워짐.
  */
 export interface MemberInput {
 	name: string;
-	email: string;
+	email?: string;
 	role: MemberRole;
 	permission: MemberPermission;
 	techStacks: string[];

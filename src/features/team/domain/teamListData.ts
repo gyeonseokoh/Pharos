@@ -8,7 +8,8 @@ export type MemberPermission = "ADMIN" | "WRITE" | "READ";
 export interface TeamMember {
 	id: string;
 	name: string;
-	email: string;
+	/** 옵셔널. GitHub OAuth 연동 시 자동 채워짐. */
+	email?: string;
 	role: MemberRole;
 	permission: MemberPermission;
 	/** 기술 스택 배열. */

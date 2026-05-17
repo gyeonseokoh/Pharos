@@ -47,13 +47,21 @@ export class TeamService {
 	 *
 	 * 책임:
 	 *   - Member 엔티티 구성 (status "active")
-	 *   - 이메일 중복 확인
+	 *   - 이름 중복 확인 (email은 옵셔널 — GitHub OAuth 연동 시 별도 채워짐)
 	 *   - Repository 저장
 	 *   - "team:member-added" 이벤트 발행
 	 */
 	async addMember(input: MemberInput): Promise<Member> {
-		const existing = await this.memberRepo.getByEmail(input.email);
-		if (existing) throw new Error(`이미 등록된 이메일입니다: ${input.email}`);
+		// 이름 중복 체크 (소규모 팀 가정)
+		const all = await this.memberRepo.list();
+		const dupName = all.find((m) => m.name === input.name && m.status !== "left");
+		if (dupName) throw new Error(`이미 등록된 이름입니다: ${input.name}`);
+
+		// 이메일이 입력된 경우만 중복 체크
+		if (input.email) {
+			const dupEmail = await this.memberRepo.getByEmail(input.email);
+			if (dupEmail) throw new Error(`이미 등록된 이메일입니다: ${input.email}`);
+		}
 
 		const now = new Date().toISOString();
 		const member: Member = {
@@ -61,7 +69,7 @@ export class TeamService {
 			type: "team-member",
 			id: `m-${Date.now()}`,
 			name: input.name,
-			email: input.email,
+			...(input.email ? { email: input.email } : {}),
 			role: input.role,
 			permission: input.permission,
 			techStacks: input.techStacks,

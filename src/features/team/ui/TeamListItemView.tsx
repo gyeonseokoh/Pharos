@@ -97,7 +97,7 @@ export class TeamListItemView extends ItemView {
 		this.root.render(
 			<TeamListView
 				data={this.teamData}
-				onInvite={() => new InviteMemberModal(this.app).open()}
+				onInvite={() => new InviteMemberModal(this.app, this.plugin).open()}
 				onChangePermission={(id) =>
 					new Notice(`[미구현] ${id} 권한 변경 Modal 예정`)
 				}

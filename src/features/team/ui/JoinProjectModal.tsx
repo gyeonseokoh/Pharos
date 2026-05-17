@@ -1,6 +1,10 @@
 /**
  * JoinProjectModal — PM-1 초기 가입 + 기술스택 + when2meet.
  * 팀원이 초대 링크/코드로 들어와서 채우는 폼.
+ *
+ * 호출 경로:
+ *   - 초대 링크 클릭 → main.ts protocol handler → 이 모달 (token 검증된 상태)
+ *   - 또는 PO가 직접 띄움 (token 없이 — 시연·테스트)
  */
 
 import { useState } from "react";
@@ -12,41 +16,84 @@ import {
 	ModalLayout,
 } from "shared/ui";
 import { When2MeetGrid } from "./When2MeetGrid";
+import type { MemberRole, MemberPermission } from "../domain/teamSchema";
+import type { PharosPluginLike } from "../../../app/settings";
+
+export interface JoinProjectModalArgs {
+	/** 초대 토큰 (있으면 검증된 상태로 들어옴). 없으면 시연·테스트 모드. */
+	token?: string;
+	/** 토큰 검증에서 받은 권한 (기본 WRITE). */
+	permission?: MemberPermission;
+}
 
 interface FormState {
 	name: string;
-	email: string;
-	password: string;
+	role: MemberRole;
 	techStacks: string;
 	availability: Set<string>;
 }
 
-function Content({ onClose }: { onClose: () => void }) {
+function Content({
+	plugin,
+	args,
+	onClose,
+}: {
+	plugin: PharosPluginLike;
+	args: JoinProjectModalArgs;
+	onClose: () => void;
+}) {
 	const [form, setForm] = useState<FormState>({
 		name: "",
-		email: "",
-		password: "",
+		role: "PM",
 		techStacks: "",
 		availability: new Set<string>(),
 	});
 
 	const canSubmit =
 		form.name.trim() &&
-		form.email.includes("@") &&
-		form.password.length >= 6 &&
 		form.techStacks.trim() &&
 		form.availability.size > 0;
+
+	const [submitting, setSubmitting] = useState(false);
+
+	const handleSubmit = async (): Promise<void> => {
+		if (submitting) return;
+		setSubmitting(true);
+		try {
+			const techStacks = form.techStacks
+				.split(",")
+				.map((s) => s.trim())
+				.filter(Boolean);
+			await plugin.teamService.addMember({
+				name: form.name.trim(),
+				role: form.role,
+				permission: args.permission ?? "WRITE",
+				techStacks,
+			});
+			// 가입 완료 → 토큰 소비 (일회용)
+			if (args.token) {
+				await plugin.inviteService.consumeToken(args.token).catch(() => {});
+			}
+			// TODO(PM-1): availability를 AvailabilityService로 저장
+			new Notice(`${form.name} 님 가입 완료`);
+			onClose();
+		} catch (err) {
+			new Notice(`가입 실패: ${(err as Error).message}`);
+			setSubmitting(false);
+		}
+	};
 
 	return (
 		<ModalLayout
 			title="🙋 프로젝트 참여"
-			description="정보를 입력하고 가용 시간을 선택해주세요"
-			submitLabel="참여"
-			submitDisabled={!canSubmit}
-			onSubmit={() => {
-				new Notice(`[미구현] ${form.name} 님 가입 예정`);
-				onClose();
-			}}
+			description={
+				args.token
+					? "초대 링크로 진입했습니다. 정보를 입력해주세요"
+					: "정보를 입력하고 가용 시간을 선택해주세요"
+			}
+			submitLabel={submitting ? "처리 중..." : "참여"}
+			submitDisabled={!canSubmit || submitting}
+			onSubmit={() => void handleSubmit()}
 			onCancel={onClose}
 			widthClass="max-w-2xl"
 		>
@@ -59,24 +106,20 @@ function Content({ onClose }: { onClose: () => void }) {
 						onChange={(e) => setForm({ ...form, name: e.target.value })}
 					/>
 				</FormField>
-				<FormField label="이메일" required>
-					<input
-						type="email"
+				<FormField label="역할" required>
+					<select
 						className={inputClass}
-						value={form.email}
-						onChange={(e) => setForm({ ...form, email: e.target.value })}
-					/>
+						style={{ height: "38px", lineHeight: "1.5" }}
+						value={form.role}
+						onChange={(e) =>
+							setForm({ ...form, role: e.target.value as MemberRole })
+						}
+					>
+						<option value="PM">PM (팀원)</option>
+						<option value="PO">PO (팀장)</option>
+					</select>
 				</FormField>
 			</div>
-
-			<FormField label="비밀번호" required hint="6자 이상">
-				<input
-					type="password"
-					className={inputClass}
-					value={form.password}
-					onChange={(e) => setForm({ ...form, password: e.target.value })}
-				/>
-			</FormField>
 
 			<FormField
 				label="기술 스택"
@@ -108,7 +151,21 @@ function Content({ onClose }: { onClose: () => void }) {
 }
 
 export class JoinProjectModal extends BaseReactModal {
+	constructor(
+		app: App,
+		private readonly plugin: PharosPluginLike,
+		private readonly args: JoinProjectModalArgs = {},
+	) {
+		super(app);
+	}
+
 	renderContent() {
-		return <Content onClose={() => this.close()} />;
+		return (
+			<Content
+				plugin={this.plugin}
+				args={this.args}
+				onClose={() => this.close()}
+			/>
+		);
 	}
 }

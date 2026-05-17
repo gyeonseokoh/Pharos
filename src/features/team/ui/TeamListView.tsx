@@ -218,10 +218,12 @@ function MemberCard({
 						)}
 					</div>
 
-					<p className="mt-0.5 flex items-center gap-1 text-[11px] text-text-faint">
-						<Mail className="h-3 w-3" />
-						{member.email}
-					</p>
+					{member.email && (
+						<p className="mt-0.5 flex items-center gap-1 text-[11px] text-text-faint">
+							<Mail className="h-3 w-3" />
+							{member.email}
+						</p>
+					)}
 
 					{member.techStacks.length > 0 && (
 						<div className="mt-1.5 flex flex-wrap gap-1">

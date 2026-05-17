@@ -156,6 +156,11 @@ export interface PharosPluginLike extends Plugin {
 	commitService: import("../features/commit/services/commitService").CommitService;
 	/** ProgressService — features/progress/services/progressService.ts */
 	progressService: import("../features/progress/services/progressService").ProgressService;
+	/**
+	 * InviteService — features/team/services/inviteService.ts
+	 * 시연용 LocalInviteService 또는 백엔드용 ServerInviteService 주입 (main.ts).
+	 */
+	inviteService: import("../features/team/services/inviteService").InviteService;
 }
 
 export class PharosSettingsTab extends PluginSettingTab {

@@ -71,6 +71,11 @@ import { VaultCommitRepository } from "./features/commit/repositories/commitRepo
 import type { CommitRepository } from "./features/commit/repositories/commitRepository";
 import { CommitService } from "./features/commit/services/commitService";
 import { runMigrationIfNeeded } from "./app/migration";
+import { eventBus, type DomainEventName } from "./shared/repo/eventBus";
+import { Notice } from "obsidian";
+import type { InviteService } from "./features/team/services/inviteService";
+import { LocalInviteService } from "./features/team/services/inviteService.local";
+import { JoinProjectModal } from "./features/team/ui/JoinProjectModal";
 
 export default class PharosPlugin extends Plugin {
 	settings: PharosSettings = { ...DEFAULT_SETTINGS };
@@ -94,6 +99,7 @@ export default class PharosPlugin extends Plugin {
 	progressService!: ProgressService;
 	availabilityService!: AvailabilityService;
 	commitService!: CommitService;
+	inviteService!: InviteService;
 
 	async onload(): Promise<void> {
 		await this.loadSettings();
@@ -118,8 +124,23 @@ export default class PharosPlugin extends Plugin {
 		this.teamService = new TeamService(this.teamRepository, this.inviteRepository);
 		this.progressService = new ProgressService(this.taskRepository);
 
+		// ─── InviteService 주입 ───
+		// 시연용: LocalInviteService (같은 컴퓨터 안에서만 동작)
+		// 백엔드 합류 시: ServerInviteService 로 한 줄 교체
+		//   this.inviteService = new ServerInviteService({ baseUrl, getAuthToken, getWorkspaceId });
+		this.inviteService = new LocalInviteService({
+			inviteRepo: this.inviteRepository,
+			getWorkspaceId: async () => {
+				const p = await this.projectService.get();
+				return p?.workspaceId ?? null;
+			},
+		});
+
 		// 마이그레이션: data.json → .md (최초 1회, 사용자 동의 후 실행)
-		await runMigrationIfNeeded(this);
+		// onload 안에서 await 하면 옵시디언 부팅이 모달 대기로 멈춤 → onLayoutReady 후 비동기 실행
+		this.app.workspace.onLayoutReady(() => {
+			void runMigrationIfNeeded(this);
+		});
 
 		// 뷰 타입 등록 — 모든 ItemView에 plugin 인스턴스 주입해서
 		// this.plugin.settings 읽고 saveSettings() 호출 가능하게 함.
@@ -225,6 +246,82 @@ export default class PharosPlugin extends Plugin {
 
 		// 설정 탭 등록
 		this.addSettingTab(new PharosSettingsTab(this.app, this));
+
+		// ─── 초대 링크 protocol handler ─────────────────────────────
+		// obsidian://pharos-join?token=xxx&workspace=yyy 클릭 시
+		// 옵시디언이 자동 실행되면서 이 콜백 호출.
+		// (회의 합의: 옵시디언 안쪽은 유석, 서버 통합은 경석)
+		this.registerObsidianProtocolHandler("pharos-join", (params) => {
+			void this.handleJoinLink(params.token ?? "");
+		});
+
+		// eventBus(새) ↔ workspace 이벤트 + settings.projectReport(구) 다리
+		// — UI는 아직 settings.projectReport·"pharos:state-changed" 의존이라
+		//   Service가 Vault에 저장한 뒤 이 다리가 settings 미러링 + 이벤트 발행
+		this.setupEventBridge();
+	}
+
+	/**
+	 * eventBus(도메인 이벤트) → settings 미러링 + "pharos:state-changed" 발행.
+	 *
+	 * Service가 Vault에 저장한 직후 호출돼서, 기존 UI(설정 의존)도 갱신되게 함.
+	 * UI 전부가 Repository 기반으로 옮기면 이 다리 제거 가능.
+	 */
+	private setupEventBridge(): void {
+		const syncProject = async (): Promise<void> => {
+			const p = await this.projectService.get();
+			if (p) {
+				this.settings.projectReport = {
+					name: p.name,
+					description: p.description,
+					deadline: p.deadline,
+					fixedMeetingMode: p.fixedMeetingMode,
+					fixedMeetingDay: p.fixedMeetingDay,
+					fixedMeetingTime: p.fixedMeetingTime,
+					createdAt: p.createdAt,
+				};
+				this.settings.planningRoadmapGenerated = p.planningRoadmapGenerated;
+				this.settings.developmentRoadmapGenerated = p.developmentRoadmapGenerated;
+			} else {
+				this.settings.projectReport = null;
+				this.settings.planningRoadmapGenerated = false;
+				this.settings.developmentRoadmapGenerated = false;
+			}
+			await this.saveSettings();
+		};
+
+		// Project 관련: settings 미러링 + 이벤트 발행
+		const projectEvents: DomainEventName[] = [
+			"project:created",
+			"project:updated",
+			"project:reset",
+			"roadmap:planning-generated",
+			"roadmap:development-generated",
+			"roadmap:development-deleted",
+		];
+		for (const evt of projectEvents) {
+			const off = eventBus.on(evt, () => void syncProject());
+			this.register(() => off.dispose());
+		}
+
+		// 그 외 도메인 이벤트: workspace.trigger만 호출 (UI 리렌더용)
+		const triggerOnly: DomainEventName[] = [
+			"meeting:created",
+			"meeting:updated",
+			"meeting:deleted",
+			"minutes:attached",
+			"task:created",
+			"task:updated",
+			"task:checked",
+			"team:member-added",
+			"team:member-removed",
+		];
+		for (const evt of triggerOnly) {
+			const off = eventBus.on(evt, () => {
+				this.app.workspace.trigger("pharos:state-changed");
+			});
+			this.register(() => off.dispose());
+		}
 	}
 
 	async onunload(): Promise<void> {
@@ -246,7 +343,31 @@ export default class PharosPlugin extends Plugin {
 	 * 시연/테스트용. projectReport·로드맵 플래그를 초기 상태로 리셋.
 	 * 모든 뷰가 "프로젝트 없음" empty state로 돌아감.
 	 */
+	/**
+	 * 초대 링크 클릭 시 호출되는 핸들러.
+	 * 토큰 검증 → 유효하면 JoinProjectModal 오픈.
+	 */
+	private async handleJoinLink(token: string): Promise<void> {
+		if (!token) {
+			new Notice("초대 링크에 토큰이 없습니다");
+			return;
+		}
+		const invite = await this.inviteService.verifyToken(token);
+		if (!invite) {
+			new Notice("초대 링크가 유효하지 않거나 만료되었습니다 (24h)");
+			return;
+		}
+		new JoinProjectModal(this.app, this, { token }).open();
+	}
+
 	async resetProject(): Promise<void> {
+		// Vault에 저장된 Project도 같이 삭제 (eventBus.emit("project:reset") 발행됨)
+		try {
+			await this.projectService.reset();
+		} catch (err) {
+			console.error("[Pharos] projectService.reset() 실패:", err);
+		}
+		// 구버전 settings 필드도 함께 초기화
 		this.settings.projectReport = null;
 		this.settings.planningRoadmapGenerated = false;
 		this.settings.developmentRoadmapGenerated = false;
