@@ -22,7 +22,8 @@ import { NewProjectModal } from "../../project/ui/NewProjectModal";
 import { ProjectSettingsModal } from "../../project/ui/ProjectSettingsModal";
 import { VIEW_TYPE_PHAROS_ROADMAP } from "../../roadmap/ui/RoadmapItemView";
 import { VIEW_TYPE_PHAROS_TEAM_LIST } from "../../team/ui/TeamListItemView";
-import type { PharosPluginLike, ProjectReport } from "../../../app/settings";
+import type { PharosPluginLike } from "../../../app/settings";
+import type { Project } from "../../project/domain/projectSchema";
 import type { DashboardData, DashboardAlert } from "../domain/dashboardData";
 
 export const VIEW_TYPE_PHAROS_DASHBOARD = "pharos-dashboard-view";
@@ -57,8 +58,9 @@ export class DashboardItemView extends ItemView {
 		void this.loadAndRender();
 
 		this.registerEvent(
-			this.app.workspace.on("pharos:state-changed" as never, () =>
-				void this.loadAndRender(),
+			this.app.workspace.on(
+				"pharos:state-changed" as never,
+				() => void this.loadAndRender(),
 			),
 		);
 	}
@@ -70,57 +72,65 @@ export class DashboardItemView extends ItemView {
 
 	private async loadAndRender(): Promise<void> {
 		if (!this.root) return;
-		const { projectReport } = this.plugin.settings;
+		const project = await this.plugin.projectService.get();
 
-		if (!projectReport) {
+		if (!project) {
 			this.root.render(
 				<EmptyDashboardView
 					onCreateProject={() =>
-						new NewProjectModal(
-							this.app,
-							this.plugin.projectService,
-						).open()
+						new NewProjectModal(this.app, this.plugin).open()
 					}
 				/>,
 			);
 			return;
 		}
 
-		const data = await this.buildDashboardData(projectReport);
+		const data = await this.buildDashboardData(project);
 		this.root.render(
 			<DashboardView
 				data={data}
-				onOpenRoadmap={() => void this.openView(VIEW_TYPE_PHAROS_ROADMAP)}
+				onOpenRoadmap={() =>
+					void this.openView(VIEW_TYPE_PHAROS_ROADMAP)
+				}
 				onOpenMeetings={() =>
 					void this.openView(VIEW_TYPE_PHAROS_MEETINGS_LIST)
 				}
-				onOpenProgress={() => void this.openView(VIEW_TYPE_PHAROS_PROGRESS)}
-				onOpenMyTasks={() => void this.openView(VIEW_TYPE_PHAROS_MY_TASKS)}
-				onOpenCalendar={() => void this.openView(VIEW_TYPE_PHAROS_CALENDAR)}
-				onOpenTeam={() => void this.openView(VIEW_TYPE_PHAROS_TEAM_LIST)}
-				onGenerateMeetingTopics={() => new AiTopicModal(this.app).open()}
+				onOpenProgress={() =>
+					void this.openView(VIEW_TYPE_PHAROS_PROGRESS)
+				}
+				onOpenMyTasks={() =>
+					void this.openView(VIEW_TYPE_PHAROS_MY_TASKS)
+				}
+				onOpenCalendar={() =>
+					void this.openView(VIEW_TYPE_PHAROS_CALENDAR)
+				}
+				onOpenTeam={() =>
+					void this.openView(VIEW_TYPE_PHAROS_TEAM_LIST)
+				}
+				onGenerateMeetingTopics={() =>
+					new AiTopicModal(this.app).open()
+				}
 				onOpenSettings={() =>
 					new ProjectSettingsModal(this.app, {
-						topic: projectReport.name,
-						description: projectReport.description,
-						deadline: projectReport.deadline,
+						topic: project.name,
+						description: project.description,
+						deadline: project.deadline,
 					}).open()
 				}
 			/>,
 		);
 	}
 
-	private async buildDashboardData(
-		projectReport: ProjectReport,
-	): Promise<DashboardData> {
+	private async buildDashboardData(project: Project): Promise<DashboardData> {
 		const today = new Date().toISOString().slice(0, 10);
-		const deadlineDate = new Date(projectReport.deadline + "T00:00:00");
+		const deadlineDate = new Date(project.deadline + "T00:00:00");
 		const todayDate = new Date();
 		todayDate.setHours(0, 0, 0, 0);
 		const daysLeft = Math.max(
 			0,
 			Math.round(
-				(deadlineDate.getTime() - todayDate.getTime()) / (1000 * 60 * 60 * 24),
+				(deadlineDate.getTime() - todayDate.getTime()) /
+					(1000 * 60 * 60 * 24),
 			),
 		);
 
@@ -134,7 +144,8 @@ export class DashboardItemView extends ItemView {
 			.filter((m) => m.date >= today && m.status !== "completed")
 			.sort(
 				(a, b) =>
-					a.date.localeCompare(b.date) || a.time.localeCompare(b.time),
+					a.date.localeCompare(b.date) ||
+					a.time.localeCompare(b.time),
 			)
 			.slice(0, 3)
 			.map((m) => ({ date: m.date, time: m.time, title: m.title }));
@@ -147,8 +158,8 @@ export class DashboardItemView extends ItemView {
 			});
 		}
 		if (
-			!this.plugin.settings.planningRoadmapGenerated &&
-			!this.plugin.settings.developmentRoadmapGenerated
+			!project.planningRoadmapGenerated &&
+			!project.developmentRoadmapGenerated
 		) {
 			alerts.push({
 				severity: "info",
@@ -158,8 +169,8 @@ export class DashboardItemView extends ItemView {
 
 		return {
 			project: {
-				name: projectReport.name,
-				deadline: projectReport.deadline,
+				name: project.name,
+				deadline: project.deadline,
 				daysUntilPrototype: null,
 				totalDays: daysLeft,
 			},
@@ -176,7 +187,8 @@ export class DashboardItemView extends ItemView {
 			myTasks: {
 				inProgress: taskSummary.inProgress,
 				total: taskSummary.total,
-				memberName: members.find((m) => m.status === "active")?.name ?? "나",
+				memberName:
+					members.find((m) => m.status === "active")?.name ?? "나",
 			},
 			members: members.map((m) => ({
 				id: m.id,
@@ -187,7 +199,7 @@ export class DashboardItemView extends ItemView {
 			})),
 			meetings: upcomingMeetings,
 			importantDates: [
-				{ label: "최종 마감", date: projectReport.deadline, dday: daysLeft },
+				{ label: "최종 마감", date: project.deadline, dday: daysLeft },
 			],
 			alerts,
 		};
