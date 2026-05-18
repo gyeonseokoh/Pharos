@@ -298,7 +298,7 @@ export class AgentService {
 		});
 
 		const raw = completion.choices[0]?.message?.content ?? "{}";
-		const parsed = JSON.parse(raw) as {
+		type ParsedResponse = {
 			overallHealth?: "on-track" | "at-risk" | "critical";
 			insights?: Array<{
 				type?: string;
@@ -311,6 +311,13 @@ export class AgentService {
 			}>;
 			summary?: string;
 		};
+		let parsed: ParsedResponse = {};
+		try {
+			parsed = JSON.parse(raw) as ParsedResponse;
+		} catch {
+			// AI가 유효하지 않은 JSON을 반환한 경우 빈 객체로 fallback
+			// 이후 ?? 기본값 처리로 안전하게 처리됨
+		}
 
 		// 10. 타입 정제 및 이름 enrichment
 		const validInsightTypes = new Set([
