@@ -122,24 +122,54 @@ export class AgentService {
 			dateTo: weekEnd,
 		});
 
-		// ── 4. 기존 회의와 충돌하는 슬롯 제거 ─────────────────────────────────
+		// ── 4. 슬롯 정제 (BR-2: 09:00~21:00, BR-5: 기존 회의 전후 2시간 여유) ─────
+		const BUSINESS_START = toMinutes("09:00");
+		const BUSINESS_END = toMinutes("21:00");
+		const BUFFER_MINUTES = 120; // BR-5
+
 		const cleanSlots = participantSlots.filter((slot) => {
+			// BR-2: 영업 시간(09:00~21:00) 이내만 허용
+			if (
+				toMinutes(slot.start) < BUSINESS_START ||
+				toMinutes(slot.end) > BUSINESS_END
+			) {
+				return false;
+			}
 			const slotDate = dayToDate(input.weekStart, slot.day);
+			// BR-5: 기존 회의와 2시간 버퍼 포함해서 충돌 여부 확인
 			return !existingMeetings.some(
 				(m) =>
 					m.date === slotDate &&
-					timesOverlap(slot.start, slot.end, m.time, m.durationMinutes),
+					timesConflictWithBuffer(
+						slot.start,
+						slot.end,
+						m.time,
+						m.durationMinutes,
+						BUFFER_MINUTES,
+					),
 			);
 		});
+
+		// ── 4a. 대안 흐름: 정제 슬롯 없으면 BR-2만 적용한 슬롯으로 재시도 ────────
+		// (PO-4 UC 3a — 공통 가용시간 없음 → 최선 부분 매칭)
+		const noCommonSlots = cleanSlots.length === 0;
+		const slotsForAI = noCommonSlots
+			? participantSlots.filter(
+					(slot) =>
+						toMinutes(slot.start) >= BUSINESS_START &&
+						toMinutes(slot.end) <= BUSINESS_END,
+				)
+			: cleanSlots;
 
 		// ── 5. 프롬프트 구성 + OpenAI 호출 ────────────────────────────────────
 		const prompt = buildSchedulePrompt({
 			weekStart: input.weekStart,
 			participants,
-			slots: cleanSlots,
+			slots: slotsForAI,
 			existingMeetings,
 			minParticipants,
 			meetingDurationMinutes,
+			noCommonSlots,
 		});
 
 		// Obsidian은 Electron renderer 환경이므로 dangerouslyAllowBrowser 필요
@@ -157,10 +187,16 @@ export class AgentService {
 
 		// ── 6. 응답 파싱 + 날짜 보강 ──────────────────────────────────────────
 		const content = response.choices[0]?.message?.content ?? "{}";
-		const raw = JSON.parse(content) as {
+		type RawResponse = {
 			recommendations?: Omit<MeetingSlotRecommendation, "date">[];
 			summary?: string;
 		};
+		let raw: RawResponse = {};
+		try {
+			raw = JSON.parse(content) as RawResponse;
+		} catch {
+			// AI가 유효하지 않은 JSON을 반환한 경우 빈 결과로 처리
+		}
 
 		// AI가 반환한 멤버 이름이 실제 참여자 목록에 있는지 검증
 		const validMemberNames = new Set(participants.map((m) => m.name));
@@ -229,6 +265,24 @@ export function timesOverlap(
 	return sStart < mEnd && sEnd > mStart;
 }
 
+/**
+ * BR-5: bufferMinutes 포함한 슬롯-회의 충돌 여부.
+ * 슬롯과 회의 사이에 bufferMinutes 이상의 여유가 없으면 충돌.
+ */
+export function timesConflictWithBuffer(
+	slotStart: string,
+	slotEnd: string,
+	meetStart: string,
+	durationMinutes: number,
+	bufferMinutes: number,
+): boolean {
+	const sStart = toMinutes(slotStart);
+	const sEnd = toMinutes(slotEnd);
+	const mStart = toMinutes(meetStart);
+	const mEnd = mStart + durationMinutes;
+	return sStart < mEnd + bufferMinutes && sEnd > mStart - bufferMinutes;
+}
+
 // ─── 프롬프트 빌더 ───────────────────────────────────────────────────────────
 
 interface PromptInput {
@@ -238,6 +292,8 @@ interface PromptInput {
 	existingMeetings: Meeting[];
 	minParticipants: number;
 	meetingDurationMinutes: number;
+	/** 공통 가용시간이 없어 BR-5 버퍼를 완화한 슬롯으로 대체한 경우 true. */
+	noCommonSlots: boolean;
 }
 
 /** OpenAI user 프롬프트 구성. */
@@ -248,6 +304,7 @@ function buildSchedulePrompt({
 	existingMeetings,
 	minParticipants,
 	meetingDurationMinutes,
+	noCommonSlots,
 }: PromptInput): string {
 	// 팀원 목록
 	const memberSection = participants.map((m) => `- ${m.name} (${m.role})`).join("\n");
@@ -286,19 +343,24 @@ function buildSchedulePrompt({
 					.map((m) => `- ${m.date} ${m.time} (${m.durationMinutes}분): ${m.title}`)
 					.join("\n");
 
+	const commonNote = noCommonSlots
+		? `- 주의: 모든 조건을 만족하는 공통 가용시간이 없습니다. 가능한 한 많은 팀원이 참여할 수 있는 최선의 시간대를 추천해 주세요(최소 인원 조건을 충족하지 못해도 됩니다).`
+		: `- 최소 ${minParticipants}명 이상이 참여할 수 있는 시간대를 추천해 주세요.`;
+
 	return `=== 팀원 목록 ===
 ${memberSection}
 
-=== ${weekStart} 주차 팀원별 가용시간 (기존 회의와 충돌 제거 후) ===
+=== ${weekStart} 주차 팀원별 가용시간 (09:00~21:00, 기존 회의 전후 2시간 제외) ===
 ${availabilitySection}
 
 === 기존 회의 일정 (해당 주) ===
 ${meetingSection}
 
 === 요청 사항 ===
-- 최소 ${minParticipants}명 이상이 참여할 수 있는 시간대를 최대 3개 추천해 주세요.
+${commonNote}
+- 최대 3개 시간대를 추천해 주세요.
 - 각 슬롯은 ${meetingDurationMinutes}분 이상 여유가 있어야 합니다.
-- 기존 회의와 겹치는 시간은 이미 제거되었습니다. 위 가용시간 내에서만 추천해 주세요.
+- 위 가용시간 내에서만 추천해 주세요.
 - 더 많은 팀원이 참여할 수 있는 시간을 우선 추천해 주세요.
 - 추천 이유를 구체적으로 한국어로 작성해 주세요.`;
 }

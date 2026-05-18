@@ -130,6 +130,11 @@ export default class PharosPlugin extends Plugin {
 			this.inviteRepository,
 		);
 		this.progressService = new ProgressService(this.taskRepository);
+		this.agentService = new AgentService(
+			this.teamService,
+			this.availabilityService,
+			this.meetingsService,
+		);
 
 		// 마이그레이션: data.json → .md (최초 1회, 사용자 동의 후 실행)
 		await runMigrationIfNeeded(this);
