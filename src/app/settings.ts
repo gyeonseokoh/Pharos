@@ -156,6 +156,8 @@ export interface PharosPluginLike extends Plugin {
 	commitService: import("../features/commit/services/commitService").CommitService;
 	/** ProgressService — features/progress/services/progressService.ts */
 	progressService: import("../features/progress/services/progressService").ProgressService;
+	/** AgentService — features/agent/services/agentService.ts */
+	agentService: import("../features/agent/services/agentService").AgentService;
 }
 
 export class PharosSettingsTab extends PluginSettingTab {
