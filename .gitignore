@@ -30,3 +30,7 @@ data.json
 
 # Obsidian vault plugin folder (installed plugin, not source)
 Pharos/
+
+# firebase
+firebase-debug.log
+.firebase/
