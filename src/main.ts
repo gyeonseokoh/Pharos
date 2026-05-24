@@ -75,6 +75,7 @@ import { Notice } from "obsidian";
 import type { InviteService } from "./features/team/services/inviteService";
 import { LocalInviteService } from "./features/team/services/inviteService.local";
 import { JoinProjectModal } from "./features/team/ui/JoinProjectModal";
+import { AgentService } from "./features/agent/services/agentService";
 
 export default class PharosPlugin extends Plugin {
 	settings: PharosSettings = { ...DEFAULT_SETTINGS };
@@ -99,6 +100,7 @@ export default class PharosPlugin extends Plugin {
 	availabilityService!: AvailabilityService;
 	commitService!: CommitService;
 	inviteService!: InviteService;
+	agentService!: AgentService;
 
 	async onload(): Promise<void> {
 		await this.loadSettings();
@@ -122,6 +124,14 @@ export default class PharosPlugin extends Plugin {
 		this.roadmapService = new RoadmapService(this.roadmapRepository);
 		this.teamService = new TeamService(this.teamRepository, this.inviteRepository);
 		this.progressService = new ProgressService(this.taskRepository);
+		this.agentService = new AgentService(
+			this.teamService,
+			this.availabilityService,
+			this.meetingsService,
+			this.progressService,
+			this.taskService,
+			this.roadmapService,
+		);
 
 		// ─── InviteService 주입 ───
 		// 시연용: LocalInviteService (같은 컴퓨터 안에서만 동작)

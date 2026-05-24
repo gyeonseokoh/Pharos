@@ -161,6 +161,8 @@ export interface PharosPluginLike extends Plugin {
 	 * 시연용 LocalInviteService 또는 백엔드용 ServerInviteService 주입 (main.ts).
 	 */
 	inviteService: import("../features/team/services/inviteService").InviteService;
+	/** AgentService — features/agent/services/agentService.ts */
+	agentService: import("../features/agent/services/agentService").AgentService;
 }
 
 export class PharosSettingsTab extends PluginSettingTab {
