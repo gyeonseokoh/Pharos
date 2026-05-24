@@ -1,0 +1,64 @@
+[debug] [2026-05-24T13:51:42.327Z] Checked if tokens are valid: true, expires at: 1779634178280
+[debug] [2026-05-24T13:51:42.330Z] Checked if tokens are valid: true, expires at: 1779634178280
+[debug] [2026-05-24T13:51:42.331Z] Checked if tokens are valid: true, expires at: 1779634178280
+[debug] [2026-05-24T13:51:42.331Z] Checked if tokens are valid: true, expires at: 1779634178280
+[debug] [2026-05-24T13:51:42.332Z] Checked if tokens are valid: true, expires at: 1779634178280
+[debug] [2026-05-24T13:51:42.332Z] Checked if tokens are valid: true, expires at: 1779634178280
+[debug] [2026-05-24T13:51:42.332Z] Checked if tokens are valid: true, expires at: 1779634178280
+[debug] [2026-05-24T13:51:42.332Z] Checked if tokens are valid: true, expires at: 1779634178280
+[debug] [2026-05-24T13:51:42.333Z] Checked if tokens are valid: true, expires at: 1779634178280
+[debug] [2026-05-24T13:51:42.333Z] Checked if tokens are valid: true, expires at: 1779634178280
+[debug] [2026-05-24T13:51:42.333Z] Checked if tokens are valid: true, expires at: 1779634178280
+[debug] [2026-05-24T13:51:42.333Z] Checked if tokens are valid: true, expires at: 1779634178280
+[debug] [2026-05-24T13:51:42.334Z] Checked if tokens are valid: true, expires at: 1779634178280
+[debug] [2026-05-24T13:51:42.334Z] Checked if tokens are valid: true, expires at: 1779634178280
+[debug] [2026-05-24T13:51:42.334Z] Checked if tokens are valid: true, expires at: 1779634178280
+[debug] [2026-05-24T13:51:42.334Z] Checked if tokens are valid: true, expires at: 1779634178280
+[debug] [2026-05-24T13:51:42.335Z] Checked if tokens are valid: true, expires at: 1779634178280
+[debug] [2026-05-24T13:51:42.335Z] Checked if tokens are valid: true, expires at: 1779634178280
+[debug] [2026-05-24T13:51:42.335Z] Checked if tokens are valid: true, expires at: 1779634178280
+[debug] [2026-05-24T13:51:42.335Z] Checked if tokens are valid: true, expires at: 1779634178280
+[debug] [2026-05-24T13:51:42.336Z] >>> [apiv2][query] GET https://serviceusage.googleapis.com/v1/projects/couple-mission-app/services/ [none]
+[debug] [2026-05-24T13:51:42.336Z] >>> [apiv2][(partial)header] GET https://serviceusage.googleapis.com/v1/projects/couple-mission-app/services/ x-goog-quota-user=projects/couple-mission-app
+[debug] [2026-05-24T13:51:42.337Z] >>> [apiv2][query] GET https://serviceusage.googleapis.com/v1/projects/couple-mission-app/services/firebasedataconnect.googleapis.com [none]
+[debug] [2026-05-24T13:51:42.337Z] >>> [apiv2][(partial)header] GET https://serviceusage.googleapis.com/v1/projects/couple-mission-app/services/firebasedataconnect.googleapis.com x-goog-quota-user=projects/couple-mission-app
+[debug] [2026-05-24T13:51:42.338Z] >>> [apiv2][query] GET https://serviceusage.googleapis.com/v1/projects/couple-mission-app/services/firebasecrashlytics.googleapis.com [none]
+[debug] [2026-05-24T13:51:42.338Z] >>> [apiv2][(partial)header] GET https://serviceusage.googleapis.com/v1/projects/couple-mission-app/services/firebasecrashlytics.googleapis.com x-goog-quota-user=projects/couple-mission-app
+[debug] [2026-05-24T13:51:42.339Z] >>> [apiv2][query] GET https://serviceusage.googleapis.com/v1/projects/couple-mission-app/services/firebaseapphosting.googleapis.com [none]
+[debug] [2026-05-24T13:51:42.339Z] >>> [apiv2][(partial)header] GET https://serviceusage.googleapis.com/v1/projects/couple-mission-app/services/firebaseapphosting.googleapis.com x-goog-quota-user=projects/couple-mission-app
+[debug] [2026-05-24T13:51:42.339Z] >>> [apiv2][query] GET https://serviceusage.googleapis.com/v1/projects/couple-mission-app/services/firebaseio.com [none]
+[debug] [2026-05-24T13:51:42.339Z] >>> [apiv2][(partial)header] GET https://serviceusage.googleapis.com/v1/projects/couple-mission-app/services/firebaseio.com x-goog-quota-user=projects/couple-mission-app
+[debug] [2026-05-24T13:51:42.340Z] >>> [apiv2][query] GET https://serviceusage.googleapis.com/v1/projects/couple-mission-app/services/ [none]
+[debug] [2026-05-24T13:51:42.340Z] >>> [apiv2][(partial)header] GET https://serviceusage.googleapis.com/v1/projects/couple-mission-app/services/ x-goog-quota-user=projects/couple-mission-app
+[debug] [2026-05-24T13:51:42.341Z] >>> [apiv2][query] GET https://serviceusage.googleapis.com/v1/projects/couple-mission-app/services/firebasedataconnect.googleapis.com [none]
+[debug] [2026-05-24T13:51:42.341Z] >>> [apiv2][(partial)header] GET https://serviceusage.googleapis.com/v1/projects/couple-mission-app/services/firebasedataconnect.googleapis.com x-goog-quota-user=projects/couple-mission-app
+[debug] [2026-05-24T13:51:42.341Z] >>> [apiv2][query] GET https://serviceusage.googleapis.com/v1/projects/couple-mission-app/services/firebasecrashlytics.googleapis.com [none]
+[debug] [2026-05-24T13:51:42.341Z] >>> [apiv2][(partial)header] GET https://serviceusage.googleapis.com/v1/projects/couple-mission-app/services/firebasecrashlytics.googleapis.com x-goog-quota-user=projects/couple-mission-app
+[debug] [2026-05-24T13:51:42.343Z] >>> [apiv2][query] GET https://serviceusage.googleapis.com/v1/projects/couple-mission-app/services/firebaseapphosting.googleapis.com [none]
+[debug] [2026-05-24T13:51:42.343Z] >>> [apiv2][(partial)header] GET https://serviceusage.googleapis.com/v1/projects/couple-mission-app/services/firebaseapphosting.googleapis.com x-goog-quota-user=projects/couple-mission-app
+[debug] [2026-05-24T13:51:42.344Z] >>> [apiv2][query] GET https://serviceusage.googleapis.com/v1/projects/couple-mission-app/services/firebaseio.com [none]
+[debug] [2026-05-24T13:51:42.344Z] >>> [apiv2][(partial)header] GET https://serviceusage.googleapis.com/v1/projects/couple-mission-app/services/firebaseio.com x-goog-quota-user=projects/couple-mission-app
+[debug] [2026-05-24T13:51:43.430Z] <<< [apiv2][status] GET https://serviceusage.googleapis.com/v1/projects/couple-mission-app/services/firebaseio.com 403
+[debug] [2026-05-24T13:51:43.430Z] <<< [apiv2][body] GET https://serviceusage.googleapis.com/v1/projects/couple-mission-app/services/firebaseio.com [omitted]
+[debug] [2026-05-24T13:51:43.438Z] <<< [apiv2][status] GET https://serviceusage.googleapis.com/v1/projects/couple-mission-app/services/firebaseio.com 403
+[debug] [2026-05-24T13:51:43.438Z] <<< [apiv2][body] GET https://serviceusage.googleapis.com/v1/projects/couple-mission-app/services/firebaseio.com [omitted]
+[debug] [2026-05-24T13:51:43.466Z] <<< [apiv2][status] GET https://serviceusage.googleapis.com/v1/projects/couple-mission-app/services/firebasedataconnect.googleapis.com 200
+[debug] [2026-05-24T13:51:43.466Z] <<< [apiv2][body] GET https://serviceusage.googleapis.com/v1/projects/couple-mission-app/services/firebasedataconnect.googleapis.com [omitted]
+[debug] [2026-05-24T13:51:43.467Z] <<< [apiv2][status] GET https://serviceusage.googleapis.com/v1/projects/couple-mission-app/services/firebaseapphosting.googleapis.com 200
+[debug] [2026-05-24T13:51:43.467Z] <<< [apiv2][body] GET https://serviceusage.googleapis.com/v1/projects/couple-mission-app/services/firebaseapphosting.googleapis.com [omitted]
+[debug] [2026-05-24T13:51:43.479Z] <<< [apiv2][status] GET https://serviceusage.googleapis.com/v1/projects/couple-mission-app/services/firebasecrashlytics.googleapis.com 200
+[debug] [2026-05-24T13:51:43.479Z] <<< [apiv2][body] GET https://serviceusage.googleapis.com/v1/projects/couple-mission-app/services/firebasecrashlytics.googleapis.com [omitted]
+[debug] [2026-05-24T13:51:43.484Z] <<< [apiv2][status] GET https://serviceusage.googleapis.com/v1/projects/couple-mission-app/services/firebaseapphosting.googleapis.com 200
+[debug] [2026-05-24T13:51:43.484Z] <<< [apiv2][body] GET https://serviceusage.googleapis.com/v1/projects/couple-mission-app/services/firebaseapphosting.googleapis.com [omitted]
+[debug] [2026-05-24T13:51:43.486Z] <<< [apiv2][status] GET https://serviceusage.googleapis.com/v1/projects/couple-mission-app/services/firebasedataconnect.googleapis.com 200
+[debug] [2026-05-24T13:51:43.486Z] <<< [apiv2][body] GET https://serviceusage.googleapis.com/v1/projects/couple-mission-app/services/firebasedataconnect.googleapis.com [omitted]
+[debug] [2026-05-24T13:51:43.493Z] <<< [apiv2][status] GET https://serviceusage.googleapis.com/v1/projects/couple-mission-app/services/firebasecrashlytics.googleapis.com 200
+[debug] [2026-05-24T13:51:43.493Z] <<< [apiv2][body] GET https://serviceusage.googleapis.com/v1/projects/couple-mission-app/services/firebasecrashlytics.googleapis.com [omitted]
+[debug] [2026-05-24T13:51:43.771Z] <<< [apiv2][status] GET https://serviceusage.googleapis.com/v1/projects/couple-mission-app/services/ 200
+[debug] [2026-05-24T13:51:43.772Z] <<< [apiv2][body] GET https://serviceusage.googleapis.com/v1/projects/couple-mission-app/services/ [omitted]
+[debug] [2026-05-24T13:51:43.775Z] > command requires scopes: ["email","openid","https://www.googleapis.com/auth/cloudplatformprojects.readonly","https://www.googleapis.com/auth/firebase","https://www.googleapis.com/auth/cloud-platform"]
+[debug] [2026-05-24T13:51:43.776Z] > authorizing via signed-in user (yuseok0997@gmail.com)
+[debug] [2026-05-24T13:51:43.777Z] <<< [apiv2][status] GET https://serviceusage.googleapis.com/v1/projects/couple-mission-app/services/ 200
+[debug] [2026-05-24T13:51:43.777Z] <<< [apiv2][body] GET https://serviceusage.googleapis.com/v1/projects/couple-mission-app/services/ [omitted]
+[debug] [2026-05-24T13:51:43.781Z] > command requires scopes: ["email","openid","https://www.googleapis.com/auth/cloudplatformprojects.readonly","https://www.googleapis.com/auth/firebase","https://www.googleapis.com/auth/cloud-platform"]
+[debug] [2026-05-24T13:51:43.782Z] > authorizing via signed-in user (yuseok0997@gmail.com)
