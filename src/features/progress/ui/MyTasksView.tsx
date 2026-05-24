@@ -284,6 +284,14 @@ function FilterTabs({
 	);
 }
 
+/**
+ * 전체 / 진행 중 / 예정 / 완료 필터 탭 버튼.
+ *
+ * <button> 대신 <div role="button"> 사용.
+ * Obsidian 테마가 <button>에 기본 스타일을 주입해
+ * active 상태의 배경색(accent)이 덮어씌워져 탭 구분이 안 되는 문제를 수정.
+ * 회의 목록(예정/완료/전체)과 동일한 패턴으로 통일.
+ */
 function FilterButton({
 	active,
 	onClick,
@@ -296,10 +304,18 @@ function FilterButton({
 	count: number;
 }) {
 	return (
-		<button
+		<div
 			onClick={onClick}
+			role="button"
+			tabIndex={0}
+			onKeyDown={(e) => {
+				if (e.key === "Enter" || e.key === " ") {
+					e.preventDefault();
+					onClick();
+				}
+			}}
 			className={cn(
-				"rounded px-3 py-1.5 text-xs font-medium transition-colors",
+				"cursor-pointer select-none rounded px-3 py-1.5 text-xs font-medium transition-colors",
 				active
 					? "bg-[color:var(--interactive-accent)] text-[color:var(--text-on-accent)]"
 					: "text-text-muted hover:text-text-normal",
@@ -314,7 +330,7 @@ function FilterButton({
 			>
 				{count}
 			</span>
-		</button>
+		</div>
 	);
 }
 

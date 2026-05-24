@@ -21,6 +21,10 @@ interface Suggestion {
 	selected: boolean;
 }
 
+// ── [DEMO] AI 연동 전 임시 하드코딩 주제 목록 ──────────────────────────────────
+// AI 연동 PR 시 이 배열 전체를 삭제하고,
+// llmClient.generateTopics(recentMinutes, roadmapProgress) 결과로 교체하세요.
+// ──────────────────────────────────────────────────────────────────────────────
 const mockSuggestions: Suggestion[] = [
 	{
 		id: "s1",

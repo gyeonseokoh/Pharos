@@ -16,7 +16,11 @@ import { RoadmapGenerateView } from "./RoadmapGenerateView";
 import { DevRoadmapGenerateModal } from "./DevRoadmapGenerateModal";
 import { VIEW_TYPE_PHAROS_DASHBOARD } from "../../progress/ui/DashboardItemView";
 import { roadmapToData } from "../domain/roadmapData";
-import type { PharosPluginLike } from "../../../app/settings";
+// ── [DEMO] AI·서버·깃허브 연동 전 임시 데모 시연용 하드코딩 연결 ──────────────────
+// 연동 완료 후 이 import 줄을 삭제하세요.
+import { mockRoadmapData } from "./mock";
+// ──────────────────────────────────────────────────────────────────────────────
+import type { PharosPluginLike, ProjectReport } from "../../../app/settings";
 import type { RoadmapData } from "../domain/roadmapData";
 import type { RoadmapInput } from "../domain/roadmapSchema";
 
@@ -24,6 +28,9 @@ export const VIEW_TYPE_PHAROS_ROADMAP = "pharos-roadmap-view";
 
 export class RoadmapItemView extends ItemView {
 	private root: Root | null = null;
+	// ── [DEMO] 승인된 개발 로드맵을 메모리에 보관 (demoMode 전용).
+	// 연동 완료 후 이 필드를 삭제하세요.
+	private demoDevRoadmap: RoadmapData | null = null;
 
 	constructor(
 		leaf: WorkspaceLeaf,
@@ -65,10 +72,40 @@ export class RoadmapItemView extends ItemView {
 
 	private async loadAndRender(): Promise<void> {
 		if (!this.root) return;
-		const { projectReport } = this.plugin.settings;
+
+		// ── [DEMO] AI·서버·깃허브 연동 전 임시 데모 시연용 하드코딩 연결 ──────────────
+		// 기획 로드맵은 mock 데이터로, 개발 로드맵은 승인 시 메모리(demoDevRoadmap)에 보관.
+		// 연동 완료 후 이 블록 전체(if 문 포함)를 삭제하세요.
+		if (this.plugin.settings.demoMode) {
+			this.root.render(
+				<RoadmapView
+					planning={mockRoadmapData}
+					development={this.demoDevRoadmap}
+					onGenerateDevelopment={
+						this.demoDevRoadmap === null
+							? () => void this.openDevRoadmapGenerator(mockRoadmapData)
+							: undefined
+					}
+					onDeleteDevelopment={
+						this.demoDevRoadmap !== null
+							? () => { this.demoDevRoadmap = null; void this.loadAndRender(); }
+							: undefined
+					}
+					onBackToHome={() => void this.openView(VIEW_TYPE_PHAROS_DASHBOARD)}
+				/>,
+			);
+			return;
+		}
+		// ──────────────────────────────────────────────────────────────────────────────
+
+		// ── [연동 후 실행되는 실서비스 흐름] ────────────────────────────────────────────
+		// demoMode 블록을 삭제하면 아래 코드가 실행됩니다.
+		// settings.projectReport(레거시) 대신 projectService.get()으로 프로젝트를 조회합니다.
+		// ────────────────────────────────────────────────────────────────────────────────
+		const project = await this.plugin.projectService.get();
 
 		// 1. 프로젝트 없음
-		if (!projectReport) {
+		if (!project) {
 			this.root.render(
 				<RoadmapEmptyView
 					onBackToDashboard={() =>
@@ -79,12 +116,12 @@ export class RoadmapItemView extends ItemView {
 			return;
 		}
 
-		// project.start는 기획 로드맵 첫 phase 시작일로 채운다 (ProjectReport에 없음).
+		// project.start는 기획 로드맵 첫 phase 시작일로 채운다.
 		// 아직 planningEntity가 없을 수도 있으므로 아래에서 실제 값으로 재설정.
 		const projectInfo = {
-			name: projectReport.name,
+			name: project.name,
 			start: "",
-			end: projectReport.deadline,
+			end: project.deadline,
 		};
 
 		// 로드맵 엔티티 조회
@@ -157,8 +194,8 @@ export class RoadmapItemView extends ItemView {
 
 	/** PO-1 기획 로드맵 생성 — 2.5초 가짜 로딩 후 service 저장. */
 	private async handleGeneratePlanning(): Promise<void> {
-		const { projectReport } = this.plugin.settings;
-		if (!projectReport || !this.root) return;
+		const project = await this.plugin.projectService.get();
+		if (!project || !this.root) return;
 
 		this.root.render(
 			<RoadmapGenerateView
@@ -169,7 +206,10 @@ export class RoadmapItemView extends ItemView {
 		);
 		await sleep(2500);
 
-		// mock 데이터로 기획 로드맵 구성 (AI 연동 전 임시)
+		// ── [DEMO] AI 연동 전 임시 mock 로드맵 데이터 ──────────────────────────────
+		// AI 연동 PR 시 아래 import와 input 구성 블록을 삭제하고,
+		// llmClient.generatePlanningRoadmap(project) 결과로 교체하세요.
+		// ────────────────────────────────────────────────────────────────────────────
 		const { mockRoadmapData } = await import("./mock");
 		const input: RoadmapInput = {
 			roadmapKind: "planning",
@@ -192,8 +232,18 @@ export class RoadmapItemView extends ItemView {
 	 * 승인 시 roadmapService.saveDevelopment() 로 저장.
 	 */
 	private async openDevRoadmapGenerator(planning: RoadmapData): Promise<void> {
-		const { projectReport } = this.plugin.settings;
-		if (!projectReport) return;
+		const project = await this.plugin.projectService.get();
+		if (!project) return;
+
+		const report: ProjectReport = {
+			name: project.name,
+			description: project.description,
+			deadline: project.deadline,
+			fixedMeetingMode: project.fixedMeetingMode,
+			fixedMeetingDay: project.fixedMeetingDay,
+			fixedMeetingTime: project.fixedMeetingTime,
+			createdAt: project.createdAt,
+		};
 
 		const planningEndIso =
 			planning.phases.find((p) => p.id === "phase-plan")?.end ??
@@ -213,7 +263,7 @@ export class RoadmapItemView extends ItemView {
 		}));
 
 		new DevRoadmapGenerateModal(this.app, {
-			report: projectReport,
+			report,
 			meetings: [],
 			members,
 			planningEndIso,
@@ -223,6 +273,14 @@ export class RoadmapItemView extends ItemView {
 	}
 
 	private async applyDevelopmentRoadmap(roadmap: RoadmapData): Promise<void> {
+		// ── [DEMO] demoMode에서는 서비스 저장 없이 메모리에 보관 후 즉시 재렌더 ──────────
+		// 연동 완료 후 이 if 블록을 삭제하세요.
+		if (this.plugin.settings.demoMode) {
+			this.demoDevRoadmap = roadmap;
+			void this.loadAndRender();
+			return;
+		}
+		// ──────────────────────────────────────────────────────────────────────────────
 		const input: RoadmapInput = {
 			roadmapKind: "development",
 			phases: roadmap.phases.map((p) => ({

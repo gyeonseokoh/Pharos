@@ -9,6 +9,10 @@ import { CalendarView } from "./CalendarView";
 import { VIEW_TYPE_PHAROS_MEETING_PAGE } from "./MeetingPageItemView";
 import { VIEW_TYPE_PHAROS_DASHBOARD } from "../../progress/ui/DashboardItemView";
 import { AdhocMeetingModal } from "./AdhocMeetingModal";
+// ── [DEMO] AI·서버·깃허브 연동 전 임시 데모 시연용 하드코딩 연결 ──────────────────
+// 연동 완료 후 이 import 줄을 삭제하세요.
+import { mockCalendarData } from "./calendarMock";
+// ──────────────────────────────────────────────────────────────────────────────
 import type { CalendarData } from "../domain/calendarData";
 import type { PharosPluginLike } from "../../../app/settings";
 
@@ -57,6 +61,30 @@ export class CalendarItemView extends ItemView {
 	}
 
 	private async loadAndRender(): Promise<void> {
+		// ── [DEMO] AI·서버·깃허브 연동 전 임시 데모 시연용 하드코딩 연결 ──────────────
+		// 연동 완료 후 이 블록 전체(if 문 포함)를 삭제하세요.
+		if (this.plugin.settings.demoMode) {
+			this.calendarData = mockCalendarData;
+			this.render();
+			return;
+		}
+		// ──────────────────────────────────────────────────────────────────────────────
+
+		// ── [연동 후 실행되는 실서비스 흐름] ────────────────────────────────────────────
+		// demoMode 블록을 삭제하면 아래 코드가 실행됩니다.
+		// settings.projectReport(레거시) 대신 projectService.get()으로 프로젝트를 확인합니다.
+		// ────────────────────────────────────────────────────────────────────────────────
+		const project = await this.plugin.projectService.get();
+		if (!project) {
+			this.root?.render(
+				<ProjectRequiredEmpty
+					viewName="캘린더"
+					onOpenDashboard={() => void this.openView(VIEW_TYPE_PHAROS_DASHBOARD)}
+				/>,
+			);
+			return;
+		}
+
 		const meetings = await this.plugin.meetingsService.list();
 		this.calendarData = {
 			meetings: meetings.map((m) => ({
@@ -74,17 +102,6 @@ export class CalendarItemView extends ItemView {
 
 	private render(): void {
 		if (!this.root) return;
-		if (!this.plugin.settings.projectReport) {
-			this.root.render(
-				<ProjectRequiredEmpty
-					viewName="캘린더"
-					onOpenDashboard={() =>
-						void this.openView(VIEW_TYPE_PHAROS_DASHBOARD)
-					}
-				/>,
-			);
-			return;
-		}
 		this.root.render(
 			<CalendarView
 				data={this.calendarData}

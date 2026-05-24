@@ -10,6 +10,10 @@ import { createRoot, type Root } from "react-dom/client";
 import { ProjectRequiredEmpty } from "shared/ui";
 import { ProgressPageView } from "./ProgressPageView";
 import { VIEW_TYPE_PHAROS_DASHBOARD } from "./DashboardItemView";
+// ── [DEMO] AI·서버·깃허브 연동 전 임시 데모 시연용 하드코딩 연결 ──────────────────
+// 연동 완료 후 이 import 줄을 삭제하세요.
+import { mockProgressPageData } from "./progressPageMock";
+// ──────────────────────────────────────────────────────────────────────────────
 import type { ProgressPageData, MemberProgressDetail, ActivityItem } from "../domain/progressPageData";
 import type { PharosPluginLike } from "../../../app/settings";
 
@@ -67,10 +71,27 @@ export class ProgressPageItemView extends ItemView {
 	}
 
 	private async loadAndRender(): Promise<void> {
-		const { projectReport } = this.plugin.settings;
-		if (!projectReport) {
-			this.progressData = null;
+		// ── [DEMO] AI·서버·깃허브 연동 전 임시 데모 시연용 하드코딩 연결 ──────────────
+		// 연동 완료 후 이 블록 전체(if 문 포함)를 삭제하세요.
+		if (this.plugin.settings.demoMode) {
+			this.progressData = mockProgressPageData;
 			this.render();
+			return;
+		}
+		// ──────────────────────────────────────────────────────────────────────────────
+
+		// ── [연동 후 실행되는 실서비스 흐름] ────────────────────────────────────────────
+		// demoMode 블록을 삭제하면 아래 코드가 실행됩니다.
+		// settings.projectReport(레거시) 대신 projectService.get()으로 프로젝트를 확인합니다.
+		// ────────────────────────────────────────────────────────────────────────────────
+		const project = await this.plugin.projectService.get();
+		if (!project) {
+			this.root?.render(
+				<ProjectRequiredEmpty
+					viewName="팀 진행도"
+					onOpenDashboard={() => void this.openView(VIEW_TYPE_PHAROS_DASHBOARD)}
+				/>,
+			);
 			return;
 		}
 
@@ -156,7 +177,7 @@ export class ProgressPageItemView extends ItemView {
 		).length;
 
 		this.progressData = {
-			projectName: projectReport.name,
+			projectName: project.name,
 			lastUpdated: new Date().toISOString(),
 			period: { start: today, end: today, label: "오늘" },
 			team: {
@@ -173,17 +194,6 @@ export class ProgressPageItemView extends ItemView {
 
 	private render(): void {
 		if (!this.root) return;
-		if (!this.plugin.settings.projectReport) {
-			this.root.render(
-				<ProjectRequiredEmpty
-					viewName="팀 진행도"
-					onOpenDashboard={() =>
-						void this.openView(VIEW_TYPE_PHAROS_DASHBOARD)
-					}
-				/>,
-			);
-			return;
-		}
 		if (!this.progressData) return;
 
 		this.root.render(

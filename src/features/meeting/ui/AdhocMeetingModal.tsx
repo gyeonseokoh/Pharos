@@ -23,6 +23,10 @@ interface TimeCandidate {
 	total: number;
 }
 
+// ── [DEMO] 서버 연동 전 임시 하드코딩 시간 후보 ────────────────────────────────
+// 서버 연동 PR 시 이 배열 전체를 삭제하고,
+// availabilityService.getCandidates() 결과로 교체하세요.
+// ──────────────────────────────────────────────────────────────────────────────
 const mockCandidates: TimeCandidate[] = [
 	{
 		id: "c1",

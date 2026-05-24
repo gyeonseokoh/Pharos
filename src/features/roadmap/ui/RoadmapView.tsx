@@ -11,7 +11,7 @@
  * 미래: 같은 ItemView가 `roadmapService.generate(...)` 결과를 주입. 이 파일은 무변경.
  */
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
 	Code2,
 	Compass,
@@ -91,6 +91,18 @@ export function RoadmapView({
 		development !== null ? "development" : "planning",
 	);
 	const [mode, setMode] = useState<Mode>("flow");
+
+	// useState 초기값은 첫 마운트에만 평가된다.
+	// 개발 로드맵 승인 후 RoadmapItemView가 development=roadmap 으로 재렌더해도
+	// 이미 마운트된 컴포넌트는 kind 값을 "planning"에서 바꾸지 않는다.
+	// useRef로 이전 값을 기억해 null→non-null 전환을 감지하고 탭을 강제 전환한다.
+	const prevDevelopment = useRef(development);
+	useEffect(() => {
+		if (prevDevelopment.current === null && development !== null) {
+			setKind("development");
+		}
+		prevDevelopment.current = development;
+	}, [development]);
 
 	const navItems: BackNavItem[] = [];
 	if (onBackToHome)
@@ -676,6 +688,10 @@ function GanttChart({
 	const chartWidth = totalDays * dayWidth;
 	const rowHeight = 36;
 	const labelWidth = 320;
+	// "4/10" 같은 두 자리 날짜 텍스트가 셀 너비(보통 20px)보다 넓어 겹치는 문제 수정.
+	// dayWidth에 따라 N칸마다 한 번만 라벨을 표시한다.
+	// 크게(≥28px): 매일 | 보통(≥18px): 2일마다 | 작게(<18px): 3일마다
+	const labelSkip = dayWidth >= 28 ? 1 : dayWidth >= 18 ? 2 : 3;
 
 	return (
 		<div className="relative overflow-x-auto">
@@ -692,6 +708,7 @@ function GanttChart({
 							const isWeekend = d.getDay() === 0 || d.getDay() === 6;
 							const isToday = i === todayOffset;
 							const isFirstOfMonth = d.getDate() === 1;
+							const showLabel = i % labelSkip === 0;
 							return (
 								<div
 									key={i}
@@ -705,7 +722,7 @@ function GanttChart({
 									style={{ width: dayWidth }}
 								>
 									<div>
-										{d.getMonth() + 1}/{d.getDate()}
+										{showLabel && `${d.getMonth() + 1}/${d.getDate()}`}
 									</div>
 								</div>
 							);
