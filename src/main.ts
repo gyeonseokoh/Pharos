@@ -72,6 +72,8 @@ import type { CommitRepository } from "./features/commit/repositories/commitRepo
 import { CommitService } from "./features/commit/services/commitService";
 import { runMigrationIfNeeded } from "./app/migration";
 import { AgentService } from "./features/agent/services/agentService";
+import { OpenAIProvider } from "./features/agent/providers/OpenAIProvider";
+import { TavilySearchProvider } from "./features/agent/search/TavilySearchProvider";
 
 export default class PharosPlugin extends Plugin {
 	settings: PharosSettings = { ...DEFAULT_SETTINGS };
@@ -119,6 +121,8 @@ export default class PharosPlugin extends Plugin {
 		this.roadmapService = new RoadmapService(this.roadmapRepository);
 		this.teamService = new TeamService(this.teamRepository, this.inviteRepository);
 		this.progressService = new ProgressService(this.taskRepository);
+		const llmProvider = new OpenAIProvider(() => this.settings.openaiApiKey);
+		const searchProvider = new TavilySearchProvider(() => this.settings.tavilyApiKey);
 		this.agentService = new AgentService(
 			this.teamService,
 			this.availabilityService,
@@ -126,6 +130,8 @@ export default class PharosPlugin extends Plugin {
 			this.progressService,
 			this.taskService,
 			this.roadmapService,
+			llmProvider,
+			searchProvider,
 		);
 
 		// 마이그레이션: data.json → .md (최초 1회, 사용자 동의 후 실행)
