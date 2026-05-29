@@ -71,7 +71,13 @@ import { VaultCommitRepository } from "./features/commit/repositories/commitRepo
 import type { CommitRepository } from "./features/commit/repositories/commitRepository";
 import { CommitService } from "./features/commit/services/commitService";
 import { runMigrationIfNeeded } from "./app/migration";
+import { Notice } from "obsidian";
+import type { InviteService } from "./features/team/services/inviteService";
+import { LocalInviteService } from "./features/team/services/inviteService.local";
+import { JoinProjectModal } from "./features/team/ui/JoinProjectModal";
 import { AgentService } from "./features/agent/services/agentService";
+import { GeminiProvider } from "./features/agent/providers/GeminiProvider";
+import { TavilySearchProvider } from "./features/agent/search/TavilySearchProvider";
 
 export default class PharosPlugin extends Plugin {
 	settings: PharosSettings = { ...DEFAULT_SETTINGS };
@@ -95,6 +101,7 @@ export default class PharosPlugin extends Plugin {
 	progressService!: ProgressService;
 	availabilityService!: AvailabilityService;
 	commitService!: CommitService;
+	inviteService!: InviteService;
 	agentService!: AgentService;
 
 	async onload(): Promise<void> {
@@ -119,6 +126,8 @@ export default class PharosPlugin extends Plugin {
 		this.roadmapService = new RoadmapService(this.roadmapRepository);
 		this.teamService = new TeamService(this.teamRepository, this.inviteRepository);
 		this.progressService = new ProgressService(this.taskRepository);
+		const llmProvider = new GeminiProvider(() => this.settings.llmApikey, this.settings.llmModel);
+		const searchProvider = new TavilySearchProvider(() => this.settings.tavilyApiKey);
 		this.agentService = new AgentService(
 			this.teamService,
 			this.availabilityService,
@@ -126,10 +135,27 @@ export default class PharosPlugin extends Plugin {
 			this.progressService,
 			this.taskService,
 			this.roadmapService,
+			llmProvider,
+			searchProvider,
 		);
 
+		// ─── InviteService 주입 ───
+		// 시연용: LocalInviteService (같은 컴퓨터 안에서만 동작)
+		// 백엔드 합류 시: ServerInviteService 로 한 줄 교체
+		//   this.inviteService = new ServerInviteService({ baseUrl, duthToken, getWorkspaceId });
+		this.inviteService = new LocalInviteService({
+			inviteRepo: this.inviteRepository,
+			getWorkspaceId: async () => {
+				const p = await this.projectService.get();
+				return p?.workspaceId ?? null;
+			},
+		});
+
 		// 마이그레이션: data.json → .md (최초 1회, 사용자 동의 후 실행)
-		await runMigrationIfNeeded(this);
+		// onload 안에서 await 하면 옵시디언 부팅이 모달 대기로 멈춤 → onLayoutReady 후 비동기 실행
+		this.app.workspace.onLayoutReady(() => {
+			void runMigrationIfNeeded(this);
+		});
 
 		// 뷰 타입 등록 — 모든 ItemView에 plugin 인스턴스 주입해서
 		// this.plugin.settings 읽고 saveSettings() 호출 가능하게 함.
@@ -235,6 +261,14 @@ export default class PharosPlugin extends Plugin {
 
 		// 설정 탭 등록
 		this.addSettingTab(new PharosSettingsTab(this.app, this));
+
+		// ─── 초대 링크 protocol handler ─────────────────────────────
+		// obsidian://pharos-join?token=xxx&workspace=yyy 클릭 시
+		// 옵시디언이 자동 실행되면서 이 콜백 호출.
+		// (회의 합의: 옵시디언 안쪽은 유석, 서버 통합은 경석)
+		this.registerObsidianProtocolHandler("pharos-join", (params) => {
+			void this.handleJoinLink(params.token ?? "");
+		});
 	}
 
 	async onunload(): Promise<void> {
@@ -250,6 +284,23 @@ export default class PharosPlugin extends Plugin {
 		await this.saveData(this.settings);
 		// 열려있는 모든 뷰가 상태 변화 감지해서 리렌더하도록 이벤트 발행
 		this.app.workspace.trigger("pharos:state-changed");
+	}
+
+	/**
+	 * 초대 링크 클릭 시 호출되는 핸들러.
+	 * 토큰 검증 → 유효하면 JoinProjectModal 오픈.
+	 */
+	private async handleJoinLink(token: string): Promise<void> {
+		if (!token) {
+			new Notice("초대 링크에 토큰이 없습니다");
+			return;
+		}
+		const invite = await this.inviteService.verifyToken(token);
+		if (!invite) {
+			new Notice("초대 링크가 유효하지 않거나 만료되었습니다 (24h)");
+			return;
+		}
+		new JoinProjectModal(this.app, this, { token }).open();
 	}
 
 	/**

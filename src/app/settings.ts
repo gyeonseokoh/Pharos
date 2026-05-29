@@ -16,6 +16,9 @@ import type {
 } from "../features/meeting/domain/meetingPageData";
 import type { Availability } from "../features/availability/domain/availabilitySchema";
 import type { CommitBatch } from "../features/commit/domain/commitSchema";
+import { AgentService } from "../features/agent/services/agentService";
+import { GeminiProvider } from "features/agent/providers/GeminiProvider";
+import { TavilySearchProvider } from "features/agent/search/TavilySearchProvider";
 
 /**
  * PO-5 업로드로 저장된 회의록 + 분석 결과.
@@ -49,8 +52,9 @@ export interface PharosSettings {
 
 	/** Vault 내 프로젝트 루트 경로. 기본 "Pharos". */
 	projectRoot: string;
-	/** OpenAI API 키 (로컬 저장). */
-	openaiApiKey: string;
+	/** LLM API 키 (로컬 저장). */
+	llmApikey: string;
+	llmModel: string; // 테스트용
 	/** GitHub Personal Access Token. */
 	githubToken: string;
 	/** GitHub 레포 URL (예: "owner/repo"). */
@@ -115,7 +119,8 @@ export const DEFAULT_SETTINGS: PharosSettings = {
 	demoMode: true,
 	// ──────────────────────────────────────────────────────────────────────────────
 	projectRoot: "Pharos",
-	openaiApiKey: "",
+	llmApikey: "",
+	llmModel: "",
 	githubToken: "",
 	githubRepo: "",
 	tavilyApiKey: "",
@@ -166,6 +171,11 @@ export interface PharosPluginLike extends Plugin {
 	commitService: import("../features/commit/services/commitService").CommitService;
 	/** ProgressService — features/progress/services/progressService.ts */
 	progressService: import("../features/progress/services/progressService").ProgressService;
+	/**
+	 * InviteService — features/team/services/inviteService.ts
+	 * 시연용 LocalInviteService 또는 백엔드용 ServerInviteService 주입 (main.ts).
+	 */
+	inviteService: import("../features/team/services/inviteService").InviteService;
 	/** AgentService — features/agent/services/agentService.ts */
 	agentService: import("../features/agent/services/agentService").AgentService;
 }
@@ -203,19 +213,53 @@ export class PharosSettingsTab extends PluginSettingTab {
 			);
 
 		// ─── AI ───
-		containerEl.createEl("h3", { text: "AI (GPT-4o-mini)" });
+		containerEl.createEl("h3", { text: "AI" });
 
 		new Setting(containerEl)
-			.setName("OpenAI API 키")
+			.setName("Gemini API 키")
 			.setDesc(
 				"회의 주제·회의록 분석·자료 요약에 사용. 키는 이 컴퓨터에만 저장됨 (외부 전송 X).",
 			)
 			.addText((text) =>
 				text
-					.setPlaceholder("sk-...")
-					.setValue(this.plugin.settings.openaiApiKey)
+					.setPlaceholder("...")
+					.setValue(this.plugin.settings.llmApikey)
 					.onChange(async (value) => {
-						this.plugin.settings.openaiApiKey = value;
+						this.plugin.settings.llmApikey = value;
+						await this.plugin.saveSettings();
+					}),
+			);
+
+		/** @test @description 임시 필드라 나중에 통째로 제거 필요. 안정성이고 뭐고 신경 안 씀. */
+		new Setting(containerEl)
+			.setName("모델")
+			.setDesc(
+				"API 사용량 제한에 빠르게 걸려서 그냥 교체해가면서 하기 위한...",
+			)
+			.addText((text) =>
+				text
+					.setPlaceholder("gemini-(version)-(pro/flash/기타 등등)")
+					.setValue(this.plugin.settings.llmModel)
+					.onChange(async (value) => {
+						this.plugin.settings.llmModel = value;
+
+						// 새 모델에 맞게 agentService 통째로 교체
+						const { agentService, teamService, availabilityService, meetingsService, progressService, taskService, roadmapService } = this.plugin
+						const new_llmProvider = new GeminiProvider(
+							() => this.plugin.settings.llmApikey, value
+						)
+						const searchProvider = new TavilySearchProvider(() => this.plugin.settings.tavilyApiKey);
+						this.plugin.agentService = new AgentService(
+							teamService,
+							availabilityService,meetingsService,
+							progressService,
+							taskService,
+							roadmapService,
+							new_llmProvider,
+							searchProvider,
+						);
+
+
 						await this.plugin.saveSettings();
 					}),
 			);
