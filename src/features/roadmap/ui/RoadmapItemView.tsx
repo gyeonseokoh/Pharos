@@ -23,6 +23,8 @@ import { mockRoadmapData } from "./mock";
 import type { PharosPluginLike, ProjectReport } from "../../../app/settings";
 import type { RoadmapData } from "../domain/roadmapData";
 import type { RoadmapInput } from "../domain/roadmapSchema";
+// 시나리오.md §8 데이터 흐름: PO-2·PO-5 회의 데이터 → PO-6 개발 로드맵 입력
+import type { MeetingPageData } from "../../meeting/domain/meetingPageData";
 
 export const VIEW_TYPE_PHAROS_ROADMAP = "pharos-roadmap-view";
 
@@ -192,7 +194,13 @@ export class RoadmapItemView extends ItemView {
 		);
 	}
 
-	/** PO-1 기획 로드맵 생성 — 2.5초 가짜 로딩 후 service 저장. */
+	/**
+	 * PO-1 기획 로드맵 생성 — 2.5초 가짜 로딩 후 service 저장.
+	 *
+	 * 실제 프로젝트의 시작일(오늘)·마감일을 기반으로 4개 기획 단계 계산.
+	 * 시나리오.md PO-1: "착수·요구사항·디자인 등을 phase로 자동 분할"
+	 * AI 연동 시: buildPlanningPhases 호출부를 llmClient.generatePlanningRoadmap(project)로 교체.
+	 */
 	private async handleGeneratePlanning(): Promise<void> {
 		const project = await this.plugin.projectService.get();
 		if (!project || !this.root) return;
@@ -206,22 +214,10 @@ export class RoadmapItemView extends ItemView {
 		);
 		await sleep(2500);
 
-		// ── [DEMO] AI 연동 전 임시 mock 로드맵 데이터 ──────────────────────────────
-		// AI 연동 PR 시 아래 import와 input 구성 블록을 삭제하고,
-		// llmClient.generatePlanningRoadmap(project) 결과로 교체하세요.
-		// ────────────────────────────────────────────────────────────────────────────
-		const { mockRoadmapData } = await import("./mock");
+		const startIso = new Date().toISOString().slice(0, 10);
 		const input: RoadmapInput = {
 			roadmapKind: "planning",
-			phases: mockRoadmapData.phases.map((p) => ({
-				id: p.id,
-				name: p.name,
-				start: p.start,
-				end: p.end,
-				status: p.status === "done" ? "completed" : p.status,
-				activities: p.activities,
-				color: p.color,
-			})),
+			phases: buildPlanningPhases(startIso, project.deadline),
 		};
 		await this.plugin.roadmapService.savePlanning(input);
 		// savePlanning → eventBus "roadmap:planning-generated" → pharos:state-changed → loadAndRender
@@ -249,7 +245,15 @@ export class RoadmapItemView extends ItemView {
 			planning.phases.find((p) => p.id === "phase-plan")?.end ??
 			new Date().toISOString().slice(0, 10);
 
-		const memberEntities = await this.plugin.teamService.list();
+		const [memberEntities, meetingEntities] = await Promise.all([
+			this.plugin.teamService.list(),
+			// 시나리오.md §8 PO-2→PO-5→PO-6 흐름:
+			// 기획 주간에 쌓인 회의들(topics + analysis)을 개발 로드맵 생성 입력으로 전달.
+			// devRoadmapSimulator.analyzeMinutes()가 meeting.topics에서 기능을 추출하고
+			// meeting.analysis.techStacks로 담당자 배정에 활용함.
+			this.plugin.meetingsService.list(),
+		]);
+
 		const members = memberEntities.map((m) => ({
 			id: m.id,
 			name: m.name,
@@ -262,9 +266,26 @@ export class RoadmapItemView extends ItemView {
 			hasFilledAvailability: false,
 		}));
 
+		// Meeting(도메인 엔티티) → MeetingPageData(시뮬레이터 입력 타입) 변환
+		// meetingType → type 필드명만 다르고 나머지는 동일 구조
+		const meetings: MeetingPageData[] = meetingEntities.map((m) => ({
+			id: m.id,
+			title: m.title,
+			date: m.date,
+			time: m.time,
+			durationMinutes: m.durationMinutes,
+			type: m.meetingType,
+			status: m.status,
+			attendees: m.attendees,
+			topics: m.topics,
+			resources: m.resources,
+			minutes: m.minutes,
+			analysis: m.analysis,
+		}));
+
 		new DevRoadmapGenerateModal(this.app, {
 			report,
-			meetings: [],
+			meetings,
 			members,
 			planningEndIso,
 			onApprove: (roadmap: RoadmapData) =>
@@ -317,4 +338,57 @@ export class RoadmapItemView extends ItemView {
 
 function sleep(ms: number): Promise<void> {
 	return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+/**
+ * 프로젝트 실제 기간 기반 기획 로드맵 phase 생성 (PO-1 시뮬레이터).
+ *
+ * 시나리오.md PO-1: "착수·요구사항·디자인 등을 phase로 자동 분할"
+ * AI 연동 전까지 실 프로젝트 날짜로 균등 분할.
+ * AI 연동 시 이 함수 대신 llmClient 결과로 교체.
+ */
+function buildPlanningPhases(startIso: string, endIso: string): RoadmapInput["phases"] {
+	const start = new Date(startIso + "T00:00:00").getTime();
+	const end   = new Date(endIso   + "T00:00:00").getTime();
+	const at = (frac: number) =>
+		new Date(start + (end - start) * frac).toISOString().slice(0, 10);
+
+	return [
+		{
+			id: "phase-kickoff",
+			name: "착수",
+			start: at(0),
+			end: at(0.2),
+			status: "todo",
+			activities: ["팀 구성", "목표 설정", "일정 수립"],
+			color: "#6366f1",
+		},
+		{
+			id: "phase-requirements",
+			name: "요구사항 분석",
+			start: at(0.15),
+			end: at(0.45),
+			status: "todo",
+			activities: ["기능 정의", "기술 스택 선정", "사용자 스토리"],
+			color: "#3b82f6",
+		},
+		{
+			id: "phase-design",
+			name: "설계·프로토타입",
+			start: at(0.4),
+			end: at(0.75),
+			status: "todo",
+			activities: ["UI/UX 설계", "시스템 아키텍처", "프로토타입"],
+			color: "#8b5cf6",
+		},
+		{
+			id: "phase-review",
+			name: "검토·확정",
+			start: at(0.7),
+			end: at(1),
+			status: "todo",
+			activities: ["스펙 확정", "팀 리뷰", "개발 준비"],
+			color: "#10b981",
+		},
+	];
 }

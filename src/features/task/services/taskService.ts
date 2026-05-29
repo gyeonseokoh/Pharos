@@ -121,6 +121,29 @@ export class TaskService {
 		return task?.checklist ?? [];
 	}
 
+	/**
+	 * 체크리스트 전체 저장. (PO-11 업무 세분화)
+	 *
+	 * ChecklistSplitModal에서 PM이 편집한 항목 목록을 한 번에 교체.
+	 * 기존 항목은 checked·checkedAt·checkedBy 보존, 신규 항목은 미완료 초기화.
+	 */
+	async saveChecklist(taskId: string, items: { id: string; text: string }[]): Promise<void> {
+		const task = await this.repo.getById(taskId);
+		if (!task) throw new Error(`Task ${taskId}를 찾을 수 없습니다`);
+
+		// id가 같은 기존 항목은 체크 상태 보존, 신규 항목은 기본값으로 초기화
+		const existingMap = new Map(task.checklist.map((c) => [c.id, c]));
+		const checklist: ChecklistItem[] = items.map((item) => {
+			const existing = existingMap.get(item.id);
+			return existing
+				? { ...existing, text: item.text }
+				: { id: item.id, text: item.text, checked: false, checkedAt: null, checkedBy: null };
+		});
+
+		await this.repo.save({ ...task, checklist });
+		eventBus.emit("task:updated", { taskId });
+	}
+
 	/** 체크리스트 항목 추가. */
 	async addChecklistItem(taskId: string, text: string): Promise<ChecklistItem> {
 		const task = await this.repo.getById(taskId);

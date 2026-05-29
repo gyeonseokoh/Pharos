@@ -1,6 +1,14 @@
 /**
  * AiTopicModal — PO-2 AI 회의 주제 제안.
- * 3~5개 주제 제시 → 선택 및 편집 → 확정.
+ * 3~5개 주제 제시 → 선택 및 편집 → 확정 → Meeting.topics[] 저장.
+ *
+ * 시나리오.md PO-2:
+ *   PO 버튼 트리거 → AI가 최근 회의록·진행도 종합 → 주제 3~5개 추천
+ *   → PO 선택·편집 → 회의에 추가.
+ *
+ * AI 연동 후 교체 지점:
+ *   mockSuggestions 배열 → agentService.generateTopics(recentMinutes, roadmapProgress) 결과
+ *   (저장 경로 meetingsService.addTopics()는 그대로 유지)
  */
 
 import { useState } from "react";
@@ -13,6 +21,7 @@ import {
 	ModalLayout,
 } from "shared/ui";
 import { cn } from "shared/ui/utils";
+import type { PharosPluginLike } from "../../../app/settings";
 
 interface Suggestion {
 	id: string;
@@ -23,7 +32,7 @@ interface Suggestion {
 
 // ── [DEMO] AI 연동 전 임시 하드코딩 주제 목록 ──────────────────────────────────
 // AI 연동 PR 시 이 배열 전체를 삭제하고,
-// llmClient.generateTopics(recentMinutes, roadmapProgress) 결과로 교체하세요.
+// agentService.generateTopics(recentMinutes, roadmapProgress) 결과로 교체하세요.
 // ──────────────────────────────────────────────────────────────────────────────
 const mockSuggestions: Suggestion[] = [
 	{
@@ -52,12 +61,23 @@ const mockSuggestions: Suggestion[] = [
 	},
 ];
 
-function Content({ onClose }: { onClose: () => void }) {
+function Content({
+	onSave,
+	onClose,
+}: {
+	// 저장 로직은 Modal 클래스에서 비동기 처리 — Content는 UI만 담당
+	onSave: (
+		selected: Suggestion[],
+		customTopic: string,
+	) => Promise<void>;
+	onClose: () => void;
+}) {
 	const [suggestions, setSuggestions] = useState(mockSuggestions);
 	const [customTopic, setCustomTopic] = useState("");
 
-	const selectedCount = suggestions.filter((s) => s.selected).length;
-	const canSubmit = selectedCount > 0 || customTopic.trim().length > 0;
+	const selectedSuggestions = suggestions.filter((s) => s.selected);
+	const hasCustom = customTopic.trim().length > 0;
+	const canSubmit = selectedSuggestions.length > 0 || hasCustom;
 
 	const toggle = (id: string) =>
 		setSuggestions((list) =>
@@ -68,11 +88,15 @@ function Content({ onClose }: { onClose: () => void }) {
 		<ModalLayout
 			title="🤖 AI 회의 주제 제안"
 			description="AI가 최근 회의록 + 로드맵 진행도를 분석해 제안"
-			submitLabel={`${selectedCount}개 주제 확정`}
+			submitLabel={`${selectedSuggestions.length + (hasCustom ? 1 : 0)}개 주제 확정`}
 			submitDisabled={!canSubmit}
 			onSubmit={() => {
-				new Notice(`[미구현] ${selectedCount}개 주제 회의에 추가 예정`);
-				onClose();
+				// 저장 성공 후 Modal 닫기, 실패 시 Modal 유지
+				void onSave(selectedSuggestions, customTopic.trim())
+					.then(() => onClose())
+					.catch((err: unknown) =>
+						new Notice(`[오류] 주제 저장 실패: ${String(err)}`),
+					);
 			}}
 			onCancel={onClose}
 			widthClass="max-w-xl"
@@ -177,7 +201,56 @@ function SuggestionRow({
 }
 
 export class AiTopicModal extends BaseReactModal {
+	private readonly plugin: PharosPluginLike;
+	// 어느 회의에 주제를 추가할지 특정하기 위한 ID
+	private readonly meetingId: string;
+
+	constructor(app: App, plugin: PharosPluginLike, meetingId: string) {
+		super(app);
+		this.plugin = plugin;
+		this.meetingId = meetingId;
+	}
+
+	/**
+	 * 선택된 AI 제안 주제 + 직접 입력 주제를 Meeting.topics[]에 저장.
+	 *
+	 * source 구분:
+	 *   - AI 제안 선택 → source: "AI"  (agentService 연동 후에도 동일)
+	 *   - PO 직접 입력 → source: "MANUAL"
+	 *
+	 * 시나리오.md §8 데이터 흐름:
+	 *   PO-2(주제 확정) → PO-5(회의록) 누적 → PO-6(개발 로드맵)
+	 *   여기서 저장된 topics가 devRoadmapSimulator.analyzeMinutes()의 입력이 됨.
+	 */
+	private async handleSave(
+		selected: Suggestion[],
+		customTopic: string,
+	): Promise<void> {
+		const topics: Parameters<typeof this.plugin.meetingsService.addTopics>[1] = [
+			// AI가 제안한 주제 — source: "AI", reason 보존
+			...selected.map((s) => ({
+				title: s.title,
+				source: "AI" as const,
+				reason: s.reason,
+			})),
+			// PO가 직접 입력한 주제 — source: "MANUAL", reason 없음
+			...(customTopic
+				? [{ title: customTopic, source: "MANUAL" as const, reason: null }]
+				: []),
+		];
+
+		await this.plugin.meetingsService.addTopics(this.meetingId, topics);
+		// saveSettings()로 pharos:state-changed 발행 → MeetingPage 리렌더 트리거
+		await this.plugin.saveSettings();
+		new Notice(`주제 ${topics.length}개가 회의에 추가되었습니다`);
+	}
+
 	renderContent() {
-		return <Content onClose={() => this.close()} />;
+		return (
+			<Content
+				onSave={(selected, custom) => this.handleSave(selected, custom)}
+				onClose={() => this.close()}
+			/>
+		);
 	}
 }

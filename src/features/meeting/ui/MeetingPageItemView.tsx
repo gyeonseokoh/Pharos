@@ -5,9 +5,11 @@
  * meetingId → meetingsService.getById() → MeetingPageData 렌더.
  */
 
-import { ItemView, WorkspaceLeaf, type ViewStateResult, Notice } from "obsidian";
+import { ItemView, Notice, WorkspaceLeaf, type ViewStateResult } from "obsidian";
+import type { TFile } from "obsidian";
 import { createRoot, type Root } from "react-dom/client";
 import { MeetingPageView } from "./MeetingPageView";
+import { ResourceUploadModal } from "./ResourceUploadModal";
 import { VIEW_TYPE_PHAROS_CALENDAR } from "./CalendarItemView";
 import { VIEW_TYPE_PHAROS_MEETINGS_LIST } from "./MeetingsListItemView";
 import { VIEW_TYPE_PHAROS_MINUTES_ARCHIVE } from "./MinutesArchiveItemView";
@@ -155,11 +157,23 @@ export class MeetingPageItemView extends ItemView {
 				data={this.meetingData}
 				{...backProps}
 				onBackToHome={() => void this.openView(VIEW_TYPE_PHAROS_DASHBOARD)}
-				onGenerateTopics={() => new AiTopicModal(this.app).open()}
-				onEditMinutes={() =>
-					new Notice(
-						"[미구현] 회의록 편집은 Obsidian 네이티브 에디터로 열 예정",
-					)
+				// plugin과 meetingId를 전달해 선택된 주제가 올바른 회의에 저장되게 함
+				// (시나리오.md §8: PO-2 주제 확정 → Meeting.topics[] → PO-6 개발 로드맵 입력)
+				onGenerateTopics={() =>
+					new AiTopicModal(this.app, this.plugin, this.meetingId!).open()
+				}
+				onEditMinutes={() => void this.openMinutesFile()}
+				// meetingId와 현재 주제 목록을 전달해 ResourceUploadModal이 저장 대상을 특정
+				onAddResource={() =>
+					new ResourceUploadModal(
+						this.app,
+						this.plugin,
+						this.meetingId!,
+						(this.meetingData?.topics ?? []).map((t) => ({
+							id: t.id,
+							title: t.title,
+						})),
+					).open()
 				}
 				onOpenTopic={(topicId) => void this.openTopic(topicId)}
 			/>,
@@ -175,6 +189,31 @@ export class MeetingPageItemView extends ItemView {
 		}
 		const leaf = workspace.getLeaf("tab");
 		await leaf.setViewState({ type: viewType, active: true });
+	}
+
+	/**
+	 * 회의록 .md 파일을 Obsidian 네이티브 에디터 탭으로 엽니다 (PO-5).
+	 *
+	 * 파일 경로는 VaultMeetingRepository.computeFilePath()와 동일한 규칙:
+	 *   {projectRoot}/Meetings/{date}_{slug}.md
+	 * 파일이 없으면 아직 Vault에 저장되지 않은 것이므로 Notice 안내.
+	 */
+	private async openMinutesFile(): Promise<void> {
+		if (!this.meetingData) return;
+		const { projectRoot } = this.plugin.settings;
+		const slug = this.meetingData.title
+			.toLowerCase()
+			.replace(/\s+/g, "-")
+			.replace(/[^\w가-힣-]/g, "")
+			.slice(0, 40);
+		const path = `${projectRoot}/Meetings/${this.meetingData.date}_${slug}.md`;
+		const file = this.app.vault.getAbstractFileByPath(path) as TFile | null;
+		if (!file) {
+			new Notice("회의록 파일이 없습니다. 먼저 회의가 Vault에 저장되어야 합니다.");
+			return;
+		}
+		const leaf = this.app.workspace.getLeaf("tab");
+		await leaf.openFile(file);
 	}
 
 	private async openTopic(topicId: string): Promise<void> {

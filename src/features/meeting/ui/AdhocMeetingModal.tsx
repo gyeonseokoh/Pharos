@@ -14,6 +14,7 @@ import {
 	textareaClass,
 } from "shared/ui";
 import { cn } from "shared/ui/utils";
+import type { PharosPluginLike } from "../../../app/settings";
 
 interface TimeCandidate {
 	id: string;
@@ -53,9 +54,12 @@ const mockCandidates: TimeCandidate[] = [
 
 function Content({
 	initialDate,
+	onSave,
 	onClose,
 }: {
 	initialDate?: string;
+	// 저장 로직은 Modal 클래스에서 비동기 처리 — Content는 UI만 담당
+	onSave: (title: string, date: string, time: string) => Promise<void>;
 	onClose: () => void;
 }) {
 	const [selectedCandidate, setSelectedCandidate] = useState<string | null>(
@@ -78,8 +82,18 @@ function Content({
 			submitLabel="회의 생성"
 			submitDisabled={!canSubmit}
 			onSubmit={() => {
-				new Notice(`[미구현] 임시 회의 "${topic}" 생성 예정`);
-				onClose();
+				const date = selectedCandidate
+					? (mockCandidates.find((c) => c.id === selectedCandidate)?.date ?? customDate)
+					: customDate;
+				const time = selectedCandidate
+					? (mockCandidates.find((c) => c.id === selectedCandidate)?.time ?? customTime)
+					: customTime;
+				// 저장 성공 후 닫기, 실패 시 Modal 유지
+				void onSave(topic, date, time)
+					.then(() => onClose())
+					.catch((err: unknown) =>
+						new Notice(`[오류] 임시 회의 생성 실패: ${String(err)}`),
+					);
 			}}
 			onCancel={onClose}
 			widthClass="max-w-xl"
@@ -194,16 +208,29 @@ function Content({
 }
 
 export class AdhocMeetingModal extends BaseReactModal {
+	private readonly plugin: PharosPluginLike;
 	private readonly initialDate?: string;
 
-	constructor(app: App, initialDate?: string) {
+	constructor(app: App, plugin: PharosPluginLike, initialDate?: string) {
 		super(app);
+		this.plugin = plugin;
 		this.initialDate = initialDate;
+	}
+
+	private async handleSave(title: string, date: string, time: string): Promise<void> {
+		await this.plugin.meetingsService.create({ title, date, time });
+		// saveSettings()로 pharos:state-changed 발행 → Calendar 등 리렌더 트리거
+		await this.plugin.saveSettings();
+		new Notice(`임시 회의 "${title}" 생성 완료`);
 	}
 
 	renderContent() {
 		return (
-			<Content initialDate={this.initialDate} onClose={() => this.close()} />
+			<Content
+				initialDate={this.initialDate}
+				onSave={(title, date, time) => this.handleSave(title, date, time)}
+				onClose={() => this.close()}
+			/>
 		);
 	}
 }

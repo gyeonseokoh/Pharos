@@ -129,7 +129,15 @@ export class TaskDetailItemView extends ItemView {
 			<TaskDetailView
 				data={this.taskData}
 				onGenerateChecklist={() =>
-					new ChecklistSplitModal(this.app, this.taskData!.title).open()
+					// taskId·plugin·이미 로드된 checklist를 함께 전달
+					// — Modal이 내부에서 재fetch 없이 저장 대상을 특정할 수 있음
+					new ChecklistSplitModal(
+						this.app,
+						this.plugin,
+						this.taskId!,
+						this.taskData!.title,
+						this.taskData!.checklist,
+					).open()
 				}
 				onBackToMyTasks={() => void this.openView(VIEW_TYPE_PHAROS_MY_TASKS)}
 				onBackToHome={() => void this.openView(VIEW_TYPE_PHAROS_DASHBOARD)}

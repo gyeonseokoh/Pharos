@@ -9,7 +9,7 @@
  *      - teamService.list()      (팀원 활동)
  */
 
-import { ItemView, WorkspaceLeaf } from "obsidian";
+import { ItemView, Notice, WorkspaceLeaf } from "obsidian";
 import { createRoot, type Root } from "react-dom/client";
 import { DashboardView } from "./DashboardView";
 import { EmptyDashboardView } from "./EmptyDashboardView";
@@ -105,9 +105,24 @@ export class DashboardItemView extends ItemView {
 					onOpenMyTasks={() => void this.openView(VIEW_TYPE_PHAROS_MY_TASKS)}
 					onOpenCalendar={() => void this.openView(VIEW_TYPE_PHAROS_CALENDAR)}
 					onOpenTeam={() => void this.openView(VIEW_TYPE_PHAROS_TEAM_LIST)}
-					onGenerateMeetingTopics={() => new AiTopicModal(this.app).open()}
+					onGenerateMeetingTopics={() => {
+						// demoMode에서도 실제 다음 회의를 찾아 meetingId 전달
+						// 회의가 없으면 안내 Notice (회의 페이지에서도 동일 기능 사용 가능)
+						void this.plugin.meetingsService.list().then((meetings) => {
+							const today = new Date().toISOString().slice(0, 10);
+							const next = meetings
+								.filter((m) => m.date >= today && m.status !== "completed")
+								.sort((a, b) => a.date.localeCompare(b.date) || a.time.localeCompare(b.time))[0];
+							if (!next) {
+								new Notice("주제를 추가할 다음 회의가 없습니다. 먼저 회의를 생성해주세요.");
+								return;
+							}
+							new AiTopicModal(this.app, this.plugin, next.id).open();
+						});
+					}}
 					onOpenSettings={() =>
-						new ProjectSettingsModal(this.app, {
+						// plugin을 전달해 Modal이 projectService.update()를 호출할 수 있게 함
+						new ProjectSettingsModal(this.app, this.plugin, {
 							topic: project.name,
 							description: project.description,
 							deadline: project.deadline,
@@ -142,11 +157,19 @@ export class DashboardItemView extends ItemView {
 				onOpenTeam={() =>
 					void this.openView(VIEW_TYPE_PHAROS_TEAM_LIST)
 				}
-				onGenerateMeetingTopics={() =>
-					new AiTopicModal(this.app).open()
-				}
+				onGenerateMeetingTopics={() => {
+					// data.meetings는 buildDashboardData()에서 이미 정렬된 다음 회의 목록
+					// 가장 가까운 회의에 주제 추가 — 회의가 없으면 안내
+					const nextId = data.meetings[0]?.id;
+					if (!nextId) {
+						new Notice("주제를 추가할 다음 회의가 없습니다. 먼저 회의를 생성해주세요.");
+						return;
+					}
+					new AiTopicModal(this.app, this.plugin, nextId).open();
+				}}
 				onOpenSettings={() =>
-					new ProjectSettingsModal(this.app, {
+					// plugin을 전달해 Modal이 projectService.update()를 호출할 수 있게 함
+					new ProjectSettingsModal(this.app, this.plugin, {
 						topic: project.name,
 						description: project.description,
 						deadline: project.deadline,

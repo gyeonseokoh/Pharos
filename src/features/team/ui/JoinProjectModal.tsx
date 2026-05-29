@@ -18,6 +18,7 @@ import {
 import { When2MeetGrid } from "./When2MeetGrid";
 import type { MemberRole, MemberPermission } from "../domain/teamSchema";
 import type { PharosPluginLike } from "../../../app/settings";
+import type { MemberSlotInput } from "../../availability/services/availabilityService";
 
 export interface JoinProjectModalArgs {
 	/** 초대 토큰 (있으면 검증된 상태로 들어옴). 없으면 시연·테스트 모드. */
@@ -64,7 +65,7 @@ function Content({
 				.split(",")
 				.map((s) => s.trim())
 				.filter(Boolean);
-			await plugin.teamService.addMember({
+			const member = await plugin.teamService.addMember({
 				name: form.name.trim(),
 				role: form.role,
 				permission: args.permission ?? "WRITE",
@@ -74,7 +75,45 @@ function Content({
 			if (args.token) {
 				await plugin.inviteService.consumeToken(args.token).catch(() => {});
 			}
-			// TODO(PM-1): availability를 AvailabilityService로 저장
+
+			// PM-1: when2meet 가용시간 → availabilityService 저장
+			// 시나리오.md §2: "팀원 가용시간 입력 → AI 교집합 → 고정 회의시간 확정 (PO-1-1)"
+			// 저장된 데이터는 availabilityService.findCommonSlots()의 입력이 됨.
+			const memberSlots: MemberSlotInput[] = [...form.availability].map((key) => {
+				const [dayStr, siStr] = key.split("-");
+				const day = Number(dayStr);
+				const si = Number(siStr);
+				const pad = (n: number) => String(n).padStart(2, "0");
+				const startH = Math.floor(si / 2);
+				const startM = (si % 2) * 30;
+				const endSi = si + 1;
+				const endH = Math.floor(endSi / 2);
+				const endM = (endSi % 2) * 30;
+				return {
+					day,
+					start: `${pad(startH)}:${pad(startM)}`,
+					end: `${pad(endH)}:${pad(endM)}`,
+				};
+			});
+
+			// 이번 주 월요일을 weekStart로 사용 (WeeklyAvailabilityModal과 동일한 기준)
+			const today = new Date();
+			const daysToMonday = today.getDay() === 0 ? -6 : 1 - today.getDay();
+			const monday = new Date(today);
+			monday.setDate(today.getDate() + daysToMonday);
+			const weekStart = monday.toISOString().slice(0, 10);
+
+			await plugin.availabilityService.saveMemberSlots(
+				weekStart,
+				member.id,
+				memberSlots,
+			);
+
+			// PM-2 스케줄러가 "나"를 특정할 수 있도록 currentMemberId 저장
+			// MyTasksItemView의 "나" 표시도 이 값을 사용함.
+			plugin.settings.currentMemberId = member.id;
+			await plugin.saveSettings();
+
 			new Notice(`${form.name} 님 가입 완료`);
 			onClose();
 		} catch (err) {

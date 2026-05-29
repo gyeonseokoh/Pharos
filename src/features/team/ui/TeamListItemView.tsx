@@ -3,6 +3,7 @@ import { createRoot, type Root } from "react-dom/client";
 import { ProjectRequiredEmpty } from "shared/ui";
 import { TeamListView } from "./TeamListView";
 import { InviteMemberModal } from "./InviteMemberModal";
+import { PermissionChangeModal } from "./PermissionChangeModal";
 import { VIEW_TYPE_PHAROS_DASHBOARD } from "../../progress/ui/DashboardItemView";
 // ── [DEMO] AI·서버·깃허브 연동 전 임시 데모 시연용 하드코딩 연결 ──────────────────
 // 연동 완료 후 이 import 줄을 삭제하세요.
@@ -109,12 +110,19 @@ export class TeamListItemView extends ItemView {
 			<TeamListView
 				data={this.teamData}
 				onInvite={() => new InviteMemberModal(this.app, this.plugin).open()}
-				onChangePermission={(id) =>
-					new Notice(`[미구현] ${id} 권한 변경 Modal 예정`)
-				}
-				onDeactivate={(id) =>
-					new Notice(`[미구현] ${id} 이탈 처리 확인 Modal 예정 (PO-14, v2)`)
-				}
+				onChangePermission={(id) => {
+					// teamData에서 해당 멤버의 이름·현재 권한을 찾아 Modal에 전달
+					const member = this.teamData?.members.find((m) => m.id === id);
+					if (!member) return;
+					new PermissionChangeModal(
+						this.app,
+						this.plugin,
+						member.id,
+						member.name,
+						member.permission,
+					).open();
+				}}
+				// onDeactivate 콜백 없음 → TeamListView에서 disabled 버튼으로 렌더 (PO-14 v2)
 				onBackToHome={() => void this.openView(VIEW_TYPE_PHAROS_DASHBOARD)}
 			/>,
 		);

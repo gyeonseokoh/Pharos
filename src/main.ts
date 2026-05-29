@@ -75,6 +75,7 @@ import { Notice } from "obsidian";
 import type { InviteService } from "./features/team/services/inviteService";
 import { LocalInviteService } from "./features/team/services/inviteService.local";
 import { JoinProjectModal } from "./features/team/ui/JoinProjectModal";
+import { WeeklyAvailabilityModal } from "./features/team/ui/WeeklyAvailabilityModal";
 import { AgentService } from "./features/agent/services/agentService";
 import { GeminiProvider } from "./features/agent/providers/GeminiProvider";
 import { TavilySearchProvider } from "./features/agent/search/TavilySearchProvider";
@@ -262,6 +263,15 @@ export default class PharosPlugin extends Plugin {
 		// 설정 탭 등록
 		this.addSettingTab(new PharosSettingsTab(this.app, this));
 
+		// ─── PM-2 주간 가용시간 알림 스케줄러 ────────────────────────────
+		// 시나리오.md PM-2: "매주 토요일 09시 알림 → 다음 주 가용시간 입력"
+		// 매분 체크하다가 설정된 요일·시각에 도달하면 WeeklyAvailabilityModal 오픈.
+		// currentMemberId가 없으면 스킵 (JoinProjectModal 가입 후 설정됨).
+		// weeklyReminderLastShown으로 같은 날 중복 오픈 방지.
+		this.registerInterval(
+			window.setInterval(() => void this.checkWeeklyReminder(), 60_000),
+		);
+
 		// ─── 초대 링크 protocol handler ─────────────────────────────
 		// obsidian://pharos-join?token=xxx&workspace=yyy 클릭 시
 		// 옵시디언이 자동 실행되면서 이 콜백 호출.
@@ -301,6 +311,52 @@ export default class PharosPlugin extends Plugin {
 			return;
 		}
 		new JoinProjectModal(this.app, this, { token }).open();
+	}
+
+	/**
+	 * PM-2 주간 가용시간 알림 체크.
+	 * registerInterval(60s)로 매분 호출됨.
+	 *
+	 * 동작 조건 (모두 충족해야 모달 오픈):
+	 *   1) currentMemberId 설정돼 있음 (JoinProjectModal 가입 완료 후)
+	 *   2) 오늘이 settings.weeklyReminderDay (기본: 토요일 = 6)
+	 *   3) 현재 시각 >= settings.weeklyReminderTime (기본: "09:00")
+	 *   4) 오늘 아직 한 번도 띄우지 않음 (weeklyReminderLastShown !== today)
+	 *
+	 * 시나리오.md §8 데이터 흐름:
+	 *   PM-2 입력 → Availability/*.md → availabilityService.findCommonSlots()
+	 *              → PO-4 임시 회의 시간 후보 (AI 연동 후 mockCandidates 교체)
+	 */
+	private async checkWeeklyReminder(): Promise<void> {
+		const { currentMemberId, weeklyReminderDay, weeklyReminderTime, weeklyReminderLastShown } =
+			this.settings;
+
+		// currentMemberId 없으면 아직 가입 전 — 스킵
+		if (!currentMemberId) return;
+
+		const now = new Date();
+		const today = now.toISOString().slice(0, 10);
+
+		// 오늘 요일 확인 (0=일 ~ 6=토)
+		if (now.getDay() !== weeklyReminderDay) return;
+
+		// 설정된 시각 이후인지 확인
+		const [rh, rm] = weeklyReminderTime.split(":").map(Number);
+		const reminderMinutes = (rh ?? 9) * 60 + (rm ?? 0);
+		const nowMinutes = now.getHours() * 60 + now.getMinutes();
+		if (nowMinutes < reminderMinutes) return;
+
+		// 오늘 이미 띄웠으면 스킵
+		if (weeklyReminderLastShown === today) return;
+
+		// 조건 충족 → 모달 오픈 + 오늘 날짜 기록
+		this.settings.weeklyReminderLastShown = today;
+		await this.saveSettings();
+
+		new WeeklyAvailabilityModal(this.app, {
+			plugin: this,
+			memberId: currentMemberId,
+		}).open();
 	}
 
 	/**

@@ -13,28 +13,28 @@ import {
 	inputClass,
 	ModalLayout,
 } from "shared/ui";
+import type { PharosPluginLike } from "../../../app/settings";
+import type { TaskChecklistItem } from "../domain/taskDetailData";
 
 interface Item {
 	id: string;
 	text: string;
 }
 
-const mockItems: Item[] = [
-	{ id: "1", text: "엔드포인트 정의 (POST /auth/login)" },
-	{ id: "2", text: "JWT 토큰 발급 로직" },
-	{ id: "3", text: "bcrypt 비밀번호 해시·검증" },
-	{ id: "4", text: "세션 저장 (SQLite)" },
-	{ id: "5", text: "테스트 케이스 작성" },
-];
-
 function Content({
 	taskTitle,
+	initialItems,
+	onSave,
 	onClose,
 }: {
 	taskTitle: string;
+	// mockItems 대신 호출부(TaskDetailItemView)가 로드한 실제 체크리스트를 받음
+	initialItems: Item[];
+	// 저장 로직은 Modal 클래스에서 비동기로 처리 — Content는 UI만 담당
+	onSave: (items: Item[]) => Promise<void>;
 	onClose: () => void;
 }) {
-	const [items, setItems] = useState(mockItems);
+	const [items, setItems] = useState<Item[]>(initialItems);
 	const [newText, setNewText] = useState("");
 
 	const update = (id: string, text: string) =>
@@ -42,7 +42,7 @@ function Content({
 	const remove = (id: string) => setItems(items.filter((it) => it.id !== id));
 	const add = () => {
 		if (!newText.trim()) return;
-		setItems([...items, { id: String(Date.now()), text: newText.trim() }]);
+		setItems([...items, { id: `chk-${Date.now()}`, text: newText.trim() }]);
 		setNewText("");
 	};
 
@@ -53,8 +53,12 @@ function Content({
 			submitLabel={`${items.length}개 항목 저장`}
 			submitDisabled={items.length < 2}
 			onSubmit={() => {
-				new Notice(`[미구현] 체크리스트 ${items.length}개 저장 예정`);
-				onClose();
+				// 저장 성공 후 Modal 닫기, 실패 시 Modal 유지 (오류 Notice는 handleSave에서)
+				void onSave(items)
+					.then(() => onClose())
+					.catch((err: unknown) =>
+						new Notice(`[오류] 체크리스트 저장 실패: ${String(err)}`),
+					);
 			}}
 			onCancel={onClose}
 			widthClass="max-w-xl"
@@ -114,14 +118,45 @@ function Content({
 }
 
 export class ChecklistSplitModal extends BaseReactModal {
+	private readonly plugin: PharosPluginLike;
+	private readonly taskId: string;
 	private readonly taskTitle: string;
+	// TaskChecklistItem(뷰모델) → Item(편집용)으로 변환한 초기값
+	// checked/checkedAt/checkedBy는 텍스트 편집 시 불필요하므로 제외
+	private readonly initialItems: Item[];
 
-	constructor(app: App, taskTitle: string) {
+	constructor(
+		app: App,
+		plugin: PharosPluginLike,
+		taskId: string,
+		taskTitle: string,
+		// TaskDetailItemView가 이미 로드한 체크리스트를 그대로 받음
+		// — Modal 내부에서 다시 fetch하지 않아도 됨
+		initialChecklist: TaskChecklistItem[],
+	) {
 		super(app);
+		this.plugin = plugin;
+		this.taskId = taskId;
 		this.taskTitle = taskTitle;
+		this.initialItems = initialChecklist.map((c) => ({ id: c.id, text: c.text }));
+	}
+
+	private async handleSave(items: Item[]): Promise<void> {
+		// 체크 상태 보존·신규 초기화는 taskService.saveChecklist() 내부에서 처리
+		await this.plugin.taskService.saveChecklist(this.taskId, items);
+		// saveSettings()로 pharos:state-changed 이벤트를 발행해 모든 ItemView 리렌더 트리거
+		await this.plugin.saveSettings();
+		new Notice(`체크리스트 ${items.length}개 저장 완료`);
 	}
 
 	renderContent() {
-		return <Content taskTitle={this.taskTitle} onClose={() => this.close()} />;
+		return (
+			<Content
+				taskTitle={this.taskTitle}
+				initialItems={this.initialItems}
+				onSave={(items) => this.handleSave(items)}
+				onClose={() => this.close()}
+			/>
+		);
 	}
 }

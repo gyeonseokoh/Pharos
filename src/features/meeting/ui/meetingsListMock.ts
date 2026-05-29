@@ -12,9 +12,9 @@ import type {
 import type { MeetingStatus } from "../domain/meetingPageData";
 
 // ── [DEMO] mock 데이터 기준 "오늘" ─────────────────────────────────────────────
-// 이 날짜 기준으로 예정/완료 필터가 동작한다.
+// 예정/완료 필터가 실행 시점 기준으로 동작하도록 new Date()로 계산.
 // 연동 완료 후 이 상수와 아래 referenceDate 줄을 삭제하세요.
-const MOCK_TODAY = "2026-04-24";
+const MOCK_TODAY = new Date().toISOString().slice(0, 10);
 
 /** 회의 ID로 풀 데이터가 있으면 그걸 쓰고, 없으면 캘린더 데이터 + 추정 상태. */
 function toListItem(meetingId: string): MeetingListItem | null {

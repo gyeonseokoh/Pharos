@@ -111,6 +111,20 @@ export interface PharosSettings {
 	 * true 이면 VaultRepository 사용 중. false/undefined 이면 SettingsRepository 사용.
 	 */
 	migrated: boolean;
+
+	/**
+	 * 현재 로그인한 팀원 ID (PM-2 알림·MyTasks "나" 표시용).
+	 * JoinProjectModal 가입 완료 시 자동 설정.
+	 * 빈 문자열 = 미설정 (아직 가입하지 않음).
+	 */
+	currentMemberId: string;
+
+	/**
+	 * PM-2 주간 가용시간 알림을 마지막으로 띄운 날짜 (ISO date).
+	 * 매주 토요일 09시에 한 번만 열리도록 중복 방지용.
+	 * 빈 문자열 = 한 번도 띄우지 않음.
+	 */
+	weeklyReminderLastShown: string;
 }
 
 export const DEFAULT_SETTINGS: PharosSettings = {
@@ -142,6 +156,8 @@ export const DEFAULT_SETTINGS: PharosSettings = {
 	availabilities: [],
 	commitBatches: [],
 	migrated: false,
+	currentMemberId: "",
+	weeklyReminderLastShown: "",
 };
 
 /**

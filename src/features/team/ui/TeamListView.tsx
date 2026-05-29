@@ -250,15 +250,16 @@ function MemberCard({
 								권한
 							</Button>
 						)}
-						{onDeactivate && (
-							<Button
-								variant="ghost"
-								size="sm"
-								onClick={() => onDeactivate(member.id)}
-							>
-								이탈
-							</Button>
-						)}
+								{/* 이탈 처리 — PO-14 v2 예정. 현재는 disabled로 표시해 존재는 알리되 클릭 불가 */}
+						<Button
+							variant="ghost"
+							size="sm"
+							disabled={!onDeactivate}
+							onClick={onDeactivate ? () => onDeactivate(member.id) : undefined}
+							title={!onDeactivate ? "팀원 이탈 처리는 v2에서 지원됩니다" : undefined}
+						>
+							이탈
+						</Button>
 					</div>
 				)}
 			</CardContent>

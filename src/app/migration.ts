@@ -8,8 +8,8 @@
  *   settings.projectReport          → {root}/project.md
  *   settings.roadmaps               → {root}/Roadmap/planning.md, development.md
  *   settings.tasks                  → {root}/Tasks/TASK-NNN.md
- *   mockTeamListData.members + settings.members → {root}/Team/{name}.md
- *   mockTeamListData.pendingInvites + settings.invites → {root}/Team/_invites.md
+ *   settings.members     → {root}/Team/{name}.md
+ *   settings.invites     → {root}/Team/_invites.md
  *   settings.availabilities         → {root}/Availability/{weekStart}.md
  *   settings.commitBatches          → {root}/Commits/{month}.md
  *   meetingPageMocks + attachedMinutes → {root}/Meetings/{date}_{slug}.md
@@ -25,7 +25,9 @@ import {
 	applyAttachedMinutes,
 	meetingPageMocks,
 } from "../features/meeting/ui/meetingPageMock";
-import { mockTeamListData } from "../features/team/ui/teamListMock";
+// mockTeamListData는 시연용 가상 데이터 — 마이그레이션에서 제거.
+// 실 배포 시 첫 사용자에게 가상 팀원이 실제 데이터처럼 기록되는 부작용 방지.
+// 팀원 데이터는 settings.members(실제 저장된 것)만 마이그레이션.
 import type { PharosPluginLike } from "./settings";
 import type { Project } from "../features/project/domain/projectSchema";
 import type { Meeting } from "../features/meeting/domain/meetingSchema";
@@ -64,12 +66,7 @@ class MigrationModal extends Modal {
 		const s = this.plugin.settings;
 		const meetingCount = Object.keys(meetingPageMocks).length;
 		const taskCount = (s.tasks ?? []).length;
-		// mockTeamListData.members + settings.members 합집합 (중복 id 제거)
-		const memberIds = new Set([
-			...mockTeamListData.members.map((m) => m.id),
-			...(s.members ?? []).map((m) => m.id),
-		]);
-		const memberCount = memberIds.size;
+		const memberCount = (s.members ?? []).length;
 		const roadmapCount = Object.keys(s.roadmaps ?? {}).length;
 
 		contentEl.createEl("p", {
@@ -236,29 +233,10 @@ async function migrate(plugin: PharosPluginLike): Promise<void> {
 			);
 		}
 
-		// 5. Team members — mockTeamListData(시연용) + settings.members(사용자 저장) 병합.
-		//    settings.members가 동일 id를 가지면 사용자 데이터를 우선.
+		// 5. Team members — settings.members(실제 저장된 팀원)만 마이그레이션.
+		//    mockTeamListData는 시연용 가상 데이터이므로 포함하지 않음.
 		const memberMap = new Map<string, Member>();
-
-		for (const mock of mockTeamListData.members) {
-			const m: Member = withUpdatedMeta({
-				version: 1,
-				type: "team-member",
-				id: mock.id,
-				name: mock.name,
-				email: mock.email,
-				role: mock.role,
-				permission: mock.permission,
-				techStacks: mock.techStacks,
-				status: mock.isActive ? "active" : "left",
-				joinedAt: mock.joinedAt,
-				createdAt: mock.joinedAt,
-				updatedAt: mock.joinedAt,
-			});
-			memberMap.set(m.id, m);
-		}
 		for (const member of plugin.settings.members ?? []) {
-			// 사용자가 저장한 데이터가 있으면 mock 위에 덮어씀
 			memberMap.set(member.id, withUpdatedMeta(member as Member));
 		}
 		for (const m of memberMap.values()) {
@@ -268,22 +246,8 @@ async function migrate(plugin: PharosPluginLike): Promise<void> {
 			);
 		}
 
-		// 6. Invites (단일 파일) — mockTeamListData.pendingInvites + settings.invites 병합.
+		// 6. Invites — settings.invites(실제 저장된 초대)만 마이그레이션.
 		const inviteMap = new Map<string, Invite>();
-		for (const pending of mockTeamListData.pendingInvites) {
-			const inv: Invite = withUpdatedMeta({
-				version: 1,
-				type: "invite",
-				id: pending.id,
-				email: pending.email,
-				permission: pending.permission,
-				invitedAt: pending.invitedAt,
-				expiresAt: pending.expiresAt,
-				createdAt: pending.invitedAt,
-				updatedAt: pending.invitedAt,
-			});
-			inviteMap.set(inv.id, inv);
-		}
 		for (const invite of plugin.settings.invites ?? []) {
 			inviteMap.set(invite.id, withUpdatedMeta(invite as Invite));
 		}

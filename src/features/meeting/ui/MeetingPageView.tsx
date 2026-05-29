@@ -53,6 +53,8 @@ export interface MeetingPageViewProps {
 	onGenerateTopics?: () => void;
 	/** "회의록 작성하기" 버튼. */
 	onEditMinutes?: () => void;
+	/** "자료 추가" 버튼 (PO-8 수동 업로드). */
+	onAddResource?: () => void;
 	/** 주제 링크 클릭 → Topic Page. */
 	onOpenTopic?: (topicId: string) => void;
 }
@@ -65,6 +67,7 @@ export function MeetingPageView({
 	onBackToHome,
 	onGenerateTopics,
 	onEditMinutes,
+	onAddResource,
 	onOpenTopic,
 }: MeetingPageViewProps) {
 	const navItems: BackNavItem[] = [];
@@ -104,6 +107,7 @@ export function MeetingPageView({
 					onGenerateTopics={onGenerateTopics}
 					onOpenTopic={onOpenTopic}
 					resourceCountByTopic={countResourcesByTopic(data)}
+					onAddResource={onAddResource}
 				/>
 
 				<MinutesSection minutes={data.minutes} onEditMinutes={onEditMinutes} />
@@ -263,12 +267,15 @@ function TopicsSection({
 	onGenerateTopics,
 	onOpenTopic,
 	resourceCountByTopic,
+	onAddResource,
 }: {
 	topics: MeetingTopic[];
 	status: MeetingStatus;
 	onGenerateTopics?: () => void;
 	onOpenTopic?: (topicId: string) => void;
 	resourceCountByTopic: Record<string, number>;
+	// PO-8 수동 자료 추가 버튼 — 주제 카드 헤더에 배치
+	onAddResource?: () => void;
 }) {
 	return (
 		<Card>
@@ -282,12 +289,20 @@ function TopicsSection({
 								: "아직 주제가 없습니다"}
 						</CardDescription>
 					</div>
-					{status !== "completed" && (
-						<Button variant="outline" size="sm" onClick={onGenerateTopics}>
-							<Sparkles className="mr-1 h-3.5 w-3.5" />
-							AI로 주제 생성
-						</Button>
-					)}
+					<div className="flex items-center gap-2">
+						{onAddResource && (
+							<Button variant="outline" size="sm" onClick={onAddResource}>
+								<Paperclip className="mr-1 h-3.5 w-3.5" />
+								자료 추가
+							</Button>
+						)}
+						{status !== "completed" && (
+							<Button variant="outline" size="sm" onClick={onGenerateTopics}>
+								<Sparkles className="mr-1 h-3.5 w-3.5" />
+								AI로 주제 생성
+							</Button>
+						)}
+					</div>
 				</div>
 			</CardHeader>
 			<CardContent>

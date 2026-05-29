@@ -85,6 +85,21 @@ export class ProjectService {
 		eventBus.emit("roadmap:development-deleted", {});
 	}
 
+	/**
+	 * 프로젝트 메타 수정. (PO-0 설정 편집)
+	 *
+	 * ProjectSettingsModal에서 name·description·deadline 변경 시 호출.
+	 * fixedMeetingMode·workspaceId·플래그 등 나머지 필드는 호출부에서
+	 * spread로 보존해야 함 — 이 메서드는 전달받은 project를 그대로 저장.
+	 */
+	async update(project: Project): Promise<void> {
+		// updatedAt만 현재 시각으로 갱신, 나머지는 호출부 책임
+		const next: Project = { ...project, updatedAt: new Date().toISOString() };
+		await this.repo.save(next);
+		// DomainEventMap 기준 project:updated 페이로드는 { projectName }
+		eventBus.emit("project:updated", { projectName: next.name });
+	}
+
 	/** 프로젝트 전체 리셋 (시연·테스트용). */
 	async reset(): Promise<void> {
 		await this.repo.delete();

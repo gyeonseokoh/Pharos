@@ -11,6 +11,7 @@ import {
 	ModalLayout,
 	textareaClass,
 } from "shared/ui";
+import type { PharosPluginLike } from "../../../app/settings";
 
 interface FormState {
 	title: string;
@@ -26,9 +27,12 @@ interface TopicOption {
 
 function Content({
 	availableTopics,
+	// 저장 로직은 Modal 클래스에서 비동기 처리 — Content는 UI만 담당
+	onSave,
 	onClose,
 }: {
 	availableTopics: TopicOption[];
+	onSave: (form: FormState) => Promise<void>;
 	onClose: () => void;
 }) {
 	const [form, setForm] = useState<FormState>({
@@ -48,8 +52,12 @@ function Content({
 			submitLabel="추가"
 			submitDisabled={!canSubmit}
 			onSubmit={() => {
-				new Notice(`[미구현] 자료 "${form.title}" 추가 예정`);
-				onClose();
+				// 저장 성공 후 닫기, 실패 시 Modal 유지
+				void onSave(form)
+					.then(() => onClose())
+					.catch((err: unknown) =>
+						new Notice(`[오류] 자료 추가 실패: ${String(err)}`),
+					);
 			}}
 			onCancel={onClose}
 		>
@@ -104,16 +112,42 @@ function isValidUrl(s: string): boolean {
 }
 
 export class ResourceUploadModal extends BaseReactModal {
+	private readonly plugin: PharosPluginLike;
+	// 어느 회의에 자료를 추가할지 특정하기 위한 ID
+	private readonly meetingId: string;
 	private readonly topics: TopicOption[];
 
-	constructor(app: App, topics: TopicOption[]) {
+	constructor(
+		app: App,
+		plugin: PharosPluginLike,
+		meetingId: string,
+		topics: TopicOption[],
+	) {
 		super(app);
+		this.plugin = plugin;
+		this.meetingId = meetingId;
 		this.topics = topics;
+	}
+
+	private async handleSave(form: FormState): Promise<void> {
+		await this.plugin.meetingsService.addResource(this.meetingId, {
+			title: form.title,
+			url: form.url,
+			summary: form.summary,
+			topicId: form.topicId,
+		});
+		// saveSettings()로 pharos:state-changed 발행 → MeetingPage 리렌더 트리거
+		await this.plugin.saveSettings();
+		new Notice(`자료 "${form.title}" 추가 완료`);
 	}
 
 	renderContent() {
 		return (
-			<Content availableTopics={this.topics} onClose={() => this.close()} />
+			<Content
+				availableTopics={this.topics}
+				onSave={(form) => this.handleSave(form)}
+				onClose={() => this.close()}
+			/>
 		);
 	}
 }
