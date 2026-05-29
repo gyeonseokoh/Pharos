@@ -76,6 +76,8 @@ import type { InviteService } from "./features/team/services/inviteService";
 import { LocalInviteService } from "./features/team/services/inviteService.local";
 import { JoinProjectModal } from "./features/team/ui/JoinProjectModal";
 import { AgentService } from "./features/agent/services/agentService";
+import { OpenAIProvider } from "./features/agent/providers/OpenAIProvider";
+import { TavilySearchProvider } from "./features/agent/search/TavilySearchProvider";
 
 export default class PharosPlugin extends Plugin {
 	settings: PharosSettings = { ...DEFAULT_SETTINGS };
@@ -124,6 +126,8 @@ export default class PharosPlugin extends Plugin {
 		this.roadmapService = new RoadmapService(this.roadmapRepository);
 		this.teamService = new TeamService(this.teamRepository, this.inviteRepository);
 		this.progressService = new ProgressService(this.taskRepository);
+		const llmProvider = new OpenAIProvider(() => this.settings.openaiApiKey);
+		const searchProvider = new TavilySearchProvider(() => this.settings.tavilyApiKey);
 		this.agentService = new AgentService(
 			this.teamService,
 			this.availabilityService,
@@ -131,6 +135,8 @@ export default class PharosPlugin extends Plugin {
 			this.progressService,
 			this.taskService,
 			this.roadmapService,
+			llmProvider,
+			searchProvider,
 		);
 
 		// ─── InviteService 주입 ───
