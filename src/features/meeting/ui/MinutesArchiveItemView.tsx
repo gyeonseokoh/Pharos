@@ -148,6 +148,7 @@ export class MinutesArchiveItemView extends ItemView {
 
 	private openUploadModal(): void {
 		new MinutesUploadModal(this.app, {
+			plugin: this.plugin,
 			candidates: this.candidateMeetings,
 			defaultAuthorName: "",
 			onApprove: (meetingId, attached) =>
@@ -165,6 +166,7 @@ export class MinutesArchiveItemView extends ItemView {
 				meetingId,
 				content: attached.minutes.content,
 				authorName: attached.minutes.authorName,
+				analysis: attached.analysis,
 			});
 		} else {
 			this.plugin.settings.attachedMinutes = {
