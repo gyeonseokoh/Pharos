@@ -71,6 +71,7 @@ function Content({
 
 	const fetchSuggestions = async (): Promise<void> => {
 		setError(null);
+		setItems([]);
 		setLoading(true);
 		try {
 			let suggestions: ChecklistSuggestion[];
@@ -123,6 +124,12 @@ function Content({
 		setSubmitting(true);
 		try {
 			const texts = items.map((it) => it.text);
+			if (isDemo) {
+				await new Promise<void>((resolve) => setTimeout(resolve, 300));
+				new Notice(`[DEMO] 체크리스트 ${texts.length}개 추가됨 (${taskTitle})`);
+				onClose();
+				return;
+			}
 			const saved = await plugin.taskService.addChecklistItems(taskId, texts);
 			new Notice(`체크리스트 ${saved.length}개 추가됨 (${taskTitle})`);
 			onClose();
