@@ -23,6 +23,7 @@ import { mockRoadmapData } from "./mock";
 import type { PharosPluginLike, ProjectReport } from "../../../app/settings";
 import type { RoadmapData } from "../domain/roadmapData";
 import type { RoadmapInput } from "../domain/roadmapSchema";
+import type { MeetingPageData } from "../../meeting/domain/meetingPageData";
 
 export const VIEW_TYPE_PHAROS_ROADMAP = "pharos-roadmap-view";
 
@@ -249,7 +250,11 @@ export class RoadmapItemView extends ItemView {
 			planning.phases.find((p) => p.id === "phase-plan")?.end ??
 			new Date().toISOString().slice(0, 10);
 
-		const memberEntities = await this.plugin.teamService.list();
+		const [memberEntities, meetingEntities] = await Promise.all([
+			this.plugin.teamService.list(),
+			this.plugin.meetingsService.list(),
+		]);
+
 		const members = memberEntities.map((m) => ({
 			id: m.id,
 			name: m.name,
@@ -262,9 +267,25 @@ export class RoadmapItemView extends ItemView {
 			hasFilledAvailability: false,
 		}));
 
+		const meetings: MeetingPageData[] = meetingEntities.map((m) => ({
+			id: m.id,
+			title: m.title,
+			date: m.date,
+			time: m.time,
+			durationMinutes: m.durationMinutes,
+			type: m.meetingType,
+			status: m.status,
+			attendees: m.attendees,
+			topics: m.topics,
+			resources: m.resources,
+			minutes: m.minutes,
+			analysis: m.analysis,
+		}));
+
 		new DevRoadmapGenerateModal(this.app, {
+			plugin: this.plugin,
 			report,
-			meetings: [],
+			meetings,
 			members,
 			planningEndIso,
 			onApprove: (roadmap: RoadmapData) =>

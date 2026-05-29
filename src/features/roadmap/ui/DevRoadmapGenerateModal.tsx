@@ -19,7 +19,7 @@ import {
 import { cn } from "shared/ui/utils";
 import type { MeetingPageData } from "../../meeting/domain/meetingPageData";
 import type { TeamMember } from "../../team/domain/teamListData";
-import type { ProjectReport } from "../../../app/settings";
+import type { ProjectReport, PharosPluginLike } from "../../../app/settings";
 import type { RoadmapData } from "../domain/roadmapData";
 import {
 	DEV_ROADMAP_STEPS,
@@ -28,6 +28,7 @@ import {
 } from "./devRoadmapSimulator";
 
 export interface DevRoadmapGenerateModalArgs {
+	plugin: PharosPluginLike;
 	report: ProjectReport;
 	meetings: MeetingPageData[];
 	members: TeamMember[];
@@ -44,6 +45,7 @@ function Content({
 	args: DevRoadmapGenerateModalArgs;
 	onClose: () => void;
 }) {
+	const isDemo = args.plugin.settings.demoMode;
 	const [phase, setPhase] = useState<Phase>("progress");
 	const [currentStepIndex, setCurrentStepIndex] = useState(0);
 	const [roadmap, setRoadmap] = useState<RoadmapData | null>(null);
@@ -99,8 +101,9 @@ function Content({
 			>
 				<ProgressList currentIndex={currentStepIndex} />
 				<p className="mt-4 text-[11px] text-text-faint">
-					나중에 실제 AI·서버가 붙으면 이 시뮬레이션 자리가 llmClient 호출로
-					교체됩니다.
+					{isDemo
+						? "[DEMO] 시연용 시뮬레이터 — 실제 AI 호출 없이 회의록 기반 로드맵 생성"
+						: `회의록 ${args.meetings.length}건을 분석해 개발 로드맵을 자동 생성합니다.`}
 				</p>
 			</ModalLayout>
 		);
