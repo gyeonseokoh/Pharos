@@ -17,12 +17,18 @@ import { VIEW_TYPE_PHAROS_MY_TASKS } from "./MyTasksItemView";
 import { VIEW_TYPE_PHAROS_PROGRESS } from "./ProgressPageItemView";
 import { VIEW_TYPE_PHAROS_CALENDAR } from "../../meeting/ui/CalendarItemView";
 import { VIEW_TYPE_PHAROS_MEETINGS_LIST } from "../../meeting/ui/MeetingsListItemView";
+import { VIEW_TYPE_PHAROS_MEETING_PAGE } from "../../meeting/ui/MeetingPageItemView";
 import { AiTopicModal } from "../../meeting/ui/AiTopicModal";
 import { NewProjectModal } from "../../project/ui/NewProjectModal";
 import { ProjectSettingsModal } from "../../project/ui/ProjectSettingsModal";
+// ── [DEMO] AI·서버·깃허브 연동 전 임시 데모 시연용 하드코딩 연결 ──────────────────
+// 연동 완료 후 이 import 줄을 삭제하세요.
+import { mockDashboardData } from "./mock";
+// ──────────────────────────────────────────────────────────────────────────────
 import { VIEW_TYPE_PHAROS_ROADMAP } from "../../roadmap/ui/RoadmapItemView";
 import { VIEW_TYPE_PHAROS_TEAM_LIST } from "../../team/ui/TeamListItemView";
-import type { PharosPluginLike, ProjectReport } from "../../../app/settings";
+import type { PharosPluginLike } from "../../../app/settings";
+import type { Project } from "../../project/domain/projectSchema";
 import type { DashboardData, DashboardAlert } from "../domain/dashboardData";
 
 export const VIEW_TYPE_PHAROS_DASHBOARD = "pharos-dashboard-view";
@@ -57,8 +63,9 @@ export class DashboardItemView extends ItemView {
 		void this.loadAndRender();
 
 		this.registerEvent(
-			this.app.workspace.on("pharos:state-changed" as never, () =>
-				void this.loadAndRender(),
+			this.app.workspace.on(
+				"pharos:state-changed" as never,
+				() => void this.loadAndRender(),
 			),
 		);
 	}
@@ -70,57 +77,95 @@ export class DashboardItemView extends ItemView {
 
 	private async loadAndRender(): Promise<void> {
 		if (!this.root) return;
-		const { projectReport } = this.plugin.settings;
 
-		if (!projectReport) {
+		const project = await this.plugin.projectService.get();
+
+		if (!project) {
 			this.root.render(
 				<EmptyDashboardView
 					onCreateProject={() =>
-						new NewProjectModal(
-							this.app,
-							this.plugin.projectService,
-						).open()
+						new NewProjectModal(this.app, this.plugin).open()
 					}
 				/>,
 			);
 			return;
 		}
 
-		const data = await this.buildDashboardData(projectReport);
+		// ── [DEMO] AI·서버·깃허브 연동 전 임시 데모 시연용 하드코딩 연결 ──────────────
+		// 프로젝트 생성 후 실서비스 대신 mock 데이터로 대시보드를 렌더합니다.
+		// 연동 완료 후 이 블록 전체(if 문 포함)를 삭제하세요.
+		if (this.plugin.settings.demoMode) {
+			this.root.render(
+				<DashboardView
+					data={mockDashboardData}
+					onOpenRoadmap={() => void this.openView(VIEW_TYPE_PHAROS_ROADMAP)}
+					onOpenMeetings={() => void this.openView(VIEW_TYPE_PHAROS_MEETINGS_LIST)}
+					onOpenMeeting={(id) => void this.openMeeting(id)}
+					onOpenProgress={() => void this.openView(VIEW_TYPE_PHAROS_PROGRESS)}
+					onOpenMyTasks={() => void this.openView(VIEW_TYPE_PHAROS_MY_TASKS)}
+					onOpenCalendar={() => void this.openView(VIEW_TYPE_PHAROS_CALENDAR)}
+					onOpenTeam={() => void this.openView(VIEW_TYPE_PHAROS_TEAM_LIST)}
+					onGenerateMeetingTopics={() => new AiTopicModal(this.app).open()}
+					onOpenSettings={() =>
+						new ProjectSettingsModal(this.app, {
+							topic: project.name,
+							description: project.description,
+							deadline: project.deadline,
+						}).open()
+					}
+				/>,
+			);
+			return;
+		}
+		// ──────────────────────────────────────────────────────────────────────────────
+
+		const data = await this.buildDashboardData(project);
 		this.root.render(
 			<DashboardView
 				data={data}
-				onOpenRoadmap={() => void this.openView(VIEW_TYPE_PHAROS_ROADMAP)}
+				onOpenRoadmap={() =>
+					void this.openView(VIEW_TYPE_PHAROS_ROADMAP)
+				}
 				onOpenMeetings={() =>
 					void this.openView(VIEW_TYPE_PHAROS_MEETINGS_LIST)
 				}
-				onOpenProgress={() => void this.openView(VIEW_TYPE_PHAROS_PROGRESS)}
-				onOpenMyTasks={() => void this.openView(VIEW_TYPE_PHAROS_MY_TASKS)}
-				onOpenCalendar={() => void this.openView(VIEW_TYPE_PHAROS_CALENDAR)}
-				onOpenTeam={() => void this.openView(VIEW_TYPE_PHAROS_TEAM_LIST)}
-				onGenerateMeetingTopics={() => new AiTopicModal(this.app).open()}
+				onOpenMeeting={(id) => void this.openMeeting(id)}
+				onOpenProgress={() =>
+					void this.openView(VIEW_TYPE_PHAROS_PROGRESS)
+				}
+				onOpenMyTasks={() =>
+					void this.openView(VIEW_TYPE_PHAROS_MY_TASKS)
+				}
+				onOpenCalendar={() =>
+					void this.openView(VIEW_TYPE_PHAROS_CALENDAR)
+				}
+				onOpenTeam={() =>
+					void this.openView(VIEW_TYPE_PHAROS_TEAM_LIST)
+				}
+				onGenerateMeetingTopics={() =>
+					new AiTopicModal(this.app).open()
+				}
 				onOpenSettings={() =>
 					new ProjectSettingsModal(this.app, {
-						topic: projectReport.name,
-						description: projectReport.description,
-						deadline: projectReport.deadline,
+						topic: project.name,
+						description: project.description,
+						deadline: project.deadline,
 					}).open()
 				}
 			/>,
 		);
 	}
 
-	private async buildDashboardData(
-		projectReport: ProjectReport,
-	): Promise<DashboardData> {
+	private async buildDashboardData(project: Project): Promise<DashboardData> {
 		const today = new Date().toISOString().slice(0, 10);
-		const deadlineDate = new Date(projectReport.deadline + "T00:00:00");
+		const deadlineDate = new Date(project.deadline + "T00:00:00");
 		const todayDate = new Date();
 		todayDate.setHours(0, 0, 0, 0);
 		const daysLeft = Math.max(
 			0,
 			Math.round(
-				(deadlineDate.getTime() - todayDate.getTime()) / (1000 * 60 * 60 * 24),
+				(deadlineDate.getTime() - todayDate.getTime()) /
+					(1000 * 60 * 60 * 24),
 			),
 		);
 
@@ -134,10 +179,11 @@ export class DashboardItemView extends ItemView {
 			.filter((m) => m.date >= today && m.status !== "completed")
 			.sort(
 				(a, b) =>
-					a.date.localeCompare(b.date) || a.time.localeCompare(b.time),
+					a.date.localeCompare(b.date) ||
+					a.time.localeCompare(b.time),
 			)
 			.slice(0, 3)
-			.map((m) => ({ date: m.date, time: m.time, title: m.title }));
+			.map((m) => ({ id: m.id, date: m.date, time: m.time, title: m.title }));
 
 		const alerts: DashboardAlert[] = [];
 		if (taskSummary.blocked > 0) {
@@ -147,8 +193,8 @@ export class DashboardItemView extends ItemView {
 			});
 		}
 		if (
-			!this.plugin.settings.planningRoadmapGenerated &&
-			!this.plugin.settings.developmentRoadmapGenerated
+			!project.planningRoadmapGenerated &&
+			!project.developmentRoadmapGenerated
 		) {
 			alerts.push({
 				severity: "info",
@@ -158,8 +204,8 @@ export class DashboardItemView extends ItemView {
 
 		return {
 			project: {
-				name: projectReport.name,
-				deadline: projectReport.deadline,
+				name: project.name,
+				deadline: project.deadline,
 				daysUntilPrototype: null,
 				totalDays: daysLeft,
 			},
@@ -176,7 +222,8 @@ export class DashboardItemView extends ItemView {
 			myTasks: {
 				inProgress: taskSummary.inProgress,
 				total: taskSummary.total,
-				memberName: members.find((m) => m.status === "active")?.name ?? "나",
+				memberName:
+					members.find((m) => m.status === "active")?.name ?? "나",
 			},
 			members: members.map((m) => ({
 				id: m.id,
@@ -187,7 +234,7 @@ export class DashboardItemView extends ItemView {
 			})),
 			meetings: upcomingMeetings,
 			importantDates: [
-				{ label: "최종 마감", date: projectReport.deadline, dday: daysLeft },
+				{ label: "최종 마감", date: project.deadline, dday: daysLeft },
 			],
 			alerts,
 		};
@@ -202,5 +249,33 @@ export class DashboardItemView extends ItemView {
 		}
 		const leaf = workspace.getLeaf("tab");
 		await leaf.setViewState({ type: viewType, active: true });
+	}
+
+	/**
+	 * 특정 회의 페이지로 이동.
+	 * MeetingPageItemView·setState({ meetingId, source }) 패턴은 캘린더·회의 목록·
+	 * 회의록 관리에서 이미 동일하게 사용 중이므로 새 인프라 추가 없이 재사용한 것.
+	 * source를 "meetings-list"로 고정해 회의 페이지의 뒤로가기가 회의 목록으로 돌아가도록 한다.
+	 * 실서비스 연동 시에도 buildDashboardData가 meetingsService.list()의 id를 그대로
+	 * 전달하므로 이 메서드는 수정 없이 동작한다.
+	 */
+	private async openMeeting(meetingId: string): Promise<void> {
+		const { workspace } = this.app;
+		const existing = workspace
+			.getLeavesOfType(VIEW_TYPE_PHAROS_MEETING_PAGE)
+			.find((leaf) => {
+				const s = leaf.getViewState().state as { meetingId?: string } | undefined;
+				return s?.meetingId === meetingId;
+			});
+		if (existing) {
+			workspace.revealLeaf(existing);
+			return;
+		}
+		const leaf = workspace.getLeaf("tab");
+		await leaf.setViewState({
+			type: VIEW_TYPE_PHAROS_MEETING_PAGE,
+			state: { meetingId, source: "meetings-list" },
+			active: true,
+		});
 	}
 }

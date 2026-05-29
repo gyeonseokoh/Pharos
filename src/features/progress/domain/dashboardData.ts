@@ -48,6 +48,16 @@ export interface MemberActivity {
 }
 
 export interface UpcomingMeeting {
+	/**
+	 * 회의 고유 ID.
+	 * 대시보드 카드에서 해당 회의 페이지로 직접 이동할 때 사용.
+	 * optional로 선언한 이유: 실서비스 연동 시 meetingsService.list()가 반환하는
+	 * Meeting 객체에 id가 이미 있으므로 buildDashboardData에서 그대로 전달하면 되고,
+	 * 없을 경우에는 회의 목록 전체로 fallback해 기존 동작이 유지된다.
+	 * 새로운 API·서비스 메서드를 추가한 게 아니라 기존 필드를 활용한 것이라
+	 * 시나리오 흐름에 영향을 주지 않는다.
+	 */
+	id?: string;
 	date: string; // ISO date
 	time: string; // HH:MM
 	title: string;

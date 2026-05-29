@@ -154,6 +154,14 @@ export function MinutesArchiveView({
 
 // ───────────────────────── Tab bar ─────────────────────────
 
+/**
+ * 분류 탭 바.
+ * 기존에는 하단 밑줄(border-b-2)만으로 활성 탭을 표시해 구분이 어려웠음.
+ * 회의 목록(예정/완료/전체)과 동일한 스타일로 변경:
+ *   - 활성 탭: accent 배경색 채움 + 흰 글씨로 명확히 구분
+ *   - 비활성 탭: 회색 글씨, hover 시 밝아짐
+ * 각 탭 고유 아이콘은 카테고리를 직관적으로 인지할 수 있도록 유지.
+ */
 function TabBar({
 	current,
 	onChange,
@@ -164,35 +172,40 @@ function TabBar({
 	counts: Record<TabKey, number>;
 }) {
 	return (
-		<div className="flex items-center gap-1 border-b border-bg-modifier">
+		<div className="inline-flex rounded-md border border-bg-modifier bg-bg-secondary p-1">
 			{TABS.map((t) => {
 				const Icon = t.icon;
 				const active = current === t.key;
 				return (
-					<button
+					<div
 						key={t.key}
-						type="button"
 						onClick={() => onChange(t.key)}
+						role="button"
+						tabIndex={0}
+						onKeyDown={(e) => {
+							if (e.key === "Enter" || e.key === " ") {
+								e.preventDefault();
+								onChange(t.key);
+							}
+						}}
 						className={cn(
-							"flex items-center gap-1.5 border-b-2 px-3 py-2 text-xs transition-colors",
+							"flex cursor-pointer select-none items-center gap-1.5 rounded px-3 py-1.5 text-xs font-medium transition-colors",
 							active
-								? "border-[color:var(--interactive-accent)] text-[color:var(--interactive-accent)]"
-								: "border-transparent text-text-muted hover:text-text-normal",
+								? "bg-[color:var(--interactive-accent)] text-[color:var(--text-on-accent)]"
+								: "text-text-muted hover:text-text-normal",
 						)}
 					>
 						<Icon className="h-3.5 w-3.5" />
 						{t.label}
 						<span
 							className={cn(
-								"rounded-full px-1.5 py-0.5 text-[10px]",
-								active
-									? "bg-[color:var(--interactive-accent)]/15 text-[color:var(--interactive-accent)]"
-									: "bg-bg-secondary text-text-faint",
+								"ml-0.5 rounded-full px-1.5 py-0.5 text-[10px] font-semibold",
+								active ? "bg-white/20" : "bg-bg-modifier",
 							)}
 						>
 							{counts[t.key]}
 						</span>
-					</button>
+					</div>
 				);
 			})}
 		</div>

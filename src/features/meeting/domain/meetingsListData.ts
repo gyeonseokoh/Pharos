@@ -25,4 +25,9 @@ export interface MeetingListItem {
 
 export interface MeetingsListData {
 	meetings: MeetingListItem[];
+	// ── [DEMO] mock 데이터 기준 "오늘" 날짜 주입용 ────────────────────────────────
+	// demoMode에서만 meetingsListMock.ts가 MOCK_TODAY를 넣어줌.
+	// 실서비스에서는 이 필드를 설정하지 않으면 뷰가 new Date()로 fallback.
+	// 연동 완료 후 이 필드와 MeetingsListView의 referenceDate 참조 줄을 삭제하세요.
+	referenceDate?: string;
 }

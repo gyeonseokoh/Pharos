@@ -11,7 +11,10 @@ import type {
 } from "../domain/meetingsListData";
 import type { MeetingStatus } from "../domain/meetingPageData";
 
-const today = "2026-04-24";
+// ── [DEMO] mock 데이터 기준 "오늘" ─────────────────────────────────────────────
+// 이 날짜 기준으로 예정/완료 필터가 동작한다.
+// 연동 완료 후 이 상수와 아래 referenceDate 줄을 삭제하세요.
+const MOCK_TODAY = "2026-04-24";
 
 /** 회의 ID로 풀 데이터가 있으면 그걸 쓰고, 없으면 캘린더 데이터 + 추정 상태. */
 function toListItem(meetingId: string): MeetingListItem | null {
@@ -24,7 +27,7 @@ function toListItem(meetingId: string): MeetingListItem | null {
 	let status: MeetingStatus;
 	if (page) {
 		status = page.status;
-	} else if (cal.date < today) {
+	} else if (cal.date < MOCK_TODAY) {
 		// 과거 회의인데 풀 데이터 없음 → 완료(회의록 미작성)로 표시
 		status = "completed";
 	} else {
@@ -52,4 +55,7 @@ export const mockMeetingsListData: MeetingsListData = {
 		.filter((m): m is MeetingListItem => m !== null)
 		// 최신 날짜가 위로
 		.sort((a, b) => b.date.localeCompare(a.date)),
+	// ── [DEMO] 뷰의 예정/완료 필터 기준 날짜 주입 ───────────────────────────────────
+	// 연동 완료 후 이 줄을 삭제하세요 (뷰가 new Date()로 fallback).
+	referenceDate: MOCK_TODAY,
 };

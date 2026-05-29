@@ -41,6 +41,12 @@ export interface ProjectReport {
 }
 
 export interface PharosSettings {
+	// ── [DEMO] AI·서버·깃허브 연동 전 임시 데모 시연용 플래그 ──────────────────────
+	// true = 각 ItemView가 서비스 대신 하드코딩 mock 데이터를 렌더합니다.
+	// AI·서버·깃허브 연동 완료 후 이 필드와 관련 분기를 모두 삭제하세요.
+	demoMode: boolean;
+	// ──────────────────────────────────────────────────────────────────────────────
+
 	/** Vault 내 프로젝트 루트 경로. 기본 "Pharos". */
 	projectRoot: string;
 	/** OpenAI API 키 (로컬 저장). */
@@ -104,6 +110,10 @@ export interface PharosSettings {
 }
 
 export const DEFAULT_SETTINGS: PharosSettings = {
+	// ── [DEMO] AI·서버·깃허브 연동 전 임시 데모 시연용 기본값 ────────────────────────
+	// 연동 완료 후 이 줄과 위 인터페이스의 demoMode 필드를 삭제하세요.
+	demoMode: true,
+	// ──────────────────────────────────────────────────────────────────────────────
 	projectRoot: "Pharos",
 	openaiApiKey: "",
 	githubToken: "",

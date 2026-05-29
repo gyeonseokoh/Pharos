@@ -12,7 +12,7 @@ import {
 	textareaClass,
 } from "shared/ui";
 import { cn } from "shared/ui/utils";
-import type { ProjectService } from "../services/projectService";
+import type { PharosPluginLike } from "../../../app/settings";
 
 interface FormState {
 	topic: string;
@@ -60,7 +60,9 @@ function NewProjectModalContent({ onClose, onSubmit }: NewProjectModalProps) {
 					className={inputClass}
 					placeholder="예: AI 기반 프로젝트 관리 도구"
 					value={form.topic}
-					onChange={(e) => setForm({ ...form, topic: e.target.value })}
+					onChange={(e) =>
+						setForm({ ...form, topic: e.target.value })
+					}
 				/>
 			</FormField>
 
@@ -70,7 +72,9 @@ function NewProjectModalContent({ onClose, onSubmit }: NewProjectModalProps) {
 					rows={3}
 					placeholder="프로젝트 목적·기능 개요·컨셉 등"
 					value={form.description}
-					onChange={(e) => setForm({ ...form, description: e.target.value })}
+					onChange={(e) =>
+						setForm({ ...form, description: e.target.value })
+					}
 				/>
 			</FormField>
 
@@ -79,7 +83,9 @@ function NewProjectModalContent({ onClose, onSubmit }: NewProjectModalProps) {
 					type="date"
 					className={inputClass}
 					value={form.deadline}
-					onChange={(e) => setForm({ ...form, deadline: e.target.value })}
+					onChange={(e) =>
+						setForm({ ...form, deadline: e.target.value })
+					}
 				/>
 			</FormField>
 
@@ -94,12 +100,16 @@ function NewProjectModalContent({ onClose, onSubmit }: NewProjectModalProps) {
 				<div className="mb-2 flex gap-2">
 					<ToggleButton
 						active={form.fixedMeetingToggle}
-						onClick={() => setForm({ ...form, fixedMeetingToggle: true })}
+						onClick={() =>
+							setForm({ ...form, fixedMeetingToggle: true })
+						}
 						label="🤖 AI가 교집합으로 정함 (권장)"
 					/>
 					<ToggleButton
 						active={!form.fixedMeetingToggle}
-						onClick={() => setForm({ ...form, fixedMeetingToggle: false })}
+						onClick={() =>
+							setForm({ ...form, fixedMeetingToggle: false })
+						}
 						label="✋ 직접 지정"
 					/>
 				</div>
@@ -110,21 +120,29 @@ function NewProjectModalContent({ onClose, onSubmit }: NewProjectModalProps) {
 							className={inputClass}
 							value={form.fixedMeetingDay}
 							onChange={(e) =>
-								setForm({ ...form, fixedMeetingDay: Number(e.target.value) })
+								setForm({
+									...form,
+									fixedMeetingDay: Number(e.target.value),
+								})
 							}
 						>
-							{["일", "월", "화", "수", "목", "금", "토"].map((d, i) => (
-								<option key={i} value={i}>
-									{d}요일
-								</option>
-							))}
+							{["일", "월", "화", "수", "목", "금", "토"].map(
+								(d, i) => (
+									<option key={i} value={i}>
+										{d}요일
+									</option>
+								),
+							)}
 						</select>
 						<input
 							type="time"
 							className={inputClass}
 							value={form.fixedMeetingTime}
 							onChange={(e) =>
-								setForm({ ...form, fixedMeetingTime: e.target.value })
+								setForm({
+									...form,
+									fixedMeetingTime: e.target.value,
+								})
 							}
 						/>
 					</div>
@@ -169,7 +187,7 @@ function ToggleButton({
 export class NewProjectModal extends BaseReactModal {
 	constructor(
 		app: App,
-		private readonly projectService: ProjectService,
+		private readonly plugin: PharosPluginLike,
 	) {
 		super(app);
 	}
@@ -184,7 +202,7 @@ export class NewProjectModal extends BaseReactModal {
 	}
 
 	private async handleSubmit(data: FormState): Promise<void> {
-		const project = await this.projectService.create({
+		const project = await this.plugin.projectService.create({
 			name: data.topic,
 			description: data.description,
 			deadline: data.deadline,
@@ -196,6 +214,7 @@ export class NewProjectModal extends BaseReactModal {
 				? undefined
 				: data.fixedMeetingTime,
 		});
+		await this.plugin.saveSettings();
 		new Notice(`프로젝트 "${project.name}" 생성 완료`);
 	}
 }

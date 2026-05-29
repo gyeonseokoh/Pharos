@@ -39,10 +39,15 @@ export const mockDashboardData: DashboardData = {
 		{ id: "m4", name: "동환", checks: 4, commits: 12, role: "PM" },
 		{ id: "m5", name: "우덕", checks: 2, commits: 3, role: "PM" },
 	],
+	// ── [DEMO] id는 calendarMock·meetingPageMock의 실제 ID와 매핑 ─────────────────
+	// 클릭 시 MeetingPageItemView로 이동하기 위해 id를 명시.
+	// 새 데이터를 만든 게 아니라 calendarMock.ts에 이미 존재하는 회의의 id를 참조한 것.
+	// 실서비스에서는 meetingsService.list()가 id를 포함한 채 반환하므로
+	// buildDashboardData에서 m.id를 그대로 전달하면 자동으로 동작한다.
 	meetings: [
-		{ date: "2026-04-24", time: "14:00", title: "주간 정기 회의" },
-		{ date: "2026-04-26", time: "19:00", title: "기술 스택 검토" },
-		{ date: "2026-04-30", time: "10:00", title: "중간발표 리허설" },
+		{ id: "mtg-0424-adhoc", date: "2026-04-24", time: "14:00", title: "UI/UX 레이아웃 중간 리뷰" },
+		{ id: "mtg-0426-adhoc", date: "2026-04-26", time: "19:00", title: "기술 스택 검토 (AI 모델)" },
+		{ id: "mtg-0430-adhoc", date: "2026-04-30", time: "10:00", title: "중간발표 리허설" },
 	],
 	importantDates: [
 		{ label: "중간발표", date: "2026-05-14", dday: 21 },

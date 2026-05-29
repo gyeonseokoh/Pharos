@@ -9,6 +9,7 @@
 
 import { useMemo, useState } from "react";
 import {
+	AlertTriangle,
 	Calendar,
 	CheckCircle2,
 	Clock,
@@ -53,24 +54,25 @@ export function MeetingsListView({
 	const [filter, setFilter] = useState<Filter>("all");
 	const [typeFilter, setTypeFilter] = useState<TypeFilter>("all");
 
+	// referenceDate가 있으면(demoMode) 그 날짜 기준, 없으면 실제 오늘 기준으로 필터링
+	const today = data.referenceDate ?? new Date().toISOString().slice(0, 10);
+
 	const filtered = useMemo(() => {
-		const today = new Date().toISOString().slice(0, 10);
 		return data.meetings.filter((m) => {
 			if (filter === "upcoming" && m.date < today) return false;
 			if (filter === "completed" && m.status !== "completed") return false;
 			if (typeFilter !== "all" && m.type !== typeFilter) return false;
 			return true;
 		});
-	}, [data.meetings, filter, typeFilter]);
+	}, [data.meetings, filter, typeFilter, today]);
 
 	const counts = useMemo(() => {
-		const today = new Date().toISOString().slice(0, 10);
 		return {
 			all: data.meetings.length,
 			upcoming: data.meetings.filter((m) => m.date >= today).length,
 			completed: data.meetings.filter((m) => m.status === "completed").length,
 		};
-	}, [data.meetings]);
+	}, [data.meetings, today]);
 
 	// 날짜별 그룹핑
 	const grouped = useMemo(() => groupByDate(filtered), [filtered]);
@@ -178,10 +180,10 @@ function StatusTabs({
 	return (
 		<div className="inline-flex rounded-md border border-bg-modifier bg-bg-secondary p-1">
 			<TabButton
-				active={active === "upcoming"}
-				onClick={() => onChange("upcoming")}
-				label="예정"
-				count={counts.upcoming}
+				active={active === "all"}
+				onClick={() => onChange("all")}
+				label="전체"
+				count={counts.all}
 			/>
 			<TabButton
 				active={active === "completed"}
@@ -190,10 +192,10 @@ function StatusTabs({
 				count={counts.completed}
 			/>
 			<TabButton
-				active={active === "all"}
-				onClick={() => onChange("all")}
-				label="전체"
-				count={counts.all}
+				active={active === "upcoming"}
+				onClick={() => onChange("upcoming")}
+				label="예정"
+				count={counts.upcoming}
 			/>
 		</div>
 	);
@@ -391,6 +393,13 @@ function MeetingCard({
 						)}
 					</div>
 				</div>
+
+				{/* 완료 회의만 오른쪽 끝에 상태 아이콘 표시.
+					 텍스트 배지("완료"/"회의록 미작성")가 잘 안 보여서
+					 아이콘으로 한눈에 구분할 수 있도록 추가함. */}
+				{meeting.status === "completed" && (
+					<CompletionIcon hasMinutes={meeting.hasMinutes} />
+				)}
 			</CardContent>
 		</Card>
 	);
@@ -405,6 +414,29 @@ function TypeIndicator({ type }: { type: MeetingType }) {
 		<div
 			className="h-10 w-1 shrink-0 rounded-full"
 			style={{ backgroundColor: `color-mix(in srgb, ${color} 80%, transparent)` }}
+		/>
+	);
+}
+
+/**
+ * 완료 회의 카드 오른쪽 끝 상태 아이콘.
+ * 초록 "완료" 텍스트가 배경과 구분이 어려워 아이콘으로 대체.
+ *   - 회의록 있음 → 초록 CheckCircle2 (완료 확인)
+ *   - 회의록 없음 → 주황 AlertTriangle (작성 필요 경고)
+ */
+function CompletionIcon({ hasMinutes }: { hasMinutes: boolean }) {
+	if (hasMinutes) {
+		return (
+			<CheckCircle2
+				className="h-5 w-5 shrink-0 text-[color:var(--color-green)]"
+				aria-label="완료"
+			/>
+		);
+	}
+	return (
+		<AlertTriangle
+			className="h-5 w-5 shrink-0 text-[color:var(--color-orange)]"
+			aria-label="회의록 미작성"
 		/>
 	);
 }
