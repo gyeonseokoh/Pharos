@@ -47,8 +47,8 @@ export {
 } from "../tasks/ScheduleCoordinationTask";
 
 export class AgentService {
-	private readonly executor: AgentExecutor;
-	private readonly tasks: {
+	readonly executor: AgentExecutor;
+	readonly tasks: {
 		coordinateSchedule: ScheduleCoordinationTask;
 		analyzeMinutes: MinutesAnalysisTask;
 		analyzeProgress: ProgressAnalysisTask;
