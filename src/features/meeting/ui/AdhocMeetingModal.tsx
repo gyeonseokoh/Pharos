@@ -104,11 +104,15 @@ function Content({
 			>
 				<div className="space-y-2">
 					{mockCandidates.map((c) => {
-						const selected = selectedCandidate === c.id && !useCustom;
+						// AI 후보 선택 여부는 useCustom 무관하게 id로만 판단
+						const selected = selectedCandidate === c.id;
 						const onPick = () => {
 							setSelectedCandidate(c.id);
-							setCustomDate("");
-							setCustomTime("");
+							// 후보 날짜·시간을 직접 지정 입력란에 자동 채움
+							// → 사용자가 선택한 값을 확인하거나 수정할 수 있고,
+							//   canSubmit 조건(customDate && customTime)도 충족됨
+							setCustomDate(c.date);
+							setCustomTime(c.time);
 						};
 						return (
 							<div
