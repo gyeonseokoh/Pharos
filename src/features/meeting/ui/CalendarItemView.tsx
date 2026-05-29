@@ -148,6 +148,6 @@ export class CalendarItemView extends ItemView {
 	}
 
 	private handleAddAdhocMeeting(date?: string): void {
-		new AdhocMeetingModal(this.app, date).open();
+		new AdhocMeetingModal(this.app, this.plugin, date).open();
 	}
 }

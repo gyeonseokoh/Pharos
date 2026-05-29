@@ -106,6 +106,20 @@ export interface AttachMinutesInput {
 }
 
 /**
+ * 회의 생성 시 받는 입력. Service.create 가 메타 필드(version·type·id 등) 채움.
+ * PO-4 임시 회의 / PO-1-1 정기 회의 양쪽에서 사용.
+ */
+export interface CreateMeetingInput {
+	title: string;
+	date: string;
+	time: string;
+	durationMinutes?: number;
+	meetingType: MeetingType;
+	attendees?: MeetingAttendee[];
+	topics?: MeetingTopic[];
+}
+
+/**
  * 회의 필터. listByXxx 메서드의 매개변수.
  */
 export interface MeetingFilter {
