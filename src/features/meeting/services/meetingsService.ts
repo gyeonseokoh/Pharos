@@ -13,6 +13,7 @@ import type {
 	MeetingAnalysis,
 	MeetingCategory,
 	MeetingFilter,
+	MeetingResource,
 } from "../domain/meetingSchema";
 import type { MeetingRepository } from "../repositories/meetingRepository";
 
@@ -67,6 +68,52 @@ export class MeetingsService {
 		await this.repo.save(updated);
 		eventBus.emit("minutes:attached", { meetingId: input.meetingId });
 		return analysis;
+	}
+
+	/**
+	 * PO-3 자료 자동 수집 결과 회의에 누적 저장.
+	 *
+	 * 호출자 (MeetingPageItemView) 가 agentService.collectResources 로 받은
+	 * CollectedResource[] 를 MeetingResource[] 로 변환해 전달.
+	 * 기존 resources 와 sourceUrl 중복은 자동 제거.
+	 * "meeting:updated" 이벤트 1회 발행.
+	 */
+	async appendResources(
+		meetingId: string,
+		incoming: Array<{
+			topicId: string | null;
+			title: string;
+			summary: string;
+			sourceUrl: string;
+		}>,
+	): Promise<MeetingResource[]> {
+		const meeting = await this.repo.getById(meetingId);
+		if (!meeting) throw new Error(`회의 ${meetingId} 를 찾을 수 없습니다`);
+
+		const existingUrls = new Set(meeting.resources.map((r) => r.sourceUrl));
+		const now = new Date().toISOString();
+		const rnd = () => Math.random().toString(36).slice(2, 8);
+
+		const added: MeetingResource[] = incoming
+			.filter((r) => r.title && r.sourceUrl && !existingUrls.has(r.sourceUrl))
+			.map((r) => ({
+				id: `res-${Date.now()}-${rnd()}`,
+				topicId: r.topicId,
+				title: r.title,
+				summary: r.summary,
+				sourceUrl: r.sourceUrl,
+				collectedAt: now,
+			}));
+
+		if (added.length === 0) return [];
+
+		await this.repo.save({
+			...meeting,
+			resources: [...meeting.resources, ...added],
+			updatedAt: now,
+		});
+		eventBus.emit("meeting:updated", { meetingId });
+		return added;
 	}
 
 	/** 회의록 삭제 (시연·테스트용). 회의 자체는 유지, attachedMinutes만 제거. */

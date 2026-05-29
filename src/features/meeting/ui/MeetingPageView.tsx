@@ -14,7 +14,9 @@
 import {
 	CheckCircle2,
 	ChevronRight,
+	ExternalLink,
 	FileText,
+	Loader2,
 	Paperclip,
 	Pencil,
 	Sparkles,
@@ -35,6 +37,7 @@ import type {
 	MeetingAttendee,
 	MeetingMinutes,
 	MeetingPageData,
+	MeetingResource,
 	MeetingStatus,
 	MeetingTopic,
 } from "../domain/meetingPageData";
@@ -55,6 +58,9 @@ export interface MeetingPageViewProps {
 	onEditMinutes?: () => void;
 	/** 주제 링크 클릭 → Topic Page. */
 	onOpenTopic?: (topicId: string) => void;
+	/** PO-3 "AI 자료 자동 수집" 버튼. 수집 진행 중에는 collectingResources=true. */
+	onCollectResources?: () => void;
+	collectingResources?: boolean;
 }
 
 export function MeetingPageView({
@@ -66,6 +72,8 @@ export function MeetingPageView({
 	onGenerateTopics,
 	onEditMinutes,
 	onOpenTopic,
+	onCollectResources,
+	collectingResources,
 }: MeetingPageViewProps) {
 	const navItems: BackNavItem[] = [];
 	if (onBackToMeetingsList)
@@ -104,6 +112,14 @@ export function MeetingPageView({
 					onGenerateTopics={onGenerateTopics}
 					onOpenTopic={onOpenTopic}
 					resourceCountByTopic={countResourcesByTopic(data)}
+				/>
+
+				<ResourcesSection
+					resources={data.resources}
+					topics={data.topics}
+					status={data.status}
+					collecting={collectingResources}
+					onCollectResources={onCollectResources}
 				/>
 
 				<MinutesSection minutes={data.minutes} onEditMinutes={onEditMinutes} />
@@ -368,6 +384,101 @@ function TopicLinkRow({
 				<ChevronRight className="h-4 w-4 shrink-0 text-text-faint transition-transform group-hover:translate-x-0.5 group-hover:text-text-muted" />
 			</div>
 		</li>
+	);
+}
+
+// ───────────────────────── Resources Section (PO-3) ─────────────────────────
+
+function ResourcesSection({
+	resources,
+	topics,
+	status,
+	collecting,
+	onCollectResources,
+}: {
+	resources: MeetingResource[];
+	topics: MeetingTopic[];
+	status: MeetingStatus;
+	collecting?: boolean;
+	onCollectResources?: () => void;
+}) {
+	const topicTitleById = new Map(topics.map((t) => [t.id, t.title]));
+	const canCollect = status !== "completed" && topics.length > 0;
+
+	return (
+		<Card>
+			<CardHeader>
+				<div className="flex items-center justify-between gap-3">
+					<div>
+						<CardTitle>📎 수집 자료</CardTitle>
+						<CardDescription>
+							{resources.length > 0
+								? `${resources.length}건 수집됨 · 주제별 외부 참고 자료`
+								: "AI 자동 수집 또는 수동 업로드로 자료를 모을 수 있습니다"}
+						</CardDescription>
+					</div>
+					{canCollect && onCollectResources && (
+						<Button
+							variant="outline"
+							size="sm"
+							onClick={onCollectResources}
+							disabled={collecting}
+						>
+							{collecting ? (
+								<>
+									<Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" />
+									수집 중...
+								</>
+							) : (
+								<>
+									<Sparkles className="mr-1 h-3.5 w-3.5" />
+									AI 자동 수집
+								</>
+							)}
+						</Button>
+					)}
+				</div>
+			</CardHeader>
+			<CardContent>
+				{resources.length === 0 ? (
+					<p className="text-xs text-text-faint">
+						{topics.length === 0
+							? "먼저 회의 주제를 추가해주세요."
+							: "아직 수집된 자료가 없습니다."}
+					</p>
+				) : (
+					<ul className="space-y-2">
+						{resources.map((r) => (
+							<li
+								key={r.id}
+								className="rounded-md border border-bg-modifier bg-bg-secondary p-3"
+							>
+								<div className="flex items-start gap-2">
+									<Paperclip className="mt-0.5 h-3.5 w-3.5 shrink-0 text-[color:var(--color-blue)]" />
+									<div className="flex-1 min-w-0">
+										<a
+											href={r.sourceUrl}
+											target="_blank"
+											rel="noopener noreferrer"
+											className="inline-flex items-center gap-1 text-sm font-medium text-text-normal hover:text-[color:var(--interactive-accent)]"
+										>
+											{r.title}
+											<ExternalLink className="h-3 w-3" />
+										</a>
+										{r.topicId && topicTitleById.has(r.topicId) && (
+											<p className="mt-0.5 text-[11px] text-[color:var(--interactive-accent)]">
+												주제: {topicTitleById.get(r.topicId)}
+											</p>
+										)}
+										<p className="mt-1 text-[11px] text-text-muted">{r.summary}</p>
+									</div>
+								</div>
+							</li>
+						))}
+					</ul>
+				)}
+			</CardContent>
+		</Card>
 	);
 }
 
