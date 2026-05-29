@@ -125,11 +125,17 @@ export class TaskDetailItemView extends ItemView {
 			this.root.render(<Empty text={`${this.taskId}를 찾을 수 없습니다.`} />);
 			return;
 		}
+		const taskData = this.taskData;
 		this.root.render(
 			<TaskDetailView
-				data={this.taskData}
+				data={taskData}
 				onGenerateChecklist={() =>
-					new ChecklistSplitModal(this.app, this.taskData!.title).open()
+					new ChecklistSplitModal(this.app, {
+						plugin: this.plugin,
+						taskId: taskData.id,
+						taskTitle: taskData.title,
+						taskDescription: taskData.description,
+					}).open()
 				}
 				onBackToMyTasks={() => void this.openView(VIEW_TYPE_PHAROS_MY_TASKS)}
 				onBackToHome={() => void this.openView(VIEW_TYPE_PHAROS_DASHBOARD)}

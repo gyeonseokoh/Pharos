@@ -137,7 +137,41 @@ export class TaskService {
 			...task,
 			checklist: [...(task.checklist ?? []), item],
 		});
+		eventBus.emit("task:updated", { taskId });
 		return item;
+	}
+
+	/**
+	 * 체크리스트 항목 여러 개를 한 번에 추가. (PO-11 AI 업무 세분화)
+	 *
+	 * AI 가 제안한 5~7 항목을 PM 이 편집·삭제 후 일괄 저장하는 흐름.
+	 * 기존 체크리스트는 보존하고 새 항목만 끝에 append.
+	 * 빈 텍스트(trim 후)는 무시. 1회 저장 → 1회 task:updated 이벤트.
+	 */
+	async addChecklistItems(taskId: string, texts: string[]): Promise<ChecklistItem[]> {
+		const task = await this.repo.getById(taskId);
+		if (!task) throw new Error(`Task ${taskId} 를 찾을 수 없습니다`);
+
+		const now = Date.now();
+		const newItems: ChecklistItem[] = texts
+			.map((t) => t.trim())
+			.filter((t) => t.length > 0)
+			.map((text, i) => ({
+				id: `chk-${now}-${i}`,
+				text,
+				checked: false,
+				checkedAt: null,
+				checkedBy: null,
+			}));
+
+		if (newItems.length === 0) return [];
+
+		await this.repo.save({
+			...task,
+			checklist: [...(task.checklist ?? []), ...newItems],
+		});
+		eventBus.emit("task:updated", { taskId });
+		return newItems;
 	}
 
 	/**
