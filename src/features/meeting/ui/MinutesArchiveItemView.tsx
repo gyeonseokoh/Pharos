@@ -218,6 +218,7 @@ export class MinutesArchiveItemView extends ItemView {
 			};
 			await this.plugin.saveSettings();
 		}
+		void this.loadAndRender();
 	}
 
 	private async openView(viewType: string): Promise<void> {
