@@ -76,7 +76,7 @@ import type { InviteService } from "./features/team/services/inviteService";
 import { LocalInviteService } from "./features/team/services/inviteService.local";
 import { JoinProjectModal } from "./features/team/ui/JoinProjectModal";
 import { AgentService } from "./features/agent/services/agentService";
-import { OpenAIProvider } from "./features/agent/providers/OpenAIProvider";
+import { GeminiProvider } from "./features/agent/providers/GeminiProvider";
 import { TavilySearchProvider } from "./features/agent/search/TavilySearchProvider";
 
 export default class PharosPlugin extends Plugin {
@@ -126,7 +126,7 @@ export default class PharosPlugin extends Plugin {
 		this.roadmapService = new RoadmapService(this.roadmapRepository);
 		this.teamService = new TeamService(this.teamRepository, this.inviteRepository);
 		this.progressService = new ProgressService(this.taskRepository);
-		const llmProvider = new OpenAIProvider(() => this.settings.openaiApiKey);
+		const llmProvider = new GeminiProvider(() => this.settings.llmApikey, this.settings.llmModel);
 		const searchProvider = new TavilySearchProvider(() => this.settings.tavilyApiKey);
 		this.agentService = new AgentService(
 			this.teamService,
@@ -142,7 +142,7 @@ export default class PharosPlugin extends Plugin {
 		// ─── InviteService 주입 ───
 		// 시연용: LocalInviteService (같은 컴퓨터 안에서만 동작)
 		// 백엔드 합류 시: ServerInviteService 로 한 줄 교체
-		//   this.inviteService = new ServerInviteService({ baseUrl, getAuthToken, getWorkspaceId });
+		//   this.inviteService = new ServerInviteService({ baseUrl, duthToken, getWorkspaceId });
 		this.inviteService = new LocalInviteService({
 			inviteRepo: this.inviteRepository,
 			getWorkspaceId: async () => {

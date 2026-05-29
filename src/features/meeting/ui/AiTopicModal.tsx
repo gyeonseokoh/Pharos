@@ -67,7 +67,7 @@ function Content({ onClose }: { onClose: () => void }) {
 	return (
 		<ModalLayout
 			title="🤖 AI 회의 주제 제안"
-			description="GPT-4o-mini가 최근 회의록 + 로드맵 진행도를 분석해 제안"
+			description="AI가 최근 회의록 + 로드맵 진행도를 분석해 제안"
 			submitLabel={`${selectedCount}개 주제 확정`}
 			submitDisabled={!canSubmit}
 			onSubmit={() => {
