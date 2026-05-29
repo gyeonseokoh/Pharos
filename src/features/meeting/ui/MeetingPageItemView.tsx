@@ -155,7 +155,14 @@ export class MeetingPageItemView extends ItemView {
 				data={this.meetingData}
 				{...backProps}
 				onBackToHome={() => void this.openView(VIEW_TYPE_PHAROS_DASHBOARD)}
-				onGenerateTopics={() => new AiTopicModal(this.app).open()}
+				onGenerateTopics={() =>
+					this.meetingId
+						? new AiTopicModal(this.app, {
+								plugin: this.plugin,
+								meetingId: this.meetingId,
+							}).open()
+						: undefined
+				}
 				onEditMinutes={() =>
 					new Notice(
 						"[미구현] 회의록 편집은 Obsidian 네이티브 에디터로 열 예정",

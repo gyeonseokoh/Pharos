@@ -105,7 +105,9 @@ export class DashboardItemView extends ItemView {
 					onOpenMyTasks={() => void this.openView(VIEW_TYPE_PHAROS_MY_TASKS)}
 					onOpenCalendar={() => void this.openView(VIEW_TYPE_PHAROS_CALENDAR)}
 					onOpenTeam={() => void this.openView(VIEW_TYPE_PHAROS_TEAM_LIST)}
-					onGenerateMeetingTopics={() => new AiTopicModal(this.app).open()}
+					onGenerateMeetingTopics={() =>
+						new AiTopicModal(this.app, { plugin: this.plugin }).open()
+					}
 					onOpenSettings={() =>
 						new ProjectSettingsModal(this.app, {
 							topic: project.name,
@@ -143,7 +145,7 @@ export class DashboardItemView extends ItemView {
 					void this.openView(VIEW_TYPE_PHAROS_TEAM_LIST)
 				}
 				onGenerateMeetingTopics={() =>
-					new AiTopicModal(this.app).open()
+					new AiTopicModal(this.app, { plugin: this.plugin }).open()
 				}
 				onOpenSettings={() =>
 					new ProjectSettingsModal(this.app, {
