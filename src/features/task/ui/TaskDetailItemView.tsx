@@ -5,6 +5,7 @@ import { ChecklistSplitModal } from "./ChecklistSplitModal";
 import { VIEW_TYPE_PHAROS_MY_TASKS } from "../../progress/ui/MyTasksItemView";
 import { VIEW_TYPE_PHAROS_DASHBOARD } from "../../progress/ui/DashboardItemView";
 import { VIEW_TYPE_PHAROS_MEETING_PAGE } from "../../meeting/ui/MeetingPageItemView";
+import { getTaskDetailMock } from "./taskDetailMock";
 import type { PharosPluginLike } from "../../../app/settings";
 import type { TaskDetailData } from "../domain/taskDetailData";
 
@@ -74,6 +75,11 @@ export class TaskDetailItemView extends ItemView {
 
 	private async loadAndRender(): Promise<void> {
 		if (!this.taskId) {
+			this.render();
+			return;
+		}
+		if (this.plugin.settings.demoMode) {
+			this.taskData = getTaskDetailMock(this.taskId);
 			this.render();
 			return;
 		}
