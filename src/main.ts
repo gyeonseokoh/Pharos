@@ -1,6 +1,7 @@
 import { Plugin } from "obsidian";
 import {
 	DEFAULT_SETTINGS,
+	PharosPluginLike,
 	PharosSettingsTab,
 	type PharosSettings,
 } from "./app/settings";
@@ -103,6 +104,9 @@ export default class PharosPlugin extends Plugin {
 	commitService!: CommitService;
 	inviteService!: InviteService;
 	agentService!: AgentService;
+	// 인터페이스 일치용 temp 필드
+	connectionManager!: import("./shared/infra/sync/ConnectionManager").ConnectionManager;
+	syncChannelManager!: import("./shared/infra/sync/SyncChannelManager").SyncChannelManager;
 
 	async onload(): Promise<void> {
 		await this.loadSettings();
@@ -269,6 +273,13 @@ export default class PharosPlugin extends Plugin {
 		this.registerObsidianProtocolHandler("pharos-join", (params) => {
 			void this.handleJoinLink(params.token ?? "");
 		});
+
+		// ─── GitHub OAuth 콜백 protocol handler ──────────────────────
+		// obsidian://pharos-callback?token=<JWT>
+		// 서버가 redirect 하면 OS가 Obsidian을 실행하고 이 콜백 호출.
+		this.registerObsidianProtocolHandler("pharos-callback", (params) => {
+			void this.handleAuthCallback(params.token ?? "");
+		});
 	}
 
 	async onunload(): Promise<void> {
@@ -301,6 +312,52 @@ export default class PharosPlugin extends Plugin {
 			return;
 		}
 		new JoinProjectModal(this.app, this, { token }).open();
+	}
+
+	/**
+	 * GitHub OAuth 콜백 핸들러
+	 * 서버 발급 JWT를 수신해 settings에 저장함
+	 * JWT sign 검증은 서버에서 완료된 상태이므로 여기선 decode만 ㄱㄱ
+	 */
+	private async handleAuthCallback(token: string): Promise<void> {
+		if (!token) {
+			new Notice("❌ 로그인 실패: 토큰이 없습니다");
+			return;
+		}
+
+		// JWT payload decode — Base64url → JSON
+		// 형식: header.payload.signature
+		let login: string;
+				try {
+			const parts = token.split(".");
+			if (parts.length < 3 || !parts[1]) {
+				new Notice("❌ 로그인 실패: 올바르지 않은 토큰 형식");
+				return;
+			}
+			const payloadB64 = parts[1];
+			// Base64url → Base64 변환 ('+', '/' 복원, padding 추가)
+			const base64 = payloadB64
+				.replace(/-/g, "+")
+				.replace(/_/g, "/")
+				.padEnd(payloadB64.length + (4 - (payloadB64.length % 4)) % 4, "=");
+			const payload = JSON.parse(atob(base64)) as { login?: string };
+			login = payload.login ?? "";
+		} catch {
+			new Notice("❌ 로그인 실패: 토큰 파싱 오류");
+			return;
+		}
+
+		this.settings.authToken   = token;
+		this.settings.githubLogin = login;
+		await this.saveSettings();
+
+		// Phase B 완료 후 아래 주석 해제:
+		// if (this.settings.workspaceId) {
+		//     this.connectionManager.setToken(token);
+		//     this.syncChannelManager.init(this.settings.hocuspocusServerUrl, this.settings.workspaceId, token);
+		// }
+
+		new Notice(`✅ GitHub 로그인 성공: @${login}`);
 	}
 
 	/**
