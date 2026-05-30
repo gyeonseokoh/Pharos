@@ -1,0 +1,527 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Pharos 개발 현황 보고서</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: 'Apple SD Gothic Neo', 'Noto Sans KR', 'Malgun Gothic', sans-serif;
+    font-size: 13px;
+    line-height: 1.7;
+    color: #1a1a2e;
+    background: #fff;
+    padding: 40px 60px;
+    max-width: 960px;
+    margin: 0 auto;
+  }
+
+  /* ── 표지 ── */
+  .cover {
+    text-align: center;
+    padding: 80px 0 60px;
+    border-bottom: 3px solid #4f46e5;
+    margin-bottom: 48px;
+  }
+  .cover .badge {
+    display: inline-block;
+    background: #4f46e5;
+    color: #fff;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 2px;
+    padding: 4px 14px;
+    border-radius: 20px;
+    margin-bottom: 20px;
+    text-transform: uppercase;
+  }
+  .cover h1 {
+    font-size: 32px;
+    font-weight: 800;
+    color: #1a1a2e;
+    margin-bottom: 12px;
+  }
+  .cover .subtitle {
+    font-size: 15px;
+    color: #6b7280;
+    margin-bottom: 32px;
+  }
+  .cover .meta {
+    display: flex;
+    justify-content: center;
+    gap: 32px;
+    font-size: 12px;
+    color: #9ca3af;
+  }
+  .cover .meta span strong { color: #4f46e5; }
+
+  /* ── 섹션 ── */
+  h2 {
+    font-size: 19px;
+    font-weight: 700;
+    color: #1a1a2e;
+    border-left: 4px solid #4f46e5;
+    padding-left: 12px;
+    margin: 40px 0 16px;
+  }
+  h3 {
+    font-size: 14px;
+    font-weight: 700;
+    color: #374151;
+    margin: 24px 0 8px;
+  }
+  h4 {
+    font-size: 13px;
+    font-weight: 600;
+    color: #4f46e5;
+    margin: 16px 0 6px;
+  }
+  p { margin-bottom: 10px; color: #374151; }
+
+  /* ── 테이블 ── */
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 12px 0 20px;
+    font-size: 12px;
+  }
+  thead tr { background: #4f46e5; color: #fff; }
+  thead th {
+    padding: 9px 12px;
+    text-align: left;
+    font-weight: 600;
+    font-size: 12px;
+  }
+  tbody tr:nth-child(even) { background: #f8f7ff; }
+  tbody tr:hover { background: #ede9fe; }
+  tbody td {
+    padding: 8px 12px;
+    border-bottom: 1px solid #e5e7eb;
+    vertical-align: top;
+  }
+  .done { color: #059669; font-weight: 700; }
+  .todo { color: #dc2626; font-weight: 700; }
+  .partial { color: #d97706; font-weight: 700; }
+
+  /* ── 강조 박스 ── */
+  .box {
+    border-radius: 8px;
+    padding: 14px 18px;
+    margin: 12px 0;
+    font-size: 12px;
+  }
+  .box-blue { background: #eff6ff; border-left: 4px solid #3b82f6; }
+  .box-green { background: #f0fdf4; border-left: 4px solid #22c55e; }
+  .box-yellow { background: #fffbeb; border-left: 4px solid #f59e0b; }
+  .box-red { background: #fef2f2; border-left: 4px solid #ef4444; }
+  .box-purple { background: #f5f3ff; border-left: 4px solid #8b5cf6; }
+  .box strong { display: block; margin-bottom: 4px; font-size: 13px; }
+
+  /* ── 인라인 코드 ── */
+  code {
+    background: #f1f5f9;
+    border-radius: 4px;
+    padding: 1px 5px;
+    font-family: 'JetBrains Mono', 'Consolas', monospace;
+    font-size: 11px;
+    color: #7c3aed;
+  }
+
+  /* ── 구분선 ── */
+  hr { border: none; border-top: 1px solid #e5e7eb; margin: 28px 0; }
+
+  /* ── 2열 그리드 ── */
+  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin: 12px 0; }
+
+  /* ── 페이지 나누기 ── */
+  .page-break { page-break-before: always; }
+
+  /* ── 프린트 설정 ── */
+  @media print {
+    body { padding: 20px 40px; font-size: 12px; }
+    .cover { padding: 40px 0 30px; }
+    h2 { font-size: 17px; }
+    table { font-size: 11px; }
+  }
+</style>
+</head>
+<body>
+
+<!-- ═══════════════════════════════════════
+     표지
+════════════════════════════════════════ -->
+<div class="cover">
+  <div class="badge">Handover Report</div>
+  <h1>Pharos 개발 현황 보고서</h1>
+  <p class="subtitle">유석 + Claude 설계 문서 기준 구현 비교 및 현재 진행 상태</p>
+  <div class="meta">
+    <span><strong>작성일</strong> 2026-05-06</span>
+    <span><strong>작성자</strong> 우덕 (인수자) + Claude</span>
+    <span><strong>기준 문서</strong> docs/architecture/repository-design.md · 시나리오.md</span>
+  </div>
+</div>
+
+
+<!-- ═══════════════════════════════════════
+     1. 현재 진행도
+════════════════════════════════════════ -->
+<h2>1. 현재 진행도 요약</h2>
+
+<table>
+  <thead>
+    <tr><th>작업 단계</th><th>세부 항목</th><th>상태</th></tr>
+  </thead>
+  <tbody>
+    <tr><td rowspan="6"><strong>1. 스키마 설계</strong></td><td>taskSchema.ts + linkedCommits 필드</td><td class="done">✅ 완료</td></tr>
+    <tr><td>roadmapSchema.ts</td><td class="done">✅ 완료</td></tr>
+    <tr><td>teamSchema.ts</td><td class="done">✅ 완료</td></tr>
+    <tr><td>availabilitySchema.ts</td><td class="done">✅ 완료</td></tr>
+    <tr><td>commitSchema.ts</td><td class="done">✅ 완료</td></tr>
+    <tr><td>shared/types 불일치 해소 (entities.ts·schemas.ts 삭제)</td><td class="done">✅ 완료</td></tr>
+
+    <tr><td rowspan="5"><strong>2. Repository 인터페이스</strong></td><td>taskRepository.ts</td><td class="done">✅ 완료</td></tr>
+    <tr><td>roadmapRepository.ts</td><td class="done">✅ 완료</td></tr>
+    <tr><td>teamRepository.ts</td><td class="done">✅ 완료</td></tr>
+    <tr><td>availabilityRepository.ts</td><td class="done">✅ 완료</td></tr>
+    <tr><td>commitRepository.ts</td><td class="done">✅ 완료</td></tr>
+
+    <tr><td rowspan="7"><strong>3. Settings 구현체</strong></td><td>taskRepository.settings.ts</td><td class="done">✅ 완료</td></tr>
+    <tr><td>roadmapRepository.settings.ts</td><td class="done">✅ 완료</td></tr>
+    <tr><td>teamRepository.settings.ts</td><td class="done">✅ 완료</td></tr>
+    <tr><td>availabilityRepository.settings.ts</td><td class="done">✅ 완료</td></tr>
+    <tr><td>commitRepository.settings.ts</td><td class="done">✅ 완료</td></tr>
+    <tr><td>settings.ts 필드 추가 (availabilities, commitBatches)</td><td class="done">✅ 완료</td></tr>
+    <tr><td>main.ts Repository 초기화</td><td class="done">✅ 완료</td></tr>
+
+    <tr><td rowspan="6"><strong>4. Service 레이어</strong></td><td>TaskService</td><td class="done">✅ 완료</td></tr>
+    <tr><td>RoadmapService</td><td class="done">✅ 완료</td></tr>
+    <tr><td>TeamService</td><td class="done">✅ 완료</td></tr>
+    <tr><td>ProgressService</td><td class="done">✅ 완료</td></tr>
+    <tr><td>AvailabilityService</td><td class="done">✅ 완료</td></tr>
+    <tr><td>CommitService (PM-4 verified/unverified 분류)</td><td class="done">✅ 완료</td></tr>
+
+    <tr><td rowspan="5"><strong>5. UI → Service 연결</strong></td><td>WeeklyAvailabilityModal → availabilityService (weekStart 월요일 수정 포함)</td><td class="done">✅ 완료</td></tr>
+    <tr><td>MinutesArchiveItemView → meetingsService 연결 (과도기 폴백 포함)</td><td class="done">✅ 완료</td></tr>
+    <tr><td>RoadmapItemView mock → roadmapService 교체</td><td class="todo">❌ 미완</td></tr>
+    <tr><td>각 ItemView 전반 mock → 실제 Service 교체</td><td class="todo">❌ 미완</td></tr>
+    <tr><td>workspaceId UUID 자동 생성</td><td class="done">✅ 완료 (projectService에 구현됨)</td></tr>
+
+    <tr><td rowspan="3"><strong>6. VaultRepository</strong></td><td>VaultStore 활성화</td><td class="todo">❌ 미착수</td></tr>
+    <tr><td>*.vault.ts 구현체 8개</td><td class="todo">❌ 미착수</td></tr>
+    <tr><td>data.json → .md 마이그레이션 스크립트</td><td class="todo">❌ 미착수</td></tr>
+  </tbody>
+</table>
+
+<div class="box box-blue">
+  <strong>📊 종합 현황</strong>
+  1단계(스키마) ~ 4단계(Service)까지 완전 완료. 5단계(UI 연결) 부분 완료. 6단계(VaultRepository)는 백엔드 연결 직전 단계로 보류.
+</div>
+
+
+<!-- ═══════════════════════════════════════
+     2. 프로젝트 개요
+════════════════════════════════════════ -->
+<div class="page-break"></div>
+<h2>2. 프로젝트 개요 및 설계 원칙</h2>
+
+<h3>2.1 Pharos란</h3>
+<p>Pharos는 Obsidian 플러그인 기반의 AI 프로젝트 매니저입니다. PO(프로젝트 오너)와 PM(프로젝트 멤버)이 회의·로드맵·Task·진행도를 한 곳에서 관리하고, AI 에이전트가 회의 주제 생성·자료 수집·회의록 분석 등을 보조합니다.</p>
+
+<h3>2.2 초기 설계 원칙 (유석 + Claude, repository-design.md 기준)</h3>
+
+<div class="grid2">
+  <div class="box box-purple">
+    <strong>3단계 Repository 패턴</strong>
+    1단계: SettingsRepository (data.json)<br>
+    2단계: VaultRepository (.md 파일)<br>
+    3단계: HocuspocusRepository (서버 실시간 동기화)
+  </div>
+  <div class="box box-purple">
+    <strong>Feature별 스키마 소유</strong>
+    각 feature가 자기 도메인 스키마를 직접 소유.<br>
+    <code>features/*/domain/*Schema.ts</code><br>
+    공유 타입은 <code>shared/types/constants.ts</code>만.
+  </div>
+  <div class="box box-purple">
+    <strong>Service = 비즈니스 로직 Facade</strong>
+    UI · 백엔드 · AI 에이전트 모두 Service를 통해 데이터 조작.<br>
+    Repository 교체 시 main.ts 한 줄만 변경.
+  </div>
+  <div class="box box-purple">
+    <strong>EntityMeta 공통 규칙</strong>
+    모든 엔티티: <code>version</code>, <code>type</code>, <code>id</code>,<br>
+    <code>createdAt</code>, <code>updatedAt</code> 필드 필수.
+  </div>
+</div>
+
+<h3>2.3 핵심 시나리오 (시나리오.md 기준)</h3>
+<table>
+  <thead><tr><th>시나리오 ID</th><th>기능</th><th>담당</th><th>구현 상태</th></tr></thead>
+  <tbody>
+    <tr><td>PO-0</td><td>프로젝트 생성 · workspaceId UUID 자동 발급</td><td>PO</td><td class="done">✅ 완료</td></tr>
+    <tr><td>PO-1</td><td>기획 로드맵 AI 생성</td><td>PO</td><td class="partial">🔶 Service 완료, UI mock 잔존</td></tr>
+    <tr><td>PO-4</td><td>임시 회의 추가 · 공통 가용시간 기반 추천</td><td>PO</td><td class="partial">🔶 availabilityService 완료, UI 연결 부분 완료</td></tr>
+    <tr><td>PO-5</td><td>회의록 업로드 · AI 분석</td><td>PO</td><td class="partial">🔶 meetingsService 연결 완료, mock 데이터 병행</td></tr>
+    <tr><td>PO-6</td><td>개발 로드맵 AI 생성</td><td>PO</td><td class="partial">🔶 Service 완료, UI mock 잔존</td></tr>
+    <tr><td>PO-12</td><td>공개 진행도 페이지 (GitHub 커밋 + 체크리스트)</td><td>PO</td><td class="partial">🔶 commitService 완료, GitHub API 연동 미구현</td></tr>
+    <tr><td>PM-1</td><td>초기 고정 가용시간 입력</td><td>PM</td><td class="partial">🔶 UI 존재, Service 완료</td></tr>
+    <tr><td>PM-2</td><td>주간 가용시간 입력</td><td>PM</td><td class="done">✅ availabilityService 연결 완료 (weekStart 월요일 기준)</td></tr>
+    <tr><td>PM-3</td><td>담당자 본인 Task 체크</td><td>PM</td><td class="done">✅ taskService.setUserCheck() 완료</td></tr>
+    <tr><td>PM-4</td><td>GitHub 커밋 매칭 (verified/unverified)</td><td>PM</td><td class="partial">🔶 commitService 완료, GitHub API 폴링 미구현</td></tr>
+  </tbody>
+</table>
+
+
+<!-- ═══════════════════════════════════════
+     3. 설계 의도 vs 구현 비교
+════════════════════════════════════════ -->
+<div class="page-break"></div>
+<h2>3. 설계 의도 vs 실제 구현 비교</h2>
+
+<h3>3.1 스키마 설계 (Task 1)</h3>
+
+<div class="box box-blue">
+  <strong>설계 의도 (repository-design.md §4)</strong>
+  각 엔티티는 EntityMeta(version · type · id · createdAt · updatedAt)를 가져야 함.
+  스키마는 feature 폴더 내 <code>domain/*Schema.ts</code>에 위치. Zod 기반 런타임 검증 필수.
+</div>
+
+<h4>변경 전 (유석 인수 시점)</h4>
+<p>
+  <code>shared/types/entities.ts</code>에 전역 타입 집중. EntityMeta 없음.
+  enum 컨벤션 불일치: <code>"TODO"</code>(shared) vs <code>"todo"</code>(feature).
+  <code>availabilitySchema.ts</code> · <code>commitSchema.ts</code> 미존재.
+  <code>Task</code>에 <code>linkedCommits</code> 필드 누락.
+</p>
+
+<h4>변경 후 (현재)</h4>
+<p>
+  모든 스키마가 각 feature의 <code>domain/*Schema.ts</code>에 위치. EntityMeta 적용.
+  <code>shared/types/entities.ts</code> · <code>schemas.ts</code> 삭제 (데드코드 제거).
+  <code>availabilitySchema.ts</code> · <code>commitSchema.ts</code> 신규 작성.
+  <code>TaskV1</code>에 <code>linkedCommits: LinkedCommitSchema[]</code> 필드 추가.
+  <code>shared/types/constants.ts</code>만 유지 (<code>COMMIT_TASK_PATTERN</code> · <code>UseCase</code> 상수).
+</p>
+
+<hr>
+
+<h3>3.2 Repository 인터페이스 (Task 2)</h3>
+
+<div class="box box-blue">
+  <strong>설계 의도 (repository-design.md §5.2)</strong>
+  Repository 인터페이스가 "어디서 읽고 쓰는지"를 Service가 몰라도 되도록 추상화.
+  <code>listByTask</code> · <code>listByMonth</code> · <code>upsertBatch</code> · <code>watch</code> 등 도메인 중심 메서드 정의.
+</div>
+
+<h4>주요 수정 내역</h4>
+<table>
+  <thead><tr><th>파일</th><th>변경 내용</th></tr></thead>
+  <tbody>
+    <tr><td><code>teamRepository.ts</code></td><td>MemberRepository → TeamRepository 리네임. <code>setStatus()</code> 추가.</td></tr>
+    <tr><td><code>taskRepository.ts</code></td><td><code>listByPhase(phaseId: string)</code> 시그니처 수정. <code>LinkedCommit</code>을 schema에서 import로 변경 (로컬 정의 제거, "manual" 상태 폐기).</td></tr>
+    <tr><td><code>availabilityRepository.ts</code></td><td>신규 작성. <code>getByWeek · listByMember · saveSlots · deleteByWeek · watch</code>.</td></tr>
+    <tr><td><code>commitRepository.ts</code></td><td>신규 작성. <code>listByTask · listByMonth · upsertBatch · deleteByMonth · watch</code>. 초기 잘못된 시그니처(<code>getByMonth</code>·<code>upsertBatch(month, commits)</code>) 설계 의도 기준으로 수정.</td></tr>
+  </tbody>
+</table>
+
+<hr>
+
+<h3>3.3 Settings 기반 구현체 (Task 3)</h3>
+
+<div class="box box-blue">
+  <strong>설계 의도 (repository-design.md §6)</strong>
+  1단계 MVP: data.json (Obsidian settings)에 임시 저장. 나중에 VaultRepository로 교체 시 main.ts 한 줄만 변경.
+</div>
+
+<h4>신규 추가</h4>
+<table>
+  <thead><tr><th>파일</th><th>내용</th></tr></thead>
+  <tbody>
+    <tr><td><code>availabilityRepository.settings.ts</code></td><td>주차별 가용시간. <code>avail-{weekStart}</code> ID 자동 생성. Listener/emit 패턴.</td></tr>
+    <tr><td><code>commitRepository.settings.ts</code></td><td>월별 배치 저장. sha 기준 중복 제거 병합. <code>commits-{month}</code> ID 자동 생성.</td></tr>
+    <tr><td><code>settings.ts</code></td><td><code>PharosSettings</code>에 <code>availabilities: Availability[]</code> · <code>commitBatches: CommitBatch[]</code> 추가. <code>PharosPluginLike</code>에 모든 Service 등록.</td></tr>
+    <tr><td><code>main.ts</code></td><td>모든 Repository · Service <code>onload()</code> 초기화 연결 완료.</td></tr>
+  </tbody>
+</table>
+
+<hr>
+
+<h3>3.4 Service 레이어 (Task 4)</h3>
+
+<div class="box box-blue">
+  <strong>설계 의도</strong>
+  UI · 백엔드 · AI 에이전트가 모두 Service만 호출. Repository를 직접 접근하지 않음.
+  도메인 이벤트(<code>task:created</code> · <code>minutes:attached</code> 등)를 eventBus로 발행.
+</div>
+
+<table>
+  <thead><tr><th>Service</th><th>주요 책임</th><th>특이사항</th></tr></thead>
+  <tbody>
+    <tr><td><code>TaskService</code></td><td>TASK-N ID 자동 발급, userCheck 토글, appendCommit</td><td>eventBus 연동 완료</td></tr>
+    <tr><td><code>RoadmapService</code></td><td>기획/개발 로드맵 저장·조회</td><td>완료</td></tr>
+    <tr><td><code>TeamService</code></td><td>팀원 초대, 상태 변경 (active/left)</td><td>완료</td></tr>
+    <tr><td><code>ProgressService</code></td><td>Task 집계 (완료율 등), read-only</td><td>v2에서 CommitRepository 연동 예정</td></tr>
+    <tr><td><code>AvailabilityService</code></td><td>주간 가용시간 저장 (타 팀원 슬롯 보존), 공통 슬롯 조회</td><td>신규 작성</td></tr>
+    <tr><td><code>CommitService</code></td><td>PM-4 커밋 분류 (verified/unverified), 월별/Task별 조회</td><td>신규 작성. verifyResult 자동 분류 로직 포함.</td></tr>
+    <tr><td><code>ProjectService</code></td><td>프로젝트 생성, workspaceId UUID 자동 발급</td><td><code>crypto.randomUUID()</code> 사용 (§1 전제 12)</td></tr>
+    <tr><td><code>MeetingsService</code></td><td>회의록 첨부(attachMinutes), 분석 시뮬레이터 호출</td><td>완료</td></tr>
+  </tbody>
+</table>
+
+<hr>
+
+<h3>3.5 UI → Service 연결 (Task 5, 진행 중)</h3>
+
+<div class="box box-yellow">
+  <strong>설계 의도</strong>
+  각 ItemView는 Service만 호출. mock 데이터 직접 import 금지. settings 직접 접근 금지.
+</div>
+
+<h4>완료된 항목</h4>
+<table>
+  <thead><tr><th>항목</th><th>변경 전</th><th>변경 후</th></tr></thead>
+  <tbody>
+    <tr>
+      <td><code>WeeklyAvailabilityModal</code></td>
+      <td>weekStart = 일요일 기준. onSubmit <code>[미구현]</code> Notice만.</td>
+      <td>weekStart = <strong>월요일</strong> 기준 (§4.6). <code>availabilityService.saveMemberSlots()</code> 실 연결. plugin · memberId 주입 구조.</td>
+    </tr>
+    <tr>
+      <td><code>MinutesArchiveItemView</code></td>
+      <td><code>settings.attachedMinutes</code> 직접 저장.</td>
+      <td>레포지토리에 회의 존재 시 → <code>meetingsService.attachMinutes()</code>. 미존재(mock 회의) 시 → settings 폴백 (migration 과도기).</td>
+    </tr>
+    <tr>
+      <td><code>ProjectService.create()</code></td>
+      <td>workspaceId 누락.</td>
+      <td><code>crypto.randomUUID()</code> 기반 <code>ws-{UUID}</code> 자동 발급.</td>
+    </tr>
+  </tbody>
+</table>
+
+<h4>미완료 항목 및 이유</h4>
+<div class="box box-red">
+  <strong>RoadmapItemView mock 완전 제거</strong>
+  <code>roadmapService.getPlanning()</code>은 <code>Roadmap</code> 엔티티를 반환하지만, <code>RoadmapView</code>는 <code>RoadmapData</code> 뷰모델을 요구함.
+  <code>Roadmap → RoadmapData</code> 어댑터 + Task 목록 로딩이 필요. 별도 작업 필요.
+</div>
+<div class="box box-red">
+  <strong>각 ItemView 전반 mock → Service 교체</strong>
+  CalendarView · MeetingsListView 등 다수 View가 <code>meetingPageMock.ts</code>의 하드코딩 데이터를 사용.
+  MeetingRepository에 실제 회의 데이터가 없으므로 Service로 교체 시 빈 화면이 됨.
+  Task 6 VaultRepository 구현 후에야 완전 해소 가능.
+</div>
+
+
+<!-- ═══════════════════════════════════════
+     4. 아키텍처 변화
+════════════════════════════════════════ -->
+<div class="page-break"></div>
+<h2>4. 아키텍처 구조 변화</h2>
+
+<h3>4.1 데이터 흐름 (현재)</h3>
+<div class="box box-green">
+  <strong>현재 데이터 흐름 (1단계)</strong>
+  UI (ItemView / Modal)<br>
+  &nbsp;&nbsp;↓ <strong>Service 호출만</strong><br>
+  Service (비즈니스 로직, 이벤트 발행)<br>
+  &nbsp;&nbsp;↓ Repository 호출<br>
+  SettingsRepository → <code>data.json</code> (Obsidian settings)<br>
+  &nbsp;&nbsp;↑ <code>pharos:state-changed</code> 이벤트로 UI 갱신
+</div>
+
+<h3>4.2 데이터 흐름 (목표, Task 6 완료 후)</h3>
+<div class="box box-purple">
+  <strong>목표 데이터 흐름 (3단계)</strong>
+  UI (ItemView / Modal)<br>
+  &nbsp;&nbsp;↓ Service 호출<br>
+  Service<br>
+  &nbsp;&nbsp;↓ Repository 호출 (교체 가능)<br>
+  VaultRepository → <code>Pharos/*.md</code> (Vault 파일)<br>
+  &nbsp;&nbsp;↓ 경석 sync 모듈이 변경 감지<br>
+  HocuspocusRepository → 백엔드 실시간 동기화
+</div>
+
+<h3>4.3 디렉토리 구조 변화</h3>
+<table>
+  <thead><tr><th>항목</th><th>변경 전</th><th>변경 후</th></tr></thead>
+  <tbody>
+    <tr><td>타입 정의 위치</td><td><code>shared/types/entities.ts</code> 전역 집중</td><td><code>features/*/domain/*Schema.ts</code> feature별 분산</td></tr>
+    <tr><td>공유 상수</td><td><code>shared/types/index.ts</code> (전부 re-export)</td><td><code>shared/types/constants.ts</code>만 (패턴·UseCase·스케줄러명)</td></tr>
+    <tr><td>availability</td><td>존재하지 않음</td><td><code>features/availability/</code> domain · repository · service 완성</td></tr>
+    <tr><td>commit</td><td>존재하지 않음</td><td><code>features/commit/</code> domain · repository · service 완성</td></tr>
+    <tr><td>Repository 수</td><td>5개 (project · meeting · task · roadmap · team)</td><td>7개 (+ availability · commit)</td></tr>
+    <tr><td>Service 수</td><td>5개</td><td>8개 (+ availability · commit · progress 분리)</td></tr>
+  </tbody>
+</table>
+
+
+<!-- ═══════════════════════════════════════
+     5. 남은 작업 및 권장사항
+════════════════════════════════════════ -->
+<h2>5. 남은 작업 및 권장사항</h2>
+
+<h3>5.1 즉시 착수 가능 (Task 5 마무리)</h3>
+<div class="box box-yellow">
+  <strong>RoadmapItemView 어댑터 작성</strong>
+  <code>Roadmap</code> 엔티티 → <code>RoadmapData</code> 뷰모델 변환 함수 작성 후
+  <code>RoadmapItemView</code>에서 <code>roadmapService.getPlanning()</code>·<code>getDevelopment()</code> 연결.
+  <code>settings.developmentRoadmap: RoadmapData</code> → <code>roadmapRepository</code> 저장으로 이관.
+</div>
+
+<h3>5.2 Task 6: VaultRepository 구현</h3>
+<p>
+  백엔드(Hocuspocus) 연결 직전 단계. 경석 sync 모듈과 연동 시 필요.
+  <code>*.vault.ts</code> 구현체 8개 작성 + <code>data.json → .md</code> 마이그레이션 스크립트.
+  우선순위: project · meeting · task (절대 보존 등급) 먼저.
+</p>
+
+<h3>5.3 GitHub API 연동 (PM-4 · PO-12 완성)</h3>
+<div class="box box-yellow">
+  <strong>현재</strong>: <code>commitService</code> · <code>commitRepository</code> 완성. GitHub API 폴링 로직만 미구현.<br>
+  <strong>다음 작업</strong>: <code>settings.githubToken</code> · <code>settings.githubRepo</code>를 읽어 GitHub REST API 폴링 후 <code>commitService.upsertBatch()</code> 호출.
+</div>
+
+<h3>5.4 알려진 기술 부채</h3>
+<table>
+  <thead><tr><th>항목</th><th>내용</th><th>위험도</th></tr></thead>
+  <tbody>
+    <tr><td>CalendarView mock 의존</td><td><code>meetingPageMock.ts</code> 하드코딩 데이터 사용. 실제 회의 저장 후 연동 필요.</td><td>중</td></tr>
+    <tr><td>currentUserId 하드코딩</td><td><code>TeamListItemView</code>에서 <code>currentUserId: ""</code>. 로그인 개념 없어 팀원 구분 불가.</td><td>중</td></tr>
+    <tr><td>defaultAuthorName 하드코딩</td><td><code>MinutesArchiveItemView</code>에서 <code>defaultAuthorName: "유석"</code>. 실제 사용자 이름으로 교체 필요.</td><td>하</td></tr>
+    <tr><td>settings.developmentRoadmap 이원화</td><td>로드맵이 settings(RoadmapData)와 repository(Roadmap) 두 곳에 저장될 수 있음. RoadmapItemView 연결 후 settings 필드 deprecated 처리 필요.</td><td>중</td></tr>
+  </tbody>
+</table>
+
+
+<!-- ═══════════════════════════════════════
+     6. 주요 파일 경로 참고
+════════════════════════════════════════ -->
+<div class="page-break"></div>
+<h2>6. 주요 파일 경로 참고</h2>
+
+<table>
+  <thead><tr><th>역할</th><th>파일 경로</th></tr></thead>
+  <tbody>
+    <tr><td>플러그인 진입점</td><td><code>src/main.ts</code></td></tr>
+    <tr><td>전역 설정 타입</td><td><code>src/app/settings.ts</code></td></tr>
+    <tr><td>Task 스키마 (linkedCommits 포함)</td><td><code>src/features/task/domain/taskSchema.ts</code></td></tr>
+    <tr><td>Availability 스키마</td><td><code>src/features/availability/domain/availabilitySchema.ts</code></td></tr>
+    <tr><td>Commit 스키마</td><td><code>src/features/commit/domain/commitSchema.ts</code></td></tr>
+    <tr><td>AvailabilityService</td><td><code>src/features/availability/services/availabilityService.ts</code></td></tr>
+    <tr><td>CommitService</td><td><code>src/features/commit/services/commitService.ts</code></td></tr>
+    <tr><td>WeeklyAvailabilityModal (월요일 기준)</td><td><code>src/features/team/ui/WeeklyAvailabilityModal.tsx</code></td></tr>
+    <tr><td>공유 상수</td><td><code>src/shared/types/constants.ts</code></td></tr>
+    <tr><td>설계 문서</td><td><code>docs/architecture/repository-design.md</code></td></tr>
+    <tr><td>시나리오 문서</td><td><code>docs/시나리오.md</code></td></tr>
+  </tbody>
+</table>
+
+<hr>
+<p style="text-align:center; color:#9ca3af; font-size:11px; margin-top:32px;">
+  Pharos 개발 현황 보고서 · 2026-05-06 · 우덕 (인수자) + Claude Sonnet 4.6
+</p>
+
+</body>
+</html>
