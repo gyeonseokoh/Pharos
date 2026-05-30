@@ -1,6 +1,7 @@
 import { Plugin } from "obsidian";
 import {
 	DEFAULT_SETTINGS,
+	PharosPluginLike,
 	PharosSettingsTab,
 	type PharosSettings,
 } from "./app/settings";
@@ -103,6 +104,9 @@ export default class PharosPlugin extends Plugin {
 	commitService!: CommitService;
 	inviteService!: InviteService;
 	agentService!: AgentService;
+	// 인터페이스 일치용 temp 필드
+	connectionManager!: import("./shared/infra/sync/ConnectionManager").ConnectionManager;
+	syncChannelManager!: import("./shared/infra/sync/SyncChannelManager").SyncChannelManager;
 
 	async onload(): Promise<void> {
 		await this.loadSettings();

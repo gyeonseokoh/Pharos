@@ -20,6 +20,9 @@ import { AgentService } from "../features/agent/services/agentService";
 import { GeminiProvider } from "features/agent/providers/GeminiProvider";
 import { TavilySearchProvider } from "features/agent/search/TavilySearchProvider";
 
+// 상수
+const SERVER_HTTP_URL = "https://pharos-backend.onrender.com"
+
 /**
  * PO-5 업로드로 저장된 회의록 + 분석 결과.
  * key = meetingId (meetingPageMocks의 id). mock 회의에 덧씌워 렌더됨.
@@ -147,7 +150,7 @@ export const DEFAULT_SETTINGS: PharosSettings = {
 	dailyDigestTime: "00:00",
 	weeklyReminderDay: 6, // 토요일
 	weeklyReminderTime: "09:00",
-	hocuspocusServerUrl: "",
+	hocuspocusServerUrl: SERVER_HTTP_URL,
 	projectReport: null,
 	planningRoadmapGenerated: false,
 	developmentRoadmapGenerated: false,
@@ -402,21 +405,49 @@ export class PharosSettingsTab extends PluginSettingTab {
 			);
 
 		// ─── 서버 (v2) ───
-		containerEl.createEl("h3", { text: "서버 동기화 (v2)" });
+		// 서버는 상수로 사용
 
-		new Setting(containerEl)
-			.setName("Hocuspocus 서버 URL")
-			.setDesc(
-				"팀 실시간 동기화용. 비어두면 로컬 전용. 경석이 올린 서버 주소 입력.",
-			)
-			.addText((text) =>
-				text
-					.setPlaceholder("wss://pharos-server.example.com:1234")
-					.setValue(this.plugin.settings.hocuspocusServerUrl)
-					.onChange(async (value) => {
-						this.plugin.settings.hocuspocusServerUrl = value;
-						await this.plugin.saveSettings();
-					}),
-			);
+
+		// ─── GitHub 계정 ───
+		containerEl.createEl("h3", { text: "GitHub 계정" });
+
+		if (this.plugin.settings.authToken) {
+			// 인증된 상태: 로그인명 + 로그아웃 버튼
+			new Setting(containerEl)
+				.setName("연결된 계정")
+				.setDesc(`@${this.plugin.settings.githubLogin} 으로 로그인됨`)
+				.addButton((btn) =>
+					btn
+						.setButtonText("로그아웃")
+						.setWarning()
+						.onClick(async () => {
+							this.plugin.settings.authToken   = "";
+							this.plugin.settings.githubLogin = "";
+							await this.plugin.saveSettings();
+							this.display(); // 섹션 재렌더
+						}),
+				);
+		} else {
+			// 미인증 상태: 로그인 버튼
+			new Setting(containerEl)
+				.setName("GitHub으로 로그인")
+				.setDesc("서버 JWT를 발급받아 실시간 동기화와 에이전트 트리거를 활성화합니다.")
+				.addButton((btn) =>
+					btn
+						.setButtonText("로그인")
+						.setCta()
+						.onClick(() => {
+							// electron.shell은 Obsidian 데스크탑 내장 Node 환경 전용
+							// ← TODO: 모바일 대응 필요 시 window.open() 분기 추가
+							try {
+								const { shell } = (window as any).require("electron");
+								shell.openExternal(`${SERVER_HTTP_URL}/auth/github`);
+							} catch {
+								// electron 없는 환경(모바일) — fallback
+								window.open(`${SERVER_HTTP_URL}/auth/github`, "_blank");
+							}
+						}),
+				);
+		}
 	}
 }
