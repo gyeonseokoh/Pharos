@@ -404,8 +404,34 @@ export class PharosSettingsTab extends PluginSettingTab {
 					}),
 			);
 
-		// ─── 서버 (v2) ───
-		// 서버는 상수로 사용
+		// ─── 서버 동기화 ───
+		containerEl.createEl("h3", { text: "서버 동기화" });
+
+		new Setting(containerEl)
+			.setName("동기화 제외 패턴")
+			.setDesc(
+				"한 줄에 패턴 하나. .gitignore 방식 지원.\n" +
+				"예: **/.obsidian/**  ·  *.tmp  ·  Pharos/archive/**\n" +
+				"비워두면 .md 파일 전체를 동기화합니다.",
+			)
+			.addTextArea((area) => {
+				area
+					.setPlaceholder("**/.obsidian/**\n*.tmp")
+					.setValue(this.plugin.settings.syncIgnorePatterns.join("\n"))
+					.onChange(async (value) => {
+						this.plugin.settings.syncIgnorePatterns = value
+							.split("\n")
+							.map((p) => p.trim())
+							.filter((p) => p.length > 0);
+						await this.plugin.saveSettings();
+					});
+				// 여러 줄이 보이도록 textarea 높이 확장
+				area.inputEl.style.width  = "100%";
+				area.inputEl.style.height = "120px";
+				area.inputEl.style.fontFamily = "monospace";
+				area.inputEl.style.fontSize   = "12px";
+				return area;
+			});
 
 
 		// ─── GitHub 계정 ───

@@ -82,6 +82,7 @@ import { SyncChannelManager } from "./shared/infra/sync/SyncChannelManager";
 import { DocumentSync } from "./shared/infra/sync/DocumentSync";
 import { shouldSync } from "./shared/infra/sync/syncFilter";
 import { TavilySearchProvider } from "./features/agent/search/TavilySearchProvider";
+import { BatchSyncService } from "./shared/infra/sync/BatchSyncService";
 
 export default class PharosPlugin extends Plugin {
 	settings: PharosSettings = { ...DEFAULT_SETTINGS };
@@ -313,11 +314,13 @@ export default class PharosPlugin extends Plugin {
 
 		this.syncChannelManager.setOnTrigger((payload) => {
 			console.log(`[Pharos] agent trigger: event=${payload.event}`);
-			// TODO(Phase C): void this.agentService.run(payload.event);
+			// TODO: void this.agentService.run(payload.event);
 		});
 		this.syncChannelManager.init(hocuspocusServerUrl, workspaceId, authToken);
 
 		console.log(`[Pharos] initSync: workspace=${workspaceId} server=${hocuspocusServerUrl}`);
+
+		void new BatchSyncService().run(this); // Vault 전체 일괄 동기화
 	}
 
 	async resetProject(): Promise<void> {
