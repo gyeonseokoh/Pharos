@@ -18,36 +18,29 @@
  * @param pattern  - glob 유사 패턴 (예: "**\/.obsidian\/**", "*.tmp", "Pharos/archive\/**")
  */
 function matchesPattern(filePath: string, pattern: string): boolean {
-    // 패턴 1: **\/something\/** — 경로 중간 세그먼트 포함
-    // 예: **\/.obsidian\/** → 경로 어딘가에 /.obsidian/ 포함
     const midSegMatch = pattern.match(/^\*\*\/(.+)\/\*\*$/)
     if (midSegMatch) {
-        const segment = midSegMatch[1]
+        const segment = midSegMatch[1]!          // ← ! 추가
         return (
-            filePath.includes(`/${segment}/`) ||  // 중간 위치
-            filePath.startsWith(`${segment}/`)    // 루트 직하위
+            filePath.includes(`/${segment}/`) ||
+            filePath.startsWith(`${segment}/`)
         )
     }
 
-    // 패턴 2: *.ext — 확장자 매치
-    // 예: *.tmp → 경로 끝이 .tmp
     const extMatch = pattern.match(/^\*(\..+)$/)
     if (extMatch) {
-        return filePath.endsWith(extMatch[1])
+        return filePath.endsWith(extMatch[1]!)   // ← ! 추가
     }
 
-    // 패턴 3: prefix/** — 특정 디렉토리 하위 전체
-    // 예: Pharos/archive/** → Pharos/archive/ 로 시작하는 모든 경로
     const prefixMatch = pattern.match(/^(.+)\/\*\*$/)
     if (prefixMatch) {
-        const prefix = prefixMatch[1]
+        const prefix = prefixMatch[1]!           // ← ! 추가
         return (
             filePath.startsWith(`${prefix}/`) ||
-            filePath === prefix               // prefix 자체 파일 포함
+            filePath === prefix
         )
     }
 
-    // 패턴 4: 리터럴 — 정확히 일치
     return filePath === pattern
 }
 
