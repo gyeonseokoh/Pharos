@@ -111,6 +111,25 @@ export interface PharosSettings {
 	 * true 이면 VaultRepository 사용 중. false/undefined 이면 SettingsRepository 사용.
 	 */
 	migrated: boolean;
+
+	// ─── 서버 인증 & 동기화 ───
+	/**
+	 * 서버가 발급한 JWT. 빈 문자열이면 미인증 상태.
+	 * GitHub Access Token은 절대 여기에 저장하지 않음 (서버 전용).
+	 */
+	authToken: string;
+	/** JWT에서 decode한 GitHub 로그인명. UI 표시용. */
+	githubLogin: string;
+	/**
+	 * 서버 DB의 workspaces.id.
+	 * null이면 워크스페이스 미등록 (로컬 전용 모드).
+	 */
+	workspaceId: number | null;
+	/**
+	 * 동기화 제외 패턴 목록. syncFilter.ts가 해석.
+	 * 예: ["**\/.obsidian\/**", "*.tmp"]
+	 */
+	syncIgnorePatterns: string[];
 }
 
 export const DEFAULT_SETTINGS: PharosSettings = {
@@ -142,6 +161,10 @@ export const DEFAULT_SETTINGS: PharosSettings = {
 	availabilities: [],
 	commitBatches: [],
 	migrated: false,
+	authToken:          "",
+	githubLogin:        "",
+	workspaceId:        null,
+	syncIgnorePatterns: ["**/.obsidian/**"],
 };
 
 /**
@@ -178,6 +201,18 @@ export interface PharosPluginLike extends Plugin {
 	inviteService: import("../features/team/services/inviteService").InviteService;
 	/** AgentService — features/agent/services/agentService.ts */
 	agentService: import("../features/agent/services/agentService").AgentService;
+
+	// ─── 동기화 인프라 (차후 테스트 후 구현, main.ts에서 주입) ───
+	/**
+	 * ConnectionManager — shared/infra/sync/ConnectionManager.ts
+	 * 파일별 HocuspocusProvider 풀 관리. setToken()으로 재연결.
+	 */
+	connectionManager: import("../shared/infra/sync/ConnectionManager").ConnectionManager;
+	/**
+	 * SyncChannelManager — shared/infra/sync/SyncChannelManager.ts
+	 * __trigger__ 채널 전용 provider. 에이전트 트리거 신호 수신.
+	 */
+	syncChannelManager: import("../shared/infra/sync/SyncChannelManager").SyncChannelManager;
 }
 
 export class PharosSettingsTab extends PluginSettingTab {
