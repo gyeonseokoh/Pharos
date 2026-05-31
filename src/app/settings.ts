@@ -52,7 +52,6 @@ export interface PharosSettings {
 	// AI·서버·깃허브 연동 완료 후 이 필드와 관련 분기를 모두 삭제하세요.
 	demoMode: boolean;
 	// ──────────────────────────────────────────────────────────────────────────────
-
 	/** Vault 내 프로젝트 루트 경로. 기본 "Pharos". */
 	projectRoot: string;
 	/** LLM API 키 (로컬 저장). */
