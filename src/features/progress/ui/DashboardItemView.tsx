@@ -29,12 +29,43 @@ import { VIEW_TYPE_PHAROS_ROADMAP } from "../../roadmap/ui/RoadmapItemView";
 import { VIEW_TYPE_PHAROS_TEAM_LIST } from "../../team/ui/TeamListItemView";
 import type { PharosPluginLike } from "../../../app/settings";
 import type { Project } from "../../project/domain/projectSchema";
-import type { DashboardData, DashboardAlert } from "../domain/dashboardData";
+import type {
+	DashboardData,
+	DashboardAlert,
+	ProgressAnalysisCard,
+} from "../domain/dashboardData";
 
 export const VIEW_TYPE_PHAROS_DASHBOARD = "pharos-dashboard-view";
 
+const MOCK_PROGRESS_ANALYSIS: ProgressAnalysisCard = {
+	loading: false,
+	error: null,
+	result: {
+		asOf: new Date().toISOString().slice(0, 10),
+		overallHealth: "on-track",
+		summary:
+			"전체 Task 의 약 절반이 완료되었고, 블로커는 없음. 다음 주 프로토타입 데드라인 직전 진행이 양호합니다.",
+		insights: [
+			{
+				type: "milestone",
+				message: "기획 로드맵 완료 · 개발 단계 진입",
+			},
+			{
+				type: "achievement",
+				message: "PM-3 체크리스트 완료율 64% 도달",
+			},
+			{
+				type: "recommendation",
+				message: "PO-12 검증 통과율 낮음 · 커밋-Task 매핑 확인 필요",
+			},
+		],
+	},
+};
+
 export class DashboardItemView extends ItemView {
 	private root: Root | null = null;
+	/** PO-12 AI 진행 분석 카드 상태 (사용자 트리거 시에만 채워짐). */
+	private progressAnalysis: ProgressAnalysisCard | null = null;
 
 	constructor(
 		leaf: WorkspaceLeaf,
@@ -97,7 +128,11 @@ export class DashboardItemView extends ItemView {
 		if (this.plugin.settings.demoMode) {
 			this.root.render(
 				<DashboardView
-					data={mockDashboardData}
+					data={{
+						...mockDashboardData,
+						progressAnalysis:
+							this.progressAnalysis ?? MOCK_PROGRESS_ANALYSIS,
+					}}
 					onOpenRoadmap={() => void this.openView(VIEW_TYPE_PHAROS_ROADMAP)}
 					onOpenMeetings={() => void this.openView(VIEW_TYPE_PHAROS_MEETINGS_LIST)}
 					onOpenMeeting={(id) => void this.openMeeting(id)}
@@ -113,6 +148,7 @@ export class DashboardItemView extends ItemView {
 							deadline: project.deadline,
 						}).open()
 					}
+					onAnalyzeProgress={() => void this.runProgressAnalysis()}
 				/>,
 			);
 			return;
@@ -122,7 +158,15 @@ export class DashboardItemView extends ItemView {
 		const data = await this.buildDashboardData(project);
 		this.root.render(
 			<DashboardView
-				data={data}
+				data={{
+					...data,
+					progressAnalysis:
+						this.progressAnalysis ?? {
+							loading: false,
+							error: null,
+							result: null,
+						},
+				}}
 				onOpenRoadmap={() =>
 					void this.openView(VIEW_TYPE_PHAROS_ROADMAP)
 				}
@@ -152,8 +196,51 @@ export class DashboardItemView extends ItemView {
 						deadline: project.deadline,
 					}).open()
 				}
+				onAnalyzeProgress={() => void this.runProgressAnalysis()}
 			/>,
 		);
+	}
+
+	/**
+	 * PO-12 AI 진행 분석 사용자 트리거.
+	 *
+	 * 비싼 LLM 호출이라 자동 호출하지 않고 명시적 버튼으로만 진입.
+	 * loading → 결과/에러 → 재렌더 사이클은 progressAnalysis 캐시 변수로 관리.
+	 * demoMode 일 때도 실제 호출하지 않고 mock 으로 유지 (시연 안정성).
+	 */
+	private async runProgressAnalysis(): Promise<void> {
+		if (this.plugin.settings.demoMode) {
+			this.progressAnalysis = MOCK_PROGRESS_ANALYSIS;
+			await this.loadAndRender();
+			return;
+		}
+
+		this.progressAnalysis = { loading: true, error: null, result: null };
+		await this.loadAndRender();
+
+		try {
+			const result = await this.plugin.agentService.analyzeProgress({});
+			this.progressAnalysis = {
+				loading: false,
+				error: null,
+				result: {
+					asOf: result.asOf,
+					overallHealth: result.overallHealth,
+					summary: result.summary,
+					insights: result.insights.map((i) => ({
+						type: i.type,
+						message: i.message,
+					})),
+				},
+			};
+		} catch (err) {
+			this.progressAnalysis = {
+				loading: false,
+				error: (err as Error).message,
+				result: null,
+			};
+		}
+		await this.loadAndRender();
 	}
 
 	private async buildDashboardData(project: Project): Promise<DashboardData> {

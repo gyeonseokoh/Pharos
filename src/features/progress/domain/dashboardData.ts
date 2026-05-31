@@ -77,6 +77,30 @@ export interface DashboardAlert {
 }
 
 /**
+ * AI 진행 분석 카드 view-model (PO-12).
+ *
+ * AgentService.analyzeProgress 결과의 UI 표시용 부분만 추림.
+ * loading=true 시 카드는 스피너 표시.
+ * result=null + loading=false 시 "AI 분석 받기" 버튼.
+ * result 있으면 overallHealth / summary / insights 카드 렌더.
+ */
+export interface ProgressAnalysisCard {
+	loading: boolean;
+	error: string | null;
+	result: ProgressAnalysisCardResult | null;
+}
+
+export interface ProgressAnalysisCardResult {
+	asOf: string;
+	overallHealth: "on-track" | "at-risk" | "critical";
+	summary: string;
+	insights: Array<{
+		type: "milestone" | "risk" | "achievement" | "recommendation";
+		message: string;
+	}>;
+}
+
+/**
  * DashboardView가 받는 데이터 전체 묶음.
  */
 export interface DashboardData {
@@ -90,4 +114,6 @@ export interface DashboardData {
 	meetings: UpcomingMeeting[];
 	importantDates: ImportantDate[];
 	alerts: DashboardAlert[];
+	/** PO-12 AI 진행 분석. null 이면 카드 영역 자체 생략. */
+	progressAnalysis?: ProgressAnalysisCard | null;
 }

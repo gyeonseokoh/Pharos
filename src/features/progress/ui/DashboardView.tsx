@@ -15,9 +15,11 @@ import {
 	CheckCircle2,
 	GitCommit,
 	Info,
+	Loader2,
 	Pin,
 	RefreshCw,
 	Settings,
+	Sparkles,
 	Users2,
 	XCircle,
 	type LucideIcon,
@@ -38,6 +40,8 @@ import type {
 	MemberActivity,
 	MyTasksSummary,
 	PhaseProgress,
+	ProgressAnalysisCard,
+	ProgressAnalysisCardResult,
 	ProgressSummary,
 	ProjectSummary,
 	UpcomingMeeting,
@@ -63,6 +67,8 @@ export interface DashboardViewProps {
 	onOpenTeam?: () => void;
 	onOpenSettings?: () => void;
 	onGenerateMeetingTopics?: () => void;
+	/** PO-12 AI 진행 분석 트리거. 사용자가 "AI 분석 받기" 버튼 클릭 시 호출. */
+	onAnalyzeProgress?: () => void;
 }
 
 export function DashboardView({
@@ -76,6 +82,7 @@ export function DashboardView({
 	onOpenTeam,
 	onOpenSettings,
 	onGenerateMeetingTopics,
+	onAnalyzeProgress,
 }: DashboardViewProps) {
 	const progressPercent = useMemo(
 		() =>
@@ -105,6 +112,13 @@ export function DashboardView({
 							prototypeProgress={data.prototypeProgress}
 							developmentProgress={data.developmentProgress}
 						/>
+						{data.progressAnalysis !== undefined &&
+							data.progressAnalysis !== null && (
+								<ProgressAnalysisCardSection
+									card={data.progressAnalysis}
+									onAnalyze={onAnalyzeProgress}
+								/>
+							)}
 						<MemberActivityCard members={data.members} />
 					</div>
 					<div className="flex flex-col gap-6">
@@ -317,6 +331,142 @@ function ProgressRow({
 			</div>
 		</div>
 	);
+}
+
+// ───────────────────────── Progress Analysis Card (PO-12) ─────────────────────────
+
+function ProgressAnalysisCardSection({
+	card,
+	onAnalyze,
+}: {
+	card: ProgressAnalysisCard;
+	onAnalyze?: () => void;
+}) {
+	return (
+		<Card>
+			<CardHeader className="flex flex-row items-center justify-between gap-3 pb-3">
+				<div className="flex items-center gap-2">
+					<Sparkles className="h-4 w-4 text-[color:var(--interactive-accent)]" />
+					<CardTitle className="text-sm">AI 진행 분석</CardTitle>
+					{card.result && <HealthBadge health={card.result.overallHealth} />}
+				</div>
+				{card.result && !card.loading && onAnalyze && (
+					<Button variant="ghost" size="sm" onClick={onAnalyze}>
+						<RefreshCw className="h-3 w-3" />
+						다시 분석
+					</Button>
+				)}
+			</CardHeader>
+			<CardContent>
+				{card.loading ? (
+					<div className="flex items-center gap-2 text-xs text-text-muted">
+						<Loader2 className="h-4 w-4 animate-spin" />
+						AI 가 프로젝트 상태를 분석 중...
+					</div>
+				) : card.error ? (
+					<div className="space-y-2">
+						<p className="text-xs text-[color:var(--color-red)]">
+							분석 실패: {card.error}
+						</p>
+						{onAnalyze && (
+							<Button variant="outline" size="sm" onClick={onAnalyze}>
+								<Sparkles className="h-3 w-3" />
+								다시 시도
+							</Button>
+						)}
+					</div>
+				) : card.result ? (
+					<ProgressAnalysisBody result={card.result} />
+				) : (
+					<div className="flex flex-col items-start gap-2">
+						<p className="text-xs text-text-muted">
+							Task·체크리스트·커밋 검증을 종합해 프로젝트 건강도를 진단합니다.
+						</p>
+						{onAnalyze && (
+							<Button variant="secondary" onClick={onAnalyze}>
+								<Sparkles className="mr-2 h-3.5 w-3.5" />
+								AI 분석 받기
+							</Button>
+						)}
+					</div>
+				)}
+			</CardContent>
+		</Card>
+	);
+}
+
+function HealthBadge({
+	health,
+}: {
+	health: ProgressAnalysisCardResult["overallHealth"];
+}) {
+	const config = {
+		"on-track": {
+			label: "순조",
+			class:
+				"bg-[color:var(--color-green)]/15 text-[color:var(--color-green)]",
+		},
+		"at-risk": {
+			label: "주의",
+			class:
+				"bg-[color:var(--color-orange)]/15 text-[color:var(--color-orange)]",
+		},
+		critical: {
+			label: "심각",
+			class: "bg-[color:var(--color-red)]/15 text-[color:var(--color-red)]",
+		},
+	}[health];
+	return (
+		<span
+			className={cn(
+				"rounded-full px-2 py-0.5 text-[10px] font-semibold",
+				config.class,
+			)}
+		>
+			{config.label}
+		</span>
+	);
+}
+
+function ProgressAnalysisBody({
+	result,
+}: {
+	result: ProgressAnalysisCardResult;
+}) {
+	return (
+		<div className="space-y-3">
+			<p className="text-xs leading-relaxed text-text-normal">{result.summary}</p>
+			{result.insights.length > 0 && (
+				<ul className="space-y-1.5">
+					{result.insights.map((ins, i) => (
+						<li
+							key={i}
+							className="flex items-start gap-2 rounded-md border border-bg-modifier bg-bg-secondary px-2.5 py-1.5"
+						>
+							<InsightIcon type={ins.type} />
+							<span className="text-[11px] text-text-muted">{ins.message}</span>
+						</li>
+					))}
+				</ul>
+			)}
+			<p className="text-[10px] text-text-faint">분석 시점 · {result.asOf}</p>
+		</div>
+	);
+}
+
+function InsightIcon({
+	type,
+}: {
+	type: ProgressAnalysisCardResult["insights"][number]["type"];
+}) {
+	const map = {
+		milestone: { Icon: CheckCircle2, color: "text-[color:var(--color-green)]" },
+		risk: { Icon: AlertTriangle, color: "text-[color:var(--color-orange)]" },
+		achievement: { Icon: CheckCircle2, color: "text-[color:var(--color-green)]" },
+		recommendation: { Icon: Info, color: "text-[color:var(--interactive-accent)]" },
+	}[type];
+	const { Icon, color } = map;
+	return <Icon className={cn("mt-0.5 h-3 w-3 shrink-0", color)} />;
 }
 
 function MemberActivityCard({ members }: { members: MemberActivity[] }) {
