@@ -14,6 +14,8 @@ import type {
 	MeetingCategory,
 	MeetingFilter,
 	MeetingResource,
+	MeetingTopic,
+	TopicSource,
 } from "../domain/meetingSchema";
 import type { MeetingRepository } from "../repositories/meetingRepository";
 
@@ -148,6 +150,58 @@ export class MeetingsService {
 			...meeting,
 			resources: [...meeting.resources, ...added],
 			updatedAt: now,
+		});
+		eventBus.emit("meeting:updated", { meetingId });
+		return added;
+	}
+
+	/**
+	 * PO-2 AI 회의 주제 생성 / 사용자 수동 추가 시 회의에 주제 누적.
+	 *
+	 * 호출자(AiTopicModal)가 선택한 주제 목록을 전달하면 id 자동 발급 후 저장.
+	 * 빈 제목은 자동 제외. 1회 save + 1회 meeting:updated 이벤트.
+	 *
+	 * source 값:
+	 *   - "AI": LLM 추천 후 사용자가 채택한 주제 (suggestedTopics 출처)
+	 *   - "MANUAL": 사용자가 직접 입력한 주제
+	 */
+	async appendTopics(
+		meetingId: string,
+		incoming: Array<{
+			title: string;
+			source: TopicSource;
+			reason?: string | null;
+			priority?: number;
+			description?: string;
+		}>,
+	): Promise<MeetingTopic[]> {
+		const meeting = await this.repo.getById(meetingId);
+		if (!meeting) throw new Error(`회의 ${meetingId} 를 찾을 수 없습니다`);
+
+		const now = Date.now();
+		const rnd = () => Math.random().toString(36).slice(2, 6);
+		const added: MeetingTopic[] = incoming
+			.filter((t) => t.title.trim().length > 0)
+			.map((t, i) => ({
+				id: `topic-${now}-${i}-${rnd()}`,
+				title: t.title.trim(),
+				description: t.description,
+				priority: t.priority ?? 3,
+				source: t.source,
+				reason: t.reason ?? null,
+			}));
+
+		if (added.length === 0) return [];
+
+		await this.repo.save({
+			...meeting,
+			topics: [...meeting.topics, ...added],
+			// 첫 주제 추가 시 status 를 ready 로 자동 갱신 (BR-2 회의 생성-주제-시작 흐름)
+			status:
+				meeting.topics.length === 0 && meeting.status === "topic_pending"
+					? "ready"
+					: meeting.status,
+			updatedAt: new Date().toISOString(),
 		});
 		eventBus.emit("meeting:updated", { meetingId });
 		return added;
