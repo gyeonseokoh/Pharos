@@ -130,7 +130,7 @@ export interface PharosSettings {
 export const DEFAULT_SETTINGS: PharosSettings = {
 	// ── [DEMO] AI·서버·깃허브 연동 전 임시 데모 시연용 기본값 ────────────────────────
 	// 연동 완료 후 이 줄과 위 인터페이스의 demoMode 필드를 삭제하세요.
-	demoMode: true,
+	demoMode: false,
 	// ──────────────────────────────────────────────────────────────────────────────
 	projectRoot: "Pharos",
 	llmApikey: "",

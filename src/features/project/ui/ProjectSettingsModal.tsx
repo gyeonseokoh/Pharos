@@ -31,11 +31,18 @@ function Content({
 }) {
 	const [form, setForm] = useState<ProjectSettings>(initial);
 
+	// toISOString()은 UTC 기준이므로 KST(+9)에서 날짜가 어긋남 → 로컬 날짜 직접 계산
+	const now = new Date();
+	const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+	// 오늘보다 이전 날짜면 저장 불가
+	const isPastDeadline = form.deadline !== "" && form.deadline < today;
+
 	return (
 		<ModalLayout
 			title="⚙️ 프로젝트 설정"
 			description="프로젝트 정보를 수정합니다"
 			submitLabel="저장"
+			submitDisabled={isPastDeadline}
 			onSubmit={() => {
 				// 저장 성공 후 Modal 닫기, 실패 시 Modal 유지 (오류 Notice는 handleSave에서)
 				void onSave(form)
@@ -62,11 +69,18 @@ function Content({
 					onChange={(e) => setForm({ ...form, description: e.target.value })}
 				/>
 			</FormField>
-			<FormField label="마감기한" required>
+			<FormField
+				label="마감기한"
+				required
+				// 이전 날짜 입력 시 안내 메시지 표시
+				hint={isPastDeadline ? "⚠️ 이전 날짜를 입력할 수 없습니다" : undefined}
+			>
 				<input
 					type="date"
 					className={inputClass}
 					value={form.deadline}
+					min={today}
+					max="2099-12-31"
 					onChange={(e) => setForm({ ...form, deadline: e.target.value })}
 				/>
 			</FormField>
@@ -85,6 +99,15 @@ export class ProjectSettingsModal extends BaseReactModal {
 	}
 
 	private async handleSave(form: ProjectSettings): Promise<void> {
+		// toISOString()은 UTC 기준이므로 KST(+9)에서 날짜가 어긋남 → 로컬 날짜 직접 계산
+	const now = new Date();
+	const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+		// UI 우회 입력까지 차단 — 오늘 이전 날짜는 저장 불가
+		if (form.deadline && form.deadline < today) {
+			new Notice("이전 날짜를 입력할 수 없습니다");
+			return;
+		}
+
 		const project = await this.plugin.projectService.get();
 		if (!project) {
 			new Notice("[오류] 저장할 프로젝트를 찾을 수 없습니다");
