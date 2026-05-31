@@ -16,6 +16,12 @@ import type {
 } from "../features/meeting/domain/meetingPageData";
 import type { Availability } from "../features/availability/domain/availabilitySchema";
 import type { CommitBatch } from "../features/commit/domain/commitSchema";
+import { AgentService } from "../features/agent/services/agentService";
+import { GeminiProvider } from "features/agent/providers/GeminiProvider";
+import { TavilySearchProvider } from "features/agent/search/TavilySearchProvider";
+
+// 상수
+const SERVER_HTTP_URL = "https://pharos-backend.onrender.com"
 
 /**
  * PO-5 업로드로 저장된 회의록 + 분석 결과.
@@ -46,11 +52,11 @@ export interface PharosSettings {
 	// AI·서버·깃허브 연동 완료 후 이 필드와 관련 분기를 모두 삭제하세요.
 	demoMode: boolean;
 	// ──────────────────────────────────────────────────────────────────────────────
-
 	/** Vault 내 프로젝트 루트 경로. 기본 "Pharos". */
 	projectRoot: string;
-	/** OpenAI API 키 (로컬 저장). */
-	openaiApiKey: string;
+	/** LLM API 키 (로컬 저장). */
+	llmApikey: string;
+	llmModel: string; // 테스트용
 	/** GitHub Personal Access Token. */
 	githubToken: string;
 	/** GitHub 레포 URL (예: "owner/repo"). */
@@ -107,6 +113,25 @@ export interface PharosSettings {
 	 * true 이면 VaultRepository 사용 중. false/undefined 이면 SettingsRepository 사용.
 	 */
 	migrated: boolean;
+
+	// ─── 서버 인증 & 동기화 ───
+	/**
+	 * 서버가 발급한 JWT. 빈 문자열이면 미인증 상태.
+	 * GitHub Access Token은 절대 여기에 저장하지 않음 (서버 전용).
+	 */
+	authToken: string;
+	/** JWT에서 decode한 GitHub 로그인명. UI 표시용. */
+	githubLogin: string;
+	/**
+	 * 서버 DB의 workspaces.id.
+	 * null이면 워크스페이스 미등록 (로컬 전용 모드).
+	 */
+	workspaceId: number | null;
+	/**
+	 * 동기화 제외 패턴 목록. syncFilter.ts가 해석.
+	 * 예: ["**\/.obsidian\/**", "*.tmp"]
+	 */
+	syncIgnorePatterns: string[];
 }
 
 export const DEFAULT_SETTINGS: PharosSettings = {
@@ -115,7 +140,8 @@ export const DEFAULT_SETTINGS: PharosSettings = {
 	demoMode: true,
 	// ──────────────────────────────────────────────────────────────────────────────
 	projectRoot: "Pharos",
-	openaiApiKey: "",
+	llmApikey: "",
+	llmModel: "",
 	githubToken: "",
 	githubRepo: "",
 	tavilyApiKey: "",
@@ -123,7 +149,7 @@ export const DEFAULT_SETTINGS: PharosSettings = {
 	dailyDigestTime: "00:00",
 	weeklyReminderDay: 6, // 토요일
 	weeklyReminderTime: "09:00",
-	hocuspocusServerUrl: "",
+	hocuspocusServerUrl: SERVER_HTTP_URL,
 	projectReport: null,
 	planningRoadmapGenerated: false,
 	developmentRoadmapGenerated: false,
@@ -137,6 +163,10 @@ export const DEFAULT_SETTINGS: PharosSettings = {
 	availabilities: [],
 	commitBatches: [],
 	migrated: false,
+	authToken:          "",
+	githubLogin:        "",
+	workspaceId:        null,
+	syncIgnorePatterns: ["**/.obsidian/**"],
 };
 
 /**
@@ -173,6 +203,18 @@ export interface PharosPluginLike extends Plugin {
 	inviteService: import("../features/team/services/inviteService").InviteService;
 	/** AgentService — features/agent/services/agentService.ts */
 	agentService: import("../features/agent/services/agentService").AgentService;
+
+	// ─── 동기화 인프라 (차후 테스트 후 구현, main.ts에서 주입) ───
+	/**
+	 * ConnectionManager — shared/infra/sync/ConnectionManager.ts
+	 * 파일별 HocuspocusProvider 풀 관리. setToken()으로 재연결.
+	 */
+	connectionManager: import("../shared/infra/sync/ConnectionManager").ConnectionManager;
+	/**
+	 * SyncChannelManager — shared/infra/sync/SyncChannelManager.ts
+	 * __trigger__ 채널 전용 provider. 에이전트 트리거 신호 수신.
+	 */
+	syncChannelManager: import("../shared/infra/sync/SyncChannelManager").SyncChannelManager;
 }
 
 export class PharosSettingsTab extends PluginSettingTab {
@@ -208,19 +250,53 @@ export class PharosSettingsTab extends PluginSettingTab {
 			);
 
 		// ─── AI ───
-		containerEl.createEl("h3", { text: "AI (GPT-4o-mini)" });
+		containerEl.createEl("h3", { text: "AI" });
 
 		new Setting(containerEl)
-			.setName("OpenAI API 키")
+			.setName("Gemini API 키")
 			.setDesc(
 				"회의 주제·회의록 분석·자료 요약에 사용. 키는 이 컴퓨터에만 저장됨 (외부 전송 X).",
 			)
 			.addText((text) =>
 				text
-					.setPlaceholder("sk-...")
-					.setValue(this.plugin.settings.openaiApiKey)
+					.setPlaceholder("...")
+					.setValue(this.plugin.settings.llmApikey)
 					.onChange(async (value) => {
-						this.plugin.settings.openaiApiKey = value;
+						this.plugin.settings.llmApikey = value;
+						await this.plugin.saveSettings();
+					}),
+			);
+
+		/** @test @description 임시 필드라 나중에 통째로 제거 필요. 안정성이고 뭐고 신경 안 씀. */
+		new Setting(containerEl)
+			.setName("모델")
+			.setDesc(
+				"API 사용량 제한에 빠르게 걸려서 그냥 교체해가면서 하기 위한...",
+			)
+			.addText((text) =>
+				text
+					.setPlaceholder("gemini-(version)-(pro/flash/기타 등등)")
+					.setValue(this.plugin.settings.llmModel)
+					.onChange(async (value) => {
+						this.plugin.settings.llmModel = value;
+
+						// 새 모델에 맞게 agentService 통째로 교체
+						const { agentService, teamService, availabilityService, meetingsService, progressService, taskService, roadmapService } = this.plugin
+						const new_llmProvider = new GeminiProvider(
+							() => this.plugin.settings.llmApikey, value
+						)
+						const searchProvider = new TavilySearchProvider(() => this.plugin.settings.tavilyApiKey);
+						this.plugin.agentService = new AgentService(
+							teamService,
+							availabilityService,meetingsService,
+							progressService,
+							taskService,
+							roadmapService,
+							new_llmProvider,
+							searchProvider,
+						);
+
+
 						await this.plugin.saveSettings();
 					}),
 			);
@@ -327,22 +403,76 @@ export class PharosSettingsTab extends PluginSettingTab {
 					}),
 			);
 
-		// ─── 서버 (v2) ───
-		containerEl.createEl("h3", { text: "서버 동기화 (v2)" });
+		// ─── 서버 동기화 ───
+		containerEl.createEl("h3", { text: "서버 동기화" });
 
 		new Setting(containerEl)
-			.setName("Hocuspocus 서버 URL")
+			.setName("동기화 제외 패턴")
 			.setDesc(
-				"팀 실시간 동기화용. 비어두면 로컬 전용. 경석이 올린 서버 주소 입력.",
+				"한 줄에 패턴 하나. .gitignore 방식 지원.\n" +
+				"예: **/.obsidian/**  ·  *.tmp  ·  Pharos/archive/**\n" +
+				"비워두면 .md 파일 전체를 동기화합니다.",
 			)
-			.addText((text) =>
-				text
-					.setPlaceholder("wss://pharos-server.example.com:1234")
-					.setValue(this.plugin.settings.hocuspocusServerUrl)
+			.addTextArea((area) => {
+				area
+					.setPlaceholder("**/.obsidian/**\n*.tmp")
+					.setValue(this.plugin.settings.syncIgnorePatterns.join("\n"))
 					.onChange(async (value) => {
-						this.plugin.settings.hocuspocusServerUrl = value;
+						this.plugin.settings.syncIgnorePatterns = value
+							.split("\n")
+							.map((p) => p.trim())
+							.filter((p) => p.length > 0);
 						await this.plugin.saveSettings();
-					}),
-			);
+					});
+				// 여러 줄이 보이도록 textarea 높이 확장
+				area.inputEl.style.width  = "100%";
+				area.inputEl.style.height = "120px";
+				area.inputEl.style.fontFamily = "monospace";
+				area.inputEl.style.fontSize   = "12px";
+				return area;
+			});
+
+
+		// ─── GitHub 계정 ───
+		containerEl.createEl("h3", { text: "GitHub 계정" });
+
+		if (this.plugin.settings.authToken) {
+			// 인증된 상태: 로그인명 + 로그아웃 버튼
+			new Setting(containerEl)
+				.setName("연결된 계정")
+				.setDesc(`@${this.plugin.settings.githubLogin} 으로 로그인됨`)
+				.addButton((btn) =>
+					btn
+						.setButtonText("로그아웃")
+						.setWarning()
+						.onClick(async () => {
+							this.plugin.settings.authToken   = "";
+							this.plugin.settings.githubLogin = "";
+							await this.plugin.saveSettings();
+							this.display(); // 섹션 재렌더
+						}),
+				);
+		} else {
+			// 미인증 상태: 로그인 버튼
+			new Setting(containerEl)
+				.setName("GitHub으로 로그인")
+				.setDesc("서버 JWT를 발급받아 실시간 동기화와 에이전트 트리거를 활성화합니다.")
+				.addButton((btn) =>
+					btn
+						.setButtonText("로그인")
+						.setCta()
+						.onClick(() => {
+							// electron.shell은 Obsidian 데스크탑 내장 Node 환경 전용
+							// ← TODO: 모바일 대응 필요 시 window.open() 분기 추가
+							try {
+								const { shell } = (window as any).require("electron");
+								shell.openExternal(`${SERVER_HTTP_URL}/auth/github`);
+							} catch {
+								// electron 없는 환경(모바일) — fallback
+								window.open(`${SERVER_HTTP_URL}/auth/github`, "_blank");
+							}
+						}),
+				);
+		}
 	}
 }

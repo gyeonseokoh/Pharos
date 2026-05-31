@@ -29,11 +29,33 @@ interface MeetingPageViewState {
 	source?: MeetingPageSource;
 }
 
+// ── [DEMO] AI 미연동 시 사용할 임시 자료 후보 ─────────────────────────────────
+// 연동 완료 후 mockResources 와 demoMode 분기 제거.
+// ──────────────────────────────────────────────────────────────────────────────
+const MOCK_COLLECTED_RESOURCES = [
+	{
+		topicId: null,
+		title: "캡스톤 디자인 우수 사례 모음",
+		summary:
+			"국내 주요 대학 캡스톤 프로젝트의 기획·발표 자료 모음. 평가 기준과 데모 영상 포함.",
+		sourceUrl: "https://example.com/capstone-best",
+	},
+	{
+		topicId: null,
+		title: "Obsidian Plugin API 가이드",
+		summary:
+			"Obsidian 공식 플러그인 API 문서. ItemView / Modal / Settings 패턴 핵심 요약.",
+		sourceUrl: "https://docs.obsidian.md/Plugins/Getting+started",
+	},
+] as const;
+
 export class MeetingPageItemView extends ItemView {
 	private root: Root | null = null;
 	private meetingId: string | null = null;
 	private source: MeetingPageSource = "calendar";
 	private meetingData: MeetingPageData | null = null;
+	/** PO-3 자료 수집 중 상태 (버튼 비활성화 / 스피너 표시용). */
+	private collectingResources = false;
 
 	constructor(
 		leaf: WorkspaceLeaf,
@@ -169,8 +191,60 @@ export class MeetingPageItemView extends ItemView {
 					)
 				}
 				onOpenTopic={(topicId) => void this.openTopic(topicId)}
+				onCollectResources={() => void this.runCollectResources()}
+				collectingResources={this.collectingResources}
 			/>,
 		);
+	}
+
+	/**
+	 * PO-3 자료 자동 수집 사용자 트리거.
+	 *
+	 * - demoMode=true: mock 자료 2건을 meetingsService.appendResources 로 저장
+	 * - demoMode=false: agentService.collectResources({meetingId}) 호출 후 결과를 appendResources
+	 * - 진행 중에는 collectingResources=true 로 버튼 비활성화 + 스피너 표시
+	 * - 결과 후 loadAndRender 로 자료 섹션 자동 갱신
+	 */
+	private async runCollectResources(): Promise<void> {
+		if (!this.meetingId || this.collectingResources) return;
+		const meetingId = this.meetingId;
+		this.collectingResources = true;
+		this.render();
+
+		try {
+			if (this.plugin.settings.demoMode) {
+				const added = await this.plugin.meetingsService.appendResources(
+					meetingId,
+					MOCK_COLLECTED_RESOURCES.map((r) => ({ ...r })),
+				);
+				new Notice(`[DEMO] 자료 ${added.length}건 수집 완료`);
+			} else {
+				const result = await this.plugin.agentService.collectResources({
+					meetingId,
+				});
+				const added = await this.plugin.meetingsService.appendResources(
+					meetingId,
+					result.resources.map((r) => ({
+						topicId: r.topicId,
+						title: r.title,
+						summary: r.summary,
+						sourceUrl: r.sourceUrl,
+					})),
+				);
+				const failedNote =
+					result.failedTopics.length > 0
+						? ` · 실패 ${result.failedTopics.length}건`
+						: "";
+				new Notice(
+					`자료 ${added.length}건 수집 완료 (전체 ${result.totalCollected}건)${failedNote}`,
+				);
+			}
+		} catch (err) {
+			new Notice(`자료 수집 실패: ${(err as Error).message}`);
+		} finally {
+			this.collectingResources = false;
+			await this.loadAndRender();
+		}
 	}
 
 	private async openView(viewType: string): Promise<void> {

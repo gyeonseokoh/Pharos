@@ -306,6 +306,9 @@
 .grid{
 	display: grid;
 }
+.contents{
+	display: contents;
+}
 .hidden{
 	display: none;
 }
@@ -507,6 +510,9 @@
 }
 .grid-cols-7{
 	grid-template-columns: repeat(7, minmax(0, 1fr));
+}
+.flex-row{
+	flex-direction: row;
 }
 .flex-col{
 	flex-direction: column;
@@ -1101,6 +1107,9 @@
 }
 .hover\:text-\[color\:var\(--color-red\)\]:hover{
 	color: var(--color-red);
+}
+.hover\:text-\[color\:var\(--interactive-accent\)\]:hover{
+	color: var(--interactive-accent);
 }
 .hover\:text-text-normal:hover{
 	color: var(--text-normal);

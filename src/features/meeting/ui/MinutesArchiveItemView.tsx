@@ -63,8 +63,51 @@ export class MinutesArchiveItemView extends ItemView {
 		// ── [DEMO] AI·서버·깃허브 연동 전 임시 데모 시연용 하드코딩 연결 ──────────────
 		// 연동 완료 후 이 블록 전체(if 문 포함)를 삭제하세요.
 		if (this.plugin.settings.demoMode) {
-			this.archiveData = { items: [] };
-			this.candidateMeetings = [];
+			const attached = this.plugin.settings.attachedMinutes;
+			this.archiveData = {
+				items: Object.entries(attached).map(([meetingId, am]) => ({
+					meetingId,
+					meetingTitle: am.minutes.authorName ? `${meetingId} 회의` : meetingId,
+					meetingDate: am.minutes.writtenAt.slice(0, 10),
+					meetingType: "adhoc" as const,
+					authorName: am.minutes.authorName,
+					writtenAt: am.minutes.writtenAt,
+					preview: am.minutes.content.slice(0, 200),
+					aiSummary: am.analysis?.summary ?? null,
+					length: am.minutes.content.length,
+					categories: am.analysis?.categories ?? [],
+				})),
+			};
+			this.candidateMeetings = [
+				{
+					id: "demo-mtg-001",
+					title: "기획 1차 회의",
+					date: "2026-05-20",
+					time: "14:00",
+					durationMinutes: 60,
+					type: "adhoc",
+					status: "ready",
+					attendees: [{ id: "m1", name: "유석", role: "PO", attended: null }],
+					topics: [{ id: "t1", title: "로드맵 방향 논의", source: "MANUAL", priority: 1, description: "", reason: null }],
+					resources: [],
+					minutes: null,
+					analysis: null,
+				},
+				{
+					id: "demo-mtg-002",
+					title: "주간 정기 회의",
+					date: "2026-05-26",
+					time: "10:00",
+					durationMinutes: 90,
+					type: "regular",
+					status: "ready",
+					attendees: [{ id: "m1", name: "유석", role: "PO", attended: null }, { id: "m2", name: "경석", role: "PM", attended: null }],
+					topics: [{ id: "t2", title: "진행 상황 점검", source: "MANUAL", priority: 1, description: "", reason: null }],
+					resources: [],
+					minutes: null,
+					analysis: null,
+				},
+			];
 			this.render();
 			return;
 		}
@@ -148,6 +191,7 @@ export class MinutesArchiveItemView extends ItemView {
 
 	private openUploadModal(): void {
 		new MinutesUploadModal(this.app, {
+			plugin: this.plugin,
 			candidates: this.candidateMeetings,
 			defaultAuthorName: "",
 			onApprove: (meetingId, attached) =>
@@ -165,6 +209,7 @@ export class MinutesArchiveItemView extends ItemView {
 				meetingId,
 				content: attached.minutes.content,
 				authorName: attached.minutes.authorName,
+				analysis: attached.analysis,
 			});
 		} else {
 			this.plugin.settings.attachedMinutes = {
@@ -173,6 +218,7 @@ export class MinutesArchiveItemView extends ItemView {
 			};
 			await this.plugin.saveSettings();
 		}
+		void this.loadAndRender();
 	}
 
 	private async openView(viewType: string): Promise<void> {

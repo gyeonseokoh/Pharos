@@ -71,13 +71,18 @@ import { VaultCommitRepository } from "./features/commit/repositories/commitRepo
 import type { CommitRepository } from "./features/commit/repositories/commitRepository";
 import { CommitService } from "./features/commit/services/commitService";
 import { runMigrationIfNeeded } from "./app/migration";
-import { Notice } from "obsidian";
+import { Notice, MarkdownView } from "obsidian";
 import type { InviteService } from "./features/team/services/inviteService";
 import { LocalInviteService } from "./features/team/services/inviteService.local";
 import { JoinProjectModal } from "./features/team/ui/JoinProjectModal";
 import { AgentService } from "./features/agent/services/agentService";
-import { OpenAIProvider } from "./features/agent/providers/OpenAIProvider";
+import { GeminiProvider } from "./features/agent/providers/GeminiProvider";
+import { ConnectionManager } from "./shared/infra/sync/ConnectionManager";
+import { SyncChannelManager } from "./shared/infra/sync/SyncChannelManager";
+import { DocumentSync } from "./shared/infra/sync/DocumentSync";
+import { shouldSync } from "./shared/infra/sync/syncFilter";
 import { TavilySearchProvider } from "./features/agent/search/TavilySearchProvider";
+import { BatchSyncService } from "./shared/infra/sync/BatchSyncService";
 
 export default class PharosPlugin extends Plugin {
 	settings: PharosSettings = { ...DEFAULT_SETTINGS };
@@ -104,12 +109,15 @@ export default class PharosPlugin extends Plugin {
 	inviteService!: InviteService;
 	agentService!: AgentService;
 
+	// ─── 동기화 인프라 ──────────────────────────────────────────────────────
+	connectionManager:  ConnectionManager  = new ConnectionManager();
+	syncChannelManager: SyncChannelManager = new SyncChannelManager();
+	/** documentName → DocumentSync. 열린 파일 추적용 */
+	private syncMap = new Map<string, DocumentSync>();
+
 	async onload(): Promise<void> {
 		await this.loadSettings();
 
-		// Repository·Service 레이어 초기화 (UI 등록 전)
-		// 2단계: VaultRepository — .md 파일 기반 저장
-		// 3단계 교체 시: Vault → Hocuspocus 구현체로 한 줄만 바꾸면 됨
 		this.projectRepository = new VaultProjectRepository(this);
 		this.projectService = new ProjectService(this.projectRepository);
 		this.meetingRepository = new VaultMeetingRepository(this);
@@ -126,7 +134,7 @@ export default class PharosPlugin extends Plugin {
 		this.roadmapService = new RoadmapService(this.roadmapRepository);
 		this.teamService = new TeamService(this.teamRepository, this.inviteRepository);
 		this.progressService = new ProgressService(this.taskRepository);
-		const llmProvider = new OpenAIProvider(() => this.settings.openaiApiKey);
+		const llmProvider = new GeminiProvider(() => this.settings.llmApikey, this.settings.llmModel);
 		const searchProvider = new TavilySearchProvider(() => this.settings.tavilyApiKey);
 		this.agentService = new AgentService(
 			this.teamService,
@@ -139,10 +147,6 @@ export default class PharosPlugin extends Plugin {
 			searchProvider,
 		);
 
-		// ─── InviteService 주입 ───
-		// 시연용: LocalInviteService (같은 컴퓨터 안에서만 동작)
-		// 백엔드 합류 시: ServerInviteService 로 한 줄 교체
-		//   this.inviteService = new ServerInviteService({ baseUrl, getAuthToken, getWorkspaceId });
 		this.inviteService = new LocalInviteService({
 			inviteRepo: this.inviteRepository,
 			getWorkspaceId: async () => {
@@ -151,128 +155,100 @@ export default class PharosPlugin extends Plugin {
 			},
 		});
 
-		// 마이그레이션: data.json → .md (최초 1회, 사용자 동의 후 실행)
-		// onload 안에서 await 하면 옵시디언 부팅이 모달 대기로 멈춤 → onLayoutReady 후 비동기 실행
 		this.app.workspace.onLayoutReady(() => {
 			void runMigrationIfNeeded(this);
+
+			// 동기화 초기화 (인증 정보가 이미 있을 때만 연결)
+			this.initSync();
+
+			// ─── 파일 열기 → DocumentSync 바인딩 ──────────────────────
+			this.registerEvent(
+				this.app.workspace.on("file-open", (file) => {
+					if (!file) return;
+					if (!this.settings.workspaceId) return;
+					if (!shouldSync(file.path, this.settings.syncIgnorePatterns)) return;
+
+					const documentName = `${this.settings.workspaceId}/${file.path}`;
+
+					if (this.syncMap.has(documentName)) return;
+
+					const sync = new DocumentSync(documentName, this.connectionManager);
+					this.syncMap.set(documentName, sync);
+
+					const view = this.app.workspace.getActiveViewOfType(MarkdownView);
+					if (view) sync.bindEditor(view);
+				}),
+			);
+
+			// ─── 레이아웃 변경 → 닫힌 파일 DocumentSync 해제 ──────────
+			this.registerEvent(
+				this.app.workspace.on("layout-change", () => {
+					if (!this.settings.workspaceId) return;
+
+					const openDocs = new Set<string>();
+					this.app.workspace.iterateAllLeaves((leaf) => {
+						const view = leaf.view;
+						if (!(view instanceof MarkdownView)) return;
+						const file = view.file;
+						if (!file) return;
+						openDocs.add(`${this.settings.workspaceId}/${file.path}`);
+					});
+
+					for (const [docName, sync] of this.syncMap) {
+						if (!openDocs.has(docName)) {
+							sync.destroy();
+							this.syncMap.delete(docName);
+							console.log(`[Pharos] sync released: ${docName}`);
+						}
+					}
+				}),
+			);
 		});
 
-		// 뷰 타입 등록 — 모든 ItemView에 plugin 인스턴스 주입해서
-		// this.plugin.settings 읽고 saveSettings() 호출 가능하게 함.
-		this.registerView(
-			VIEW_TYPE_PHAROS_DASHBOARD,
-			(leaf) => new DashboardItemView(leaf, this),
-		);
-		this.registerView(
-			VIEW_TYPE_PHAROS_ROADMAP,
-			(leaf) => new RoadmapItemView(leaf, this),
-		);
-		this.registerView(
-			VIEW_TYPE_PHAROS_PROGRESS,
-			(leaf) => new ProgressPageItemView(leaf, this),
-		);
-		this.registerView(
-			VIEW_TYPE_PHAROS_MY_TASKS,
-			(leaf) => new MyTasksItemView(leaf, this),
-		);
-		this.registerView(
-			VIEW_TYPE_PHAROS_CALENDAR,
-			(leaf) => new CalendarItemView(leaf, this),
-		);
-		this.registerView(
-			VIEW_TYPE_PHAROS_MEETING_PAGE,
-			(leaf) => new MeetingPageItemView(leaf, this),
-		);
-		this.registerView(
-			VIEW_TYPE_PHAROS_MEETINGS_LIST,
-			(leaf) => new MeetingsListItemView(leaf, this),
-		);
-		this.registerView(
-			VIEW_TYPE_PHAROS_TOPIC_PAGE,
-			(leaf) => new TopicPageItemView(leaf, this),
-		);
-		this.registerView(
-			VIEW_TYPE_PHAROS_MINUTES_ARCHIVE,
-			(leaf) => new MinutesArchiveItemView(leaf, this),
-		);
-		this.registerView(
-			VIEW_TYPE_PHAROS_TEAM_LIST,
-			(leaf) => new TeamListItemView(leaf, this),
-		);
-		this.registerView(
-			VIEW_TYPE_PHAROS_TASK_DETAIL,
-			(leaf) => new TaskDetailItemView(leaf, this),
-		);
+		this.registerView(VIEW_TYPE_PHAROS_DASHBOARD,    (leaf) => new DashboardItemView(leaf, this));
+		this.registerView(VIEW_TYPE_PHAROS_ROADMAP,      (leaf) => new RoadmapItemView(leaf, this));
+		this.registerView(VIEW_TYPE_PHAROS_PROGRESS,     (leaf) => new ProgressPageItemView(leaf, this));
+		this.registerView(VIEW_TYPE_PHAROS_MY_TASKS,     (leaf) => new MyTasksItemView(leaf, this));
+		this.registerView(VIEW_TYPE_PHAROS_CALENDAR,     (leaf) => new CalendarItemView(leaf, this));
+		this.registerView(VIEW_TYPE_PHAROS_MEETING_PAGE, (leaf) => new MeetingPageItemView(leaf, this));
+		this.registerView(VIEW_TYPE_PHAROS_MEETINGS_LIST,(leaf) => new MeetingsListItemView(leaf, this));
+		this.registerView(VIEW_TYPE_PHAROS_TOPIC_PAGE,   (leaf) => new TopicPageItemView(leaf, this));
+		this.registerView(VIEW_TYPE_PHAROS_MINUTES_ARCHIVE, (leaf) => new MinutesArchiveItemView(leaf, this));
+		this.registerView(VIEW_TYPE_PHAROS_TEAM_LIST,    (leaf) => new TeamListItemView(leaf, this));
+		this.registerView(VIEW_TYPE_PHAROS_TASK_DETAIL,  (leaf) => new TaskDetailItemView(leaf, this));
 
-		// Ribbon 아이콘
 		this.addRibbonIcon("layout-dashboard", "Pharos Dashboard", () => {
 			void this.activateView(VIEW_TYPE_PHAROS_DASHBOARD);
 		});
 
-		// 명령 팔레트
-		this.addCommand({
-			id: "open-dashboard",
-			name: "Open Pharos Dashboard",
-			callback: () => void this.activateView(VIEW_TYPE_PHAROS_DASHBOARD),
-		});
-		this.addCommand({
-			id: "open-roadmap",
-			name: "Open Pharos Roadmap",
-			callback: () => void this.activateView(VIEW_TYPE_PHAROS_ROADMAP),
-		});
-		this.addCommand({
-			id: "open-progress",
-			name: "Open Team Progress",
-			callback: () => void this.activateView(VIEW_TYPE_PHAROS_PROGRESS),
-		});
-		this.addCommand({
-			id: "open-my-tasks",
-			name: "Open My Tasks",
-			callback: () => void this.activateView(VIEW_TYPE_PHAROS_MY_TASKS),
-		});
-		this.addCommand({
-			id: "open-calendar",
-			name: "Open Pharos Calendar",
-			callback: () => void this.activateView(VIEW_TYPE_PHAROS_CALENDAR),
-		});
-		this.addCommand({
-			id: "open-meetings",
-			name: "Open Meetings List",
-			callback: () => void this.activateView(VIEW_TYPE_PHAROS_MEETINGS_LIST),
-		});
-		this.addCommand({
-			id: "open-team-list",
-			name: "Open Team List",
-			callback: () => void this.activateView(VIEW_TYPE_PHAROS_TEAM_LIST),
-		});
-		this.addCommand({
-			id: "open-minutes-archive",
-			name: "Open Minutes Management",
-			callback: () =>
-				void this.activateView(VIEW_TYPE_PHAROS_MINUTES_ARCHIVE),
-		});
+		this.addCommand({ id: "open-dashboard",       name: "Open Pharos Dashboard",    callback: () => void this.activateView(VIEW_TYPE_PHAROS_DASHBOARD) });
+		this.addCommand({ id: "open-roadmap",          name: "Open Pharos Roadmap",      callback: () => void this.activateView(VIEW_TYPE_PHAROS_ROADMAP) });
+		this.addCommand({ id: "open-progress",         name: "Open Team Progress",       callback: () => void this.activateView(VIEW_TYPE_PHAROS_PROGRESS) });
+		this.addCommand({ id: "open-my-tasks",         name: "Open My Tasks",            callback: () => void this.activateView(VIEW_TYPE_PHAROS_MY_TASKS) });
+		this.addCommand({ id: "open-calendar",         name: "Open Pharos Calendar",     callback: () => void this.activateView(VIEW_TYPE_PHAROS_CALENDAR) });
+		this.addCommand({ id: "open-meetings",         name: "Open Meetings List",       callback: () => void this.activateView(VIEW_TYPE_PHAROS_MEETINGS_LIST) });
+		this.addCommand({ id: "open-team-list",        name: "Open Team List",           callback: () => void this.activateView(VIEW_TYPE_PHAROS_TEAM_LIST) });
+		this.addCommand({ id: "open-minutes-archive",  name: "Open Minutes Management",  callback: () => void this.activateView(VIEW_TYPE_PHAROS_MINUTES_ARCHIVE) });
+		this.addCommand({ id: "reset-project",         name: "Pharos: Reset Project (test)", callback: () => void this.resetProject() });
 
-		// 시연/테스트용 초기화 — projectReport·로드맵 플래그 전부 리셋
-		this.addCommand({
-			id: "reset-project",
-			name: "Pharos: Reset Project (test)",
-			callback: () => void this.resetProject(),
-		});
-
-		// 설정 탭 등록
 		this.addSettingTab(new PharosSettingsTab(this.app, this));
 
-		// ─── 초대 링크 protocol handler ─────────────────────────────
-		// obsidian://pharos-join?token=xxx&workspace=yyy 클릭 시
-		// 옵시디언이 자동 실행되면서 이 콜백 호출.
-		// (회의 합의: 옵시디언 안쪽은 유석, 서버 통합은 경석)
 		this.registerObsidianProtocolHandler("pharos-join", (params) => {
 			void this.handleJoinLink(params.token ?? "");
+		});
+
+		this.registerObsidianProtocolHandler("pharos-callback", (params) => {
+			void this.handleAuthCallback(params.token ?? "");
 		});
 	}
 
 	async onunload(): Promise<void> {
-		// 플러그인 비활성 시 열린 탭 정리 (선택)
+		for (const sync of this.syncMap.values()) {
+			sync.destroy();
+		}
+		this.syncMap.clear();
+		this.syncChannelManager.destroy();
+		this.connectionManager.destroyAll();
 	}
 
 	async loadSettings(): Promise<void> {
@@ -282,31 +258,71 @@ export default class PharosPlugin extends Plugin {
 
 	async saveSettings(): Promise<void> {
 		await this.saveData(this.settings);
-		// 열려있는 모든 뷰가 상태 변화 감지해서 리렌더하도록 이벤트 발행
 		this.app.workspace.trigger("pharos:state-changed");
 	}
 
-	/**
-	 * 초대 링크 클릭 시 호출되는 핸들러.
-	 * 토큰 검증 → 유효하면 JoinProjectModal 오픈.
-	 */
 	private async handleJoinLink(token: string): Promise<void> {
-		if (!token) {
-			new Notice("초대 링크에 토큰이 없습니다");
-			return;
-		}
+		if (!token) { new Notice("초대 링크에 토큰이 없습니다"); return; }
 		const invite = await this.inviteService.verifyToken(token);
-		if (!invite) {
-			new Notice("초대 링크가 유효하지 않거나 만료되었습니다 (24h)");
-			return;
-		}
+		if (!invite) { new Notice("초대 링크가 유효하지 않거나 만료되었습니다 (24h)"); return; }
 		new JoinProjectModal(this.app, this, { token }).open();
 	}
 
+	private async handleAuthCallback(token: string): Promise<void> {
+		if (!token) { new Notice("❌ 로그인 실패: 토큰이 없습니다"); return; }
+
+		let login: string;
+		try {
+			const parts = token.split(".");
+			if (parts.length < 3 || !parts[1]) {
+				new Notice("❌ 로그인 실패: 올바르지 않은 토큰 형식");
+				return;
+			}
+			const base64 = parts[1]
+				.replace(/-/g, "+")
+				.replace(/_/g, "/")
+				.padEnd(parts[1].length + (4 - (parts[1].length % 4)) % 4, "=");
+			login = (JSON.parse(atob(base64)) as { login?: string }).login ?? "";
+		} catch {
+			new Notice("❌ 로그인 실패: 토큰 파싱 오류");
+			return;
+		}
+
+		this.settings.authToken   = token;
+		this.settings.githubLogin = login;
+		await this.saveSettings();
+
+		// 로그인 완료 -> 동기화 재초기화
+		this.initSync();
+
+		new Notice(`✅ GitHub 로그인 성공: @${login}`);
+	}
+
 	/**
-	 * 시연/테스트용. projectReport·로드맵 플래그를 초기 상태로 리셋.
-	 * 모든 뷰가 "프로젝트 없음" empty state로 돌아감.
+	 * 동기화 인프라 초기화.
+	 * onLayoutReady / handleAuthCallback 두 진입점에서 호출.
+	 * 인증 토큰 또는 workspaceId 없으면 조용히 종료.
 	 */
+	private initSync(): void {
+		const { authToken, workspaceId, hocuspocusServerUrl } = this.settings;
+		if (!authToken || !workspaceId || !hocuspocusServerUrl) {
+			console.log("[Pharos] initSync: 인증 정보 부족 — 동기화 생략");
+			return;
+		}
+		this.connectionManager.setServerUrl(hocuspocusServerUrl);
+		this.connectionManager.setToken(authToken);
+
+		this.syncChannelManager.setOnTrigger((payload) => {
+			console.log(`[Pharos] agent trigger: event=${payload.event}`);
+			// TODO: void this.agentService.run(payload.event);
+		});
+		this.syncChannelManager.init(hocuspocusServerUrl, workspaceId, authToken);
+
+		console.log(`[Pharos] initSync: workspace=${workspaceId} server=${hocuspocusServerUrl}`);
+
+		void new BatchSyncService().run(this); // Vault 전체 일괄 동기화
+	}
+
 	async resetProject(): Promise<void> {
 		this.settings.projectReport = null;
 		this.settings.planningRoadmapGenerated = false;
@@ -317,22 +333,11 @@ export default class PharosPlugin extends Plugin {
 		await this.saveSettings();
 	}
 
-	/**
-	 * 지정한 뷰 타입의 탭이 이미 있으면 포커스, 없으면 새 탭으로 오픈.
-	 */
 	async activateView(viewType: string): Promise<void> {
 		const { workspace } = this.app;
-
 		const [existing] = workspace.getLeavesOfType(viewType);
-		if (existing) {
-			workspace.revealLeaf(existing);
-			return;
-		}
-
+		if (existing) { workspace.revealLeaf(existing); return; }
 		const leaf = workspace.getLeaf("tab");
-		await leaf.setViewState({
-			type: viewType,
-			active: true,
-		});
+		await leaf.setViewState({ type: viewType, active: true });
 	}
 }
