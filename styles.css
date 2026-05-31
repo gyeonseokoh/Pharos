@@ -1108,6 +1108,9 @@
 .hover\:text-\[color\:var\(--color-red\)\]:hover{
 	color: var(--color-red);
 }
+.hover\:text-\[color\:var\(--interactive-accent\)\]:hover{
+	color: var(--interactive-accent);
+}
 .hover\:text-text-normal:hover{
 	color: var(--text-normal);
 }
