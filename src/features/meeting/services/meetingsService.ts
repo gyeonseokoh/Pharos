@@ -8,6 +8,7 @@
 import { eventBus } from "../../../shared/repo/eventBus";
 import type {
 	AttachMinutesInput,
+	CreateMeetingInput,
 	Meeting,
 	MeetingAnalysis,
 	MeetingCategory,
@@ -36,6 +37,41 @@ export class MeetingsService {
 	/** 카테고리별 회의록 (회의록 관리 탭 필터). */
 	async listByCategory(category: MeetingCategory): Promise<Meeting[]> {
 		return this.repo.listByCategory(category);
+	}
+
+	/**
+	 * 새 회의 생성. (PO-4 임시 회의 / PO-1-1 정기 회의)
+	 *
+	 * 책임:
+	 *   - id 자동 발급 (mtg-<date>-<slug>-<rand>)
+	 *   - 기본값 채움 (status, 빈 배열들)
+	 *   - Repository 저장
+	 *   - "meeting:created" 이벤트 발행
+	 */
+	async create(input: CreateMeetingInput): Promise<Meeting> {
+		const now = new Date().toISOString();
+		const id = generateMeetingId(input.date, input.title);
+		const meeting: Meeting = {
+			version: 1,
+			type: "meeting",
+			id,
+			title: input.title,
+			date: input.date,
+			time: input.time,
+			durationMinutes: input.durationMinutes ?? 60,
+			meetingType: input.meetingType,
+			status: "topic_pending",
+			attendees: input.attendees ?? [],
+			topics: input.topics ?? [],
+			resources: [],
+			minutes: null,
+			analysis: null,
+			createdAt: now,
+			updatedAt: now,
+		};
+		await this.repo.save(meeting);
+		eventBus.emit("meeting:created", { meetingId: id });
+		return meeting;
 	}
 
 	/**
@@ -75,4 +111,16 @@ export class MeetingsService {
 		await this.repo.delete(meetingId);
 		eventBus.emit("meeting:updated", { meetingId });
 	}
+}
+
+/** "mtg-2026-05-25-ui-review-a1b2" 형태의 id 생성. */
+function generateMeetingId(date: string, title: string): string {
+	const slug = title
+		.toLowerCase()
+		.replace(/[^\w가-힣\s-]/g, "")
+		.trim()
+		.replace(/\s+/g, "-")
+		.slice(0, 30);
+	const rnd = Math.random().toString(36).slice(2, 6);
+	return `mtg-${date}-${slug || rnd}-${rnd}`;
 }
