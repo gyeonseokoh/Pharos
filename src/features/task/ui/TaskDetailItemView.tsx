@@ -5,6 +5,7 @@ import { ChecklistSplitModal } from "./ChecklistSplitModal";
 import { VIEW_TYPE_PHAROS_MY_TASKS } from "../../progress/ui/MyTasksItemView";
 import { VIEW_TYPE_PHAROS_DASHBOARD } from "../../progress/ui/DashboardItemView";
 import { VIEW_TYPE_PHAROS_MEETING_PAGE } from "../../meeting/ui/MeetingPageItemView";
+import { getTaskDetailMock } from "./taskDetailMock";
 import type { PharosPluginLike } from "../../../app/settings";
 import type { TaskDetailData } from "../domain/taskDetailData";
 
@@ -77,6 +78,11 @@ export class TaskDetailItemView extends ItemView {
 			this.render();
 			return;
 		}
+		if (this.plugin.settings.demoMode) {
+			this.taskData = getTaskDetailMock(this.taskId);
+			this.render();
+			return;
+		}
 		const task = await this.plugin.taskService.getById(this.taskId);
 		if (!task) {
 			this.taskData = null;
@@ -125,11 +131,17 @@ export class TaskDetailItemView extends ItemView {
 			this.root.render(<Empty text={`${this.taskId}를 찾을 수 없습니다.`} />);
 			return;
 		}
+		const taskData = this.taskData;
 		this.root.render(
 			<TaskDetailView
-				data={this.taskData}
+				data={taskData}
 				onGenerateChecklist={() =>
-					new ChecklistSplitModal(this.app, this.taskData!.title).open()
+					new ChecklistSplitModal(this.app, {
+						plugin: this.plugin,
+						taskId: taskData.id,
+						taskTitle: taskData.title,
+						taskDescription: taskData.description,
+					}).open()
 				}
 				onBackToMyTasks={() => void this.openView(VIEW_TYPE_PHAROS_MY_TASKS)}
 				onBackToHome={() => void this.openView(VIEW_TYPE_PHAROS_DASHBOARD)}
