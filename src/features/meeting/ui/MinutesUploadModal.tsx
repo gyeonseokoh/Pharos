@@ -3,8 +3,13 @@
  *
  * 시나리오:
  *   Phase 1 (input): 회의 선택 + 입력/파일 업로드 + 작성자
- *   Phase 2 (progress): 5단계 분석 애니메이션 (각 ~500ms)
+ *   Phase 2 (progress): 분석 단계 애니메이션 (시뮬레이터 또는 실제 LLM 병행)
  *   Phase 3 (preview): 추출 결과 확인 → 승인/재분석/취소
+ *
+ * 분석 분기 (demoMode):
+ *   - true: 시뮬레이터 (extract* 휴리스틱) + classifyMinute
+ *   - false: plugin.agentService.analyzeMinutes(LLM) + classifyMinute(로컬)
+ *     → categories 는 LLM 영역이 아니므로 로컬 휴리스틱으로 보강
  *
  * 승인 시 onApprove(meetingId, AttachedMinute) 콜백으로 상위에 전달.
  */
@@ -29,13 +34,16 @@ import {
 } from "shared/ui";
 import { cn } from "shared/ui/utils";
 import type { MeetingAnalysis, MeetingPageData } from "../domain/meetingPageData";
-import type { AttachedMinute } from "../../../app/settings";
+import type { AttachedMinute, PharosPluginLike } from "../../../app/settings";
 import {
 	MINUTES_ANALYSIS_STEPS,
-	analyzeMinutes,
+	analyzeMinutes as analyzeMinutesLocal,
+	classifyMinute,
 } from "./minutesAnalysisSimulator";
 
 export interface MinutesUploadModalArgs {
+	/** 플러그인 인스턴스 (agentService 호출용). */
+	plugin: PharosPluginLike;
 	/** 회의록 없는 회의 후보. 드롭다운에 표시. */
 	candidates: MeetingPageData[];
 	/** 초기 작성자 이름 (예: 로그인 유저). */
@@ -70,39 +78,70 @@ function Content({
 
 	const [stepIndex, setStepIndex] = useState(0);
 	const [analysis, setAnalysis] = useState<MeetingAnalysis | null>(null);
+	const [analysisError, setAnalysisError] = useState<string | null>(null);
 
 	const selectedMeeting = useMemo(
 		() => args.candidates.find((m) => m.id === meetingId) ?? null,
 		[args.candidates, meetingId],
 	);
+	const isDemo = args.plugin.settings.demoMode;
 
 	const canSubmit =
 		selectedMeeting !== null &&
 		authorName.trim().length > 0 &&
 		content.trim().length >= 20;
 
-	// 분석 애니메이션
+	// 분석 (애니메이션 + 실제 분석 병행). cancelled 가드로 unmount 안전.
 	useEffect(() => {
 		if (phase !== "progress") return;
 		let cancelled = false;
+		setAnalysisError(null);
 
-		const run = async () => {
+		const runAnimation = async () => {
 			for (let i = 0; i < MINUTES_ANALYSIS_STEPS.length; i++) {
 				if (cancelled) return;
 				setStepIndex(i);
 				await sleep(500);
 			}
-			if (cancelled) return;
-			const result = analyzeMinutes({ content });
-			setAnalysis(result);
-			setPhase("preview");
+		};
+
+		const runAnalysis = async (): Promise<MeetingAnalysis> => {
+			if (isDemo || !selectedMeeting) {
+				return analyzeMinutesLocal({ content });
+			}
+			// 실서비스: LLM 분석 + 로컬 categories 보강
+			const llm = await args.plugin.agentService.analyzeMinutes({
+				meetingId: selectedMeeting.id,
+				minutesText: content,
+			});
+			return {
+				keywords: llm.keywords,
+				techStacks: llm.techStacks,
+				decisions: llm.decisions,
+				summary: llm.summary,
+				categories: classifyMinute(content),
+				analyzedAt: new Date().toISOString(),
+			};
+		};
+
+		const run = async () => {
+			try {
+				const [, result] = await Promise.all([runAnimation(), runAnalysis()]);
+				if (cancelled) return;
+				setAnalysis(result);
+				setPhase("preview");
+			} catch (err) {
+				if (cancelled) return;
+				setAnalysisError((err as Error).message);
+				setPhase("input");
+			}
 		};
 
 		void run();
 		return () => {
 			cancelled = true;
 		};
-	}, [phase, content]);
+	}, [phase, content, isDemo, selectedMeeting, args.plugin]);
 
 	const handleFile = (file: File | null) => {
 		if (!file) return;
@@ -153,10 +192,17 @@ function Content({
 		return (
 			<ModalLayout
 				title="✍️ 회의록 작성"
-				description="회의를 선택하고 본문을 직접 쓰거나 파일로 업로드하세요"
+				description={
+					analysisError
+						? `분석 실패: ${analysisError} — 다시 시도하거나 직접 지정해주세요.`
+						: "회의를 선택하고 본문을 직접 쓰거나 파일로 업로드하세요"
+				}
 				submitLabel="분석 시작"
 				submitDisabled={!canSubmit}
-				onSubmit={() => setPhase("progress")}
+				onSubmit={() => {
+					setAnalysisError(null);
+					setPhase("progress");
+				}}
 				onCancel={onClose}
 				widthClass="max-w-xl"
 			>
@@ -250,7 +296,9 @@ function Content({
 			>
 				<ProgressList currentIndex={stepIndex} />
 				<p className="mt-4 text-[11px] text-text-faint">
-					시뮬레이션 단계 · 실제 LLM 연동 시 이 부분이 교체됩니다.
+					{isDemo
+						? "[DEMO] 시뮬레이터 휴리스틱 분석 진행 중"
+						: "Agent · LLM 호출 진행 중. 응답 도착 시 다음 단계로 이동합니다."}
 				</p>
 			</ModalLayout>
 		);

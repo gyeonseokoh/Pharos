@@ -6,7 +6,6 @@
  */
 
 import { eventBus } from "../../../shared/repo/eventBus";
-import { analyzeMinutes } from "../ui/minutesAnalysisSimulator";
 import type {
 	AttachMinutesInput,
 	Meeting,
@@ -43,15 +42,17 @@ export class MeetingsService {
 	 * PO-5 회의록 첨부.
 	 *
 	 * 책임:
-	 *   - 분석 시뮬레이터(향후 LLM) 호출하여 키워드·결정사항·카테고리 추출
-	 *   - Repository 저장 (회의에 minutes·analysis 합쳐 저장)
+	 *   - 호출자가 미리 만든 analysis 와 함께 회의에 합쳐 Repository 저장
 	 *   - "minutes:attached" 이벤트 발행
+	 *
+	 * 분석 자체는 호출자(MinutesUploadModal)가 demoMode 분기로
+	 *   - 시뮬레이터 (시연용 휴리스틱)
+	 *   - agentService.analyzeMinutes (실서비스 LLM)
+	 * 중 골라 수행 후 결과를 전달.
 	 */
 	async attachMinutes(input: AttachMinutesInput): Promise<MeetingAnalysis> {
 		const meeting = await this.repo.getById(input.meetingId);
 		if (!meeting) throw new Error(`회의 ${input.meetingId} 를 찾을 수 없습니다`);
-
-		const analysis = analyzeMinutes({ content: input.content });
 
 		const updated: Meeting = {
 			...meeting,
@@ -60,13 +61,13 @@ export class MeetingsService {
 				writtenAt: new Date().toISOString(),
 				content: input.content,
 			},
-			analysis,
+			analysis: input.analysis,
 			status: "completed",
 			updatedAt: new Date().toISOString(),
 		};
 		await this.repo.save(updated);
 		eventBus.emit("minutes:attached", { meetingId: input.meetingId });
-		return analysis;
+		return input.analysis;
 	}
 
 	/** 회의록 삭제 (시연·테스트용). 회의 자체는 유지, attachedMinutes만 제거. */
