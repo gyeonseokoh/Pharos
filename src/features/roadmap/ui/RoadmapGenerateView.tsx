@@ -81,7 +81,7 @@ const COPY = {
 		buttonLabel: "AI 기획 로드맵 생성하기",
 		loadingLabel: "AI가 보고서를 분석하고 있습니다... 잠시만 기다려주세요.",
 		description:
-			"현재는 목업으로 시뮬레이션됩니다. 추후 OpenAI 연동 후 실제 생성으로 교체됩니다.",
+			"AI 키가 설정된 경우 실제 LLM이 프로젝트 정보를 분석해 생성합니다. demoMode에서는 시뮬레이터로 동작합니다.",
 	},
 	development: {
 		title: "개발 로드맵이 아직 없습니다",

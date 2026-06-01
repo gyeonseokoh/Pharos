@@ -134,7 +134,7 @@ export default class PharosPlugin extends Plugin {
 		this.roadmapService = new RoadmapService(this.roadmapRepository);
 		this.teamService = new TeamService(this.teamRepository, this.inviteRepository);
 		this.progressService = new ProgressService(this.taskRepository);
-		const llmProvider = new GeminiProvider(() => this.settings.llmApikey, this.settings.llmModel);
+		const llmProvider = new GeminiProvider(() => this.settings.llmApikey, () => this.settings.llmModel || "gemini-2.0-flash");
 		const searchProvider = new TavilySearchProvider(() => this.settings.tavilyApiKey);
 		this.agentService = new AgentService(
 			this.teamService,
