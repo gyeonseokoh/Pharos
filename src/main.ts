@@ -83,6 +83,7 @@ import { DocumentSync } from "./shared/infra/sync/DocumentSync";
 import { shouldSync } from "./shared/infra/sync/syncFilter";
 import { TavilySearchProvider } from "./features/agent/search/TavilySearchProvider";
 import { BatchSyncService } from "./shared/infra/sync/BatchSyncService";
+import { eventBus } from "./shared/repo/eventBus";
 
 export default class PharosPlugin extends Plugin {
 	settings: PharosSettings = { ...DEFAULT_SETTINGS };
@@ -153,6 +154,15 @@ export default class PharosPlugin extends Plugin {
 				const p = await this.projectService.get();
 				return p?.workspaceId ?? null;
 			},
+		});
+
+		// eventBus → pharos:state-changed 브릿지
+		// meeting:updated, minutes:attached 등 내부 이벤트를 모든 View가 수신하도록 전파
+		eventBus.on("meeting:updated", () => {
+			this.app.workspace.trigger("pharos:state-changed");
+		});
+		eventBus.on("minutes:attached", () => {
+			this.app.workspace.trigger("pharos:state-changed");
 		});
 
 		this.app.workspace.onLayoutReady(() => {

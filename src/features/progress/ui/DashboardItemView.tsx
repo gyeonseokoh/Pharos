@@ -145,6 +145,7 @@ export class DashboardItemView extends ItemView {
 					}
 					onOpenSettings={() =>
 						new ProjectSettingsModal(this.app, {
+							plugin: this.plugin,
 							topic: project.name,
 							description: project.description,
 							deadline: project.deadline,
@@ -193,6 +194,7 @@ export class DashboardItemView extends ItemView {
 				}
 				onOpenSettings={() =>
 					new ProjectSettingsModal(this.app, {
+						plugin: this.plugin,
 						topic: project.name,
 						description: project.description,
 						deadline: project.deadline,

@@ -58,6 +58,23 @@ export class ProjectService {
 		return project;
 	}
 
+	/**
+	 * 프로젝트 정보 수정. (PO-0 설정 수정)
+	 * 로드맵 플래그·workspaceId·createdAt 은 유지.
+	 */
+	async update(input: Pick<ProjectInput, "name" | "description" | "deadline">): Promise<void> {
+		const project = await this.repo.get();
+		if (!project) throw new Error("프로젝트가 없습니다");
+		await this.repo.save({
+			...project,
+			name: input.name,
+			description: input.description,
+			deadline: input.deadline,
+			updatedAt: new Date().toISOString(),
+		});
+		eventBus.emit("project:created", { projectName: input.name });
+	}
+
 	/** 기획 로드맵 생성 완료 표시. (PO-1) */
 	async markPlanningGenerated(): Promise<void> {
 		const project = await this.repo.get();

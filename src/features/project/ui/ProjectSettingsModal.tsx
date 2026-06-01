@@ -11,6 +11,7 @@ import {
 	ModalLayout,
 	textareaClass,
 } from "shared/ui";
+import type { PharosPluginLike } from "../../../app/settings";
 
 export interface ProjectSettings {
 	topic: string;
@@ -19,23 +20,43 @@ export interface ProjectSettings {
 }
 
 function Content({
+	plugin,
 	initial,
 	onClose,
 }: {
+	plugin: PharosPluginLike;
 	initial: ProjectSettings;
 	onClose: () => void;
 }) {
 	const [form, setForm] = useState<ProjectSettings>(initial);
+	const [submitting, setSubmitting] = useState(false);
+
+	const canSubmit = !submitting && form.topic.trim().length > 0 && form.deadline.length > 0;
+
+	const handleSubmit = async (): Promise<void> => {
+		if (!canSubmit) return;
+		setSubmitting(true);
+		try {
+			await plugin.projectService.update({
+				name: form.topic.trim(),
+				description: form.description.trim(),
+				deadline: form.deadline,
+			});
+			new Notice("프로젝트 설정이 저장됐습니다");
+			onClose();
+		} catch (err) {
+			new Notice(`저장 실패: ${(err as Error).message}`);
+			setSubmitting(false);
+		}
+	};
 
 	return (
 		<ModalLayout
 			title="⚙️ 프로젝트 설정"
 			description="프로젝트 정보를 수정합니다"
-			submitLabel="저장"
-			onSubmit={() => {
-				new Notice(`[미구현] 프로젝트 설정 저장 예정`);
-				onClose();
-			}}
+			submitLabel={submitting ? "저장 중..." : "저장"}
+			submitDisabled={!canSubmit}
+			onSubmit={() => void handleSubmit()}
 			onCancel={onClose}
 		>
 			<FormField label="프로젝트 주제" required>
@@ -66,15 +87,32 @@ function Content({
 	);
 }
 
-export class ProjectSettingsModal extends BaseReactModal {
-	private readonly initial: ProjectSettings;
+export interface ProjectSettingsModalArgs {
+	plugin: PharosPluginLike;
+	topic: string;
+	description: string;
+	deadline: string;
+}
 
-	constructor(app: App, initial: ProjectSettings) {
+export class ProjectSettingsModal extends BaseReactModal {
+	constructor(
+		app: App,
+		private readonly args: ProjectSettingsModalArgs,
+	) {
 		super(app);
-		this.initial = initial;
 	}
 
 	renderContent() {
-		return <Content initial={this.initial} onClose={() => this.close()} />;
+		return (
+			<Content
+				plugin={this.args.plugin}
+				initial={{
+					topic: this.args.topic,
+					description: this.args.description,
+					deadline: this.args.deadline,
+				}}
+				onClose={() => this.close()}
+			/>
+		);
 	}
 }

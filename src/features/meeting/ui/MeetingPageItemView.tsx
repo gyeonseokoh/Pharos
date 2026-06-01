@@ -14,6 +14,8 @@ import { VIEW_TYPE_PHAROS_MINUTES_ARCHIVE } from "./MinutesArchiveItemView";
 import { VIEW_TYPE_PHAROS_TOPIC_PAGE } from "./TopicPageItemView";
 import { VIEW_TYPE_PHAROS_DASHBOARD } from "../../progress/ui/DashboardItemView";
 import { AiTopicModal } from "./AiTopicModal";
+import { getMeetingPageMock } from "./meetingPageMock";
+import { mockCalendarData } from "./calendarMock";
 import type { MeetingPageData } from "../domain/meetingPageData";
 import type { PharosPluginLike } from "../../../app/settings";
 
@@ -121,6 +123,18 @@ export class MeetingPageItemView extends ItemView {
 	private async loadAndRender(): Promise<void> {
 		if (!this.meetingId) {
 			this.meetingData = null;
+			this.render();
+			return;
+		}
+
+		if (this.plugin.settings.demoMode) {
+			const cal = mockCalendarData.meetings.find((m) => m.id === this.meetingId);
+			this.meetingData = getMeetingPageMock(this.meetingId, cal ? {
+				title: cal.title,
+				date: cal.date,
+				time: cal.time,
+				type: cal.type,
+			} : undefined);
 			this.render();
 			return;
 		}
