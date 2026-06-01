@@ -278,15 +278,31 @@ export class MeetingPageItemView extends ItemView {
 		const root = this.plugin.settings.projectRoot;
 		const filePath = `${root}/Meetings/${date}_${slug}.md`;
 
-		let file = this.app.vault.getAbstractFileByPath(filePath) as TFile | null;
-		if (!file) {
-			// 파일이 없으면 새로 생성 (demoMode 포함)
+		// 파일이 없으면 올바른 frontmatter로 생성 (빈 파일 생성 시 파싱 에러 방지)
+		if (!this.app.vault.getAbstractFileByPath(filePath)) {
 			try {
-				file = await this.app.vault.create(filePath, "");
+				await this.plugin.meetingsService.ensureVaultFile({
+					id: this.meetingData.id,
+					title: this.meetingData.title,
+					date: this.meetingData.date,
+					time: this.meetingData.time,
+					durationMinutes: this.meetingData.durationMinutes,
+					type: this.meetingData.type,
+					status: this.meetingData.status,
+					attendees: this.meetingData.attendees,
+					topics: this.meetingData.topics,
+					resources: this.meetingData.resources,
+				});
 			} catch {
 				new Notice(`회의 파일 생성 실패: ${filePath}`);
 				return;
 			}
+		}
+
+		let file = this.app.vault.getAbstractFileByPath(filePath) as TFile | null;
+		if (!file) {
+			new Notice(`회의 파일을 찾을 수 없습니다: ${filePath}`);
+			return;
 		}
 
 		// 이미 열린 탭이 있으면 재사용

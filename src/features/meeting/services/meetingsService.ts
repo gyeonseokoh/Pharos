@@ -212,6 +212,47 @@ export class MeetingsService {
 		await this.repo.delete(meetingId);
 		eventBus.emit("meeting:updated", { meetingId });
 	}
+
+	/**
+	 * 회의 vault 파일이 없으면 생성.
+	 * MeetingPageItemView에서 네이티브 에디터로 열기 전 호출.
+	 * 빈 파일 대신 올바른 frontmatter를 포함한 파일을 생성해 파싱 에러를 방지.
+	 */
+	async ensureVaultFile(data: {
+		id: string;
+		title: string;
+		date: string;
+		time: string;
+		durationMinutes: number;
+		type: "regular" | "adhoc";
+		status: string;
+		attendees: Meeting["attendees"];
+		topics: Meeting["topics"];
+		resources: Meeting["resources"];
+	}): Promise<void> {
+		const existing = await this.repo.getById(data.id);
+		if (existing) return;
+		const now = new Date().toISOString();
+		const meeting: Meeting = {
+			version: 1,
+			type: "meeting",
+			id: data.id,
+			title: data.title,
+			date: data.date,
+			time: data.time,
+			durationMinutes: data.durationMinutes,
+			meetingType: data.type,
+			status: data.status as Meeting["status"],
+			attendees: data.attendees,
+			topics: data.topics,
+			resources: data.resources,
+			minutes: null,
+			analysis: null,
+			createdAt: now,
+			updatedAt: now,
+		};
+		await this.repo.save(meeting);
+	}
 }
 
 /** "mtg-2026-05-25-ui-review-a1b2" 형태의 id 생성. */
