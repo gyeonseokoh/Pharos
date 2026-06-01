@@ -11,6 +11,7 @@ import {
 	ModalLayout,
 	textareaClass,
 } from "shared/ui";
+import type { PharosPluginLike } from "../../../app/settings";
 
 interface FormState {
 	title: string;
@@ -25,9 +26,13 @@ interface TopicOption {
 }
 
 function Content({
+	plugin,
+	meetingId,
 	availableTopics,
 	onClose,
 }: {
+	plugin: PharosPluginLike;
+	meetingId: string;
 	availableTopics: TopicOption[];
 	onClose: () => void;
 }) {
@@ -37,20 +42,38 @@ function Content({
 		summary: "",
 		topicId: availableTopics[0]?.id ?? "__general__",
 	});
+	const [submitting, setSubmitting] = useState(false);
 
 	const canSubmit =
-		form.title.trim().length >= 2 && isValidUrl(form.url);
+		!submitting && form.title.trim().length >= 2 && isValidUrl(form.url);
+
+	const handleSubmit = async (): Promise<void> => {
+		if (!canSubmit) return;
+		setSubmitting(true);
+		try {
+			await plugin.meetingsService.appendResources(meetingId, [
+				{
+					topicId: form.topicId === "__general__" ? null : form.topicId,
+					title: form.title.trim(),
+					summary: form.summary.trim(),
+					sourceUrl: form.url.trim(),
+				},
+			]);
+			new Notice(`자료 "${form.title.trim()}" 추가됨`);
+			onClose();
+		} catch (err) {
+			new Notice(`자료 추가 실패: ${(err as Error).message}`);
+			setSubmitting(false);
+		}
+	};
 
 	return (
 		<ModalLayout
 			title="📎 자료 추가"
 			description="회의에 참고할 외부 링크 · 자료"
-			submitLabel="추가"
+			submitLabel={submitting ? "추가 중..." : "추가"}
 			submitDisabled={!canSubmit}
-			onSubmit={() => {
-				new Notice(`[미구현] 자료 "${form.title}" 추가 예정`);
-				onClose();
-			}}
+			onSubmit={() => void handleSubmit()}
 			onCancel={onClose}
 		>
 			<FormField label="제목" required>
@@ -72,7 +95,7 @@ function Content({
 				/>
 			</FormField>
 
-			<FormField label="요약" hint="AI 자동 요약 대신 수동 입력할 때">
+			<FormField label="요약" hint="간단한 내용 설명 (선택)">
 				<textarea
 					className={textareaClass}
 					rows={3}
@@ -103,17 +126,28 @@ function isValidUrl(s: string): boolean {
 	return /^https?:\/\//.test(s);
 }
 
-export class ResourceUploadModal extends BaseReactModal {
-	private readonly topics: TopicOption[];
+export interface ResourceUploadModalArgs {
+	plugin: PharosPluginLike;
+	meetingId: string;
+	topics: TopicOption[];
+}
 
-	constructor(app: App, topics: TopicOption[]) {
+export class ResourceUploadModal extends BaseReactModal {
+	constructor(
+		app: App,
+		private readonly args: ResourceUploadModalArgs,
+	) {
 		super(app);
-		this.topics = topics;
 	}
 
 	renderContent() {
 		return (
-			<Content availableTopics={this.topics} onClose={() => this.close()} />
+			<Content
+				plugin={this.args.plugin}
+				meetingId={this.args.meetingId}
+				availableTopics={this.args.topics}
+				onClose={() => this.close()}
+			/>
 		);
 	}
 }
