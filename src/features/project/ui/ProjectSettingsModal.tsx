@@ -11,6 +11,7 @@ import {
 	ModalLayout,
 	textareaClass,
 } from "shared/ui";
+import type { PharosPluginLike } from "../../../app/settings";
 
 export interface ProjectSettings {
 	topic: string;
@@ -20,9 +21,12 @@ export interface ProjectSettings {
 
 function Content({
 	initial,
+	// 저장 로직은 Modal 클래스에서 비동기로 처리 — Content는 UI만 담당
+	onSave,
 	onClose,
 }: {
 	initial: ProjectSettings;
+	onSave: (form: ProjectSettings) => Promise<void>;
 	onClose: () => void;
 }) {
 	const [form, setForm] = useState<ProjectSettings>(initial);
@@ -40,8 +44,12 @@ function Content({
 			submitLabel="저장"
 			submitDisabled={isPastDeadline}
 			onSubmit={() => {
-				new Notice(`[미구현] 프로젝트 설정 저장 예정`);
-				onClose();
+				// 저장 성공 후 Modal 닫기, 실패 시 Modal 유지 (오류 Notice는 handleSave에서)
+				void onSave(form)
+					.then(() => onClose())
+					.catch((err: unknown) =>
+						new Notice(`[오류] 프로젝트 설정 저장 실패: ${String(err)}`),
+					);
 			}}
 			onCancel={onClose}
 		>
@@ -50,9 +58,7 @@ function Content({
 					type="text"
 					className={inputClass}
 					value={form.topic}
-					onChange={(e) =>
-						setForm({ ...form, topic: e.target.value })
-					}
+					onChange={(e) => setForm({ ...form, topic: e.target.value })}
 				/>
 			</FormField>
 			<FormField label="설명">
@@ -60,20 +66,14 @@ function Content({
 					className={textareaClass}
 					rows={3}
 					value={form.description}
-					onChange={(e) =>
-						setForm({ ...form, description: e.target.value })
-					}
+					onChange={(e) => setForm({ ...form, description: e.target.value })}
 				/>
 			</FormField>
 			<FormField
 				label="마감기한"
 				required
 				// 이전 날짜 입력 시 안내 메시지 표시
-				hint={
-					isPastDeadline
-						? "⚠️ 이전 날짜를 입력할 수 없습니다"
-						: undefined
-				}
+				hint={isPastDeadline ? "⚠️ 이전 날짜를 입력할 수 없습니다" : undefined}
 			>
 				<input
 					type="date"
@@ -81,9 +81,7 @@ function Content({
 					value={form.deadline}
 					min={today}
 					max="2099-12-31"
-					onChange={(e) =>
-						setForm({ ...form, deadline: e.target.value })
-					}
+					onChange={(e) => setForm({ ...form, deadline: e.target.value })}
 				/>
 			</FormField>
 		</ModalLayout>
@@ -91,10 +89,12 @@ function Content({
 }
 
 export class ProjectSettingsModal extends BaseReactModal {
+	private readonly plugin: PharosPluginLike;
 	private readonly initial: ProjectSettings;
 
-	constructor(app: App, initial: ProjectSettings) {
+	constructor(app: App, plugin: PharosPluginLike, initial: ProjectSettings) {
 		super(app);
+		this.plugin = plugin;
 		this.initial = initial;
 	}
 
@@ -130,6 +130,12 @@ export class ProjectSettingsModal extends BaseReactModal {
 	}
 
 	renderContent() {
-		return <Content initial={this.initial} onClose={() => this.close()} />;
+		return (
+			<Content
+				initial={this.initial}
+				onSave={(form) => this.handleSave(form)}
+				onClose={() => this.close()}
+			/>
+		);
 	}
 }
