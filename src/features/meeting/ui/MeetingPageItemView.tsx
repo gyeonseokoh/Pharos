@@ -5,7 +5,7 @@
  * meetingId → meetingsService.getById() → MeetingPageData 렌더.
  */
 
-import { ItemView, WorkspaceLeaf, type ViewStateResult, Notice } from "obsidian";
+import { ItemView, WorkspaceLeaf, type ViewStateResult, Notice, type TFile, MarkdownView } from "obsidian";
 import { createRoot, type Root } from "react-dom/client";
 import { MeetingPageView } from "./MeetingPageView";
 import { VIEW_TYPE_PHAROS_CALENDAR } from "./CalendarItemView";
@@ -199,11 +199,7 @@ export class MeetingPageItemView extends ItemView {
 							}).open()
 						: undefined
 				}
-				onEditMinutes={() =>
-					new Notice(
-						"[미구현] 회의록 편집은 Obsidian 네이티브 에디터로 열 예정",
-					)
-				}
+				onEditMinutes={() => void this.openMinutesInEditor()}
 				onOpenTopic={(topicId) => void this.openTopic(topicId)}
 				onCollectResources={() => void this.runCollectResources()}
 				collectingResources={this.collectingResources}
@@ -259,6 +255,51 @@ export class MeetingPageItemView extends ItemView {
 			this.collectingResources = false;
 			await this.loadAndRender();
 		}
+	}
+
+	/**
+	 * 회의록 .md 파일을 Obsidian 네이티브 에디터로 열기.
+	 * VaultMeetingRepository와 동일한 경로 규칙: {projectRoot}/Meetings/{date}_{slug}.md
+	 */
+	/**
+	 * 회의록 .md 파일을 Obsidian 네이티브 에디터로 열기.
+	 * 파일이 없으면 새로 생성 후 오픈.
+	 * 이미 열린 탭이 있으면 재사용.
+	 */
+	private async openMinutesInEditor(): Promise<void> {
+		if (!this.meetingData) return;
+
+		const { date, title } = this.meetingData;
+		const slug = title
+			.toLowerCase()
+			.replace(/\s+/g, "-")
+			.replace(/[^\w가-힣-]/g, "")
+			.slice(0, 40);
+		const root = this.plugin.settings.projectRoot;
+		const filePath = `${root}/Meetings/${date}_${slug}.md`;
+
+		let file = this.app.vault.getAbstractFileByPath(filePath) as TFile | null;
+		if (!file) {
+			// 파일이 없으면 새로 생성 (demoMode 포함)
+			try {
+				file = await this.app.vault.create(filePath, "");
+			} catch {
+				new Notice(`회의 파일 생성 실패: ${filePath}`);
+				return;
+			}
+		}
+
+		// 이미 열린 탭이 있으면 재사용
+		const existing = this.app.workspace
+			.getLeavesOfType("markdown")
+			.find((leaf) => (leaf.view as MarkdownView).file?.path === filePath);
+		if (existing) {
+			this.app.workspace.revealLeaf(existing);
+			return;
+		}
+
+		const leaf = this.app.workspace.getLeaf("tab");
+		await leaf.openFile(file);
 	}
 
 	private async openView(viewType: string): Promise<void> {

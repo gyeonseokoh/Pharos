@@ -124,7 +124,8 @@ export class TeamListItemView extends ItemView {
 	}
 
 	private async handleChangePermission(memberId: string): Promise<void> {
-		const member = this.teamData?.members.find((m) => m.id === memberId);
+		if (!this.teamData) return;
+		const member = this.teamData.members.find((m) => m.id === memberId);
 		if (!member) return;
 
 		const order: Array<"ADMIN" | "WRITE" | "READ"> = ["ADMIN", "WRITE", "READ"];
@@ -134,9 +135,21 @@ export class TeamListItemView extends ItemView {
 		const label = { ADMIN: "관리자", WRITE: "편집", READ: "읽기" }[next];
 
 		try {
-			await this.plugin.teamService.updatePermission(memberId, next);
-			new Notice(`${member.name}의 권한이 "${label}"으로 변경됐습니다`);
-			await this.loadAndRender();
+			if (this.plugin.settings.demoMode) {
+				// demoMode: vault 저장 없이 메모리 상태만 업데이트 후 재렌더
+				this.teamData = {
+					...this.teamData,
+					members: this.teamData.members.map((m) =>
+						m.id === memberId ? { ...m, permission: next } : m,
+					),
+				};
+				new Notice(`${member.name}의 권한이 "${label}"으로 변경됐습니다`);
+				this.render();
+			} else {
+				await this.plugin.teamService.updatePermission(memberId, next);
+				new Notice(`${member.name}의 권한이 "${label}"으로 변경됐습니다`);
+				await this.loadAndRender();
+			}
 		} catch (err) {
 			new Notice(`권한 변경 실패: ${(err as Error).message}`);
 		}

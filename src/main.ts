@@ -157,13 +157,13 @@ export default class PharosPlugin extends Plugin {
 		});
 
 		// eventBus → pharos:state-changed 브릿지
-		// meeting:updated, minutes:attached 등 내부 이벤트를 모든 View가 수신하도록 전파
-		eventBus.on("meeting:updated", () => {
+		// 내부 이벤트를 모든 View가 수신하도록 전파
+		const triggerStateChanged = () => {
 			this.app.workspace.trigger("pharos:state-changed");
-		});
-		eventBus.on("minutes:attached", () => {
-			this.app.workspace.trigger("pharos:state-changed");
-		});
+		};
+		eventBus.on("project:created", triggerStateChanged);
+		eventBus.on("meeting:updated", triggerStateChanged);
+		eventBus.on("minutes:attached", triggerStateChanged);
 
 		this.app.workspace.onLayoutReady(() => {
 			void runMigrationIfNeeded(this);

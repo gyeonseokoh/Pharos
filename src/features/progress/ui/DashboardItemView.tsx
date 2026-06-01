@@ -130,6 +130,11 @@ export class DashboardItemView extends ItemView {
 				<DashboardView
 					data={{
 						...mockDashboardData,
+						project: {
+							...mockDashboardData.project,
+							name: project.name,
+							deadline: project.deadline,
+						},
 						progressAnalysis:
 							this.progressAnalysis ?? MOCK_PROGRESS_ANALYSIS,
 					}}
