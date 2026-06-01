@@ -1,5 +1,10 @@
 /**
  * ResourceUploadModal — PO-8 수집 자료 수동 업로드.
+ *
+ * 흐름:
+ *   1. URL·제목 입력, 연결할 주제 선택
+ *   2. "추가" → meetingsService.appendResources(meetingId, [...]) 저장
+ *   3. Notice + 모달 닫기 → 상위 loadAndRender가 pharos:state-changed 수신 후 갱신
  */
 
 import { useState } from "react";
@@ -11,6 +16,13 @@ import {
 	ModalLayout,
 	textareaClass,
 } from "shared/ui";
+import type { PharosPluginLike } from "../../../app/settings";
+
+export interface ResourceUploadModalArgs {
+	plugin: PharosPluginLike;
+	meetingId: string;
+	topics: Array<{ id: string; title: string }>;
+}
 
 interface FormState {
 	title: string;
@@ -19,38 +31,54 @@ interface FormState {
 	topicId: string;
 }
 
-interface TopicOption {
-	id: string;
-	title: string;
-}
-
 function Content({
-	availableTopics,
+	args,
 	onClose,
 }: {
-	availableTopics: TopicOption[];
+	args: ResourceUploadModalArgs;
 	onClose: () => void;
 }) {
+	const { plugin, meetingId, topics } = args;
 	const [form, setForm] = useState<FormState>({
 		title: "",
 		url: "",
 		summary: "",
-		topicId: availableTopics[0]?.id ?? "__general__",
+		topicId: topics[0]?.id ?? "__general__",
 	});
+	const [submitting, setSubmitting] = useState(false);
 
 	const canSubmit =
-		form.title.trim().length >= 2 && isValidUrl(form.url);
+		!submitting &&
+		form.title.trim().length >= 2 &&
+		isValidUrl(form.url);
+
+	const handleSubmit = async (): Promise<void> => {
+		if (submitting) return;
+		setSubmitting(true);
+		try {
+			await plugin.meetingsService.appendResources(meetingId, [
+				{
+					topicId: form.topicId === "__general__" ? null : form.topicId,
+					title: form.title.trim(),
+					summary: form.summary.trim() || form.title.trim(),
+					sourceUrl: form.url,
+				},
+			]);
+			new Notice(`자료 "${form.title.trim()}" 추가됨`);
+			onClose();
+		} catch (err) {
+			new Notice(`자료 추가 실패: ${(err as Error).message}`);
+			setSubmitting(false);
+		}
+	};
 
 	return (
 		<ModalLayout
 			title="📎 자료 추가"
 			description="회의에 참고할 외부 링크 · 자료"
-			submitLabel="추가"
+			submitLabel={submitting ? "추가 중..." : "추가"}
 			submitDisabled={!canSubmit}
-			onSubmit={() => {
-				new Notice(`[미구현] 자료 "${form.title}" 추가 예정`);
-				onClose();
-			}}
+			onSubmit={() => void handleSubmit()}
 			onCancel={onClose}
 		>
 			<FormField label="제목" required>
@@ -72,7 +100,7 @@ function Content({
 				/>
 			</FormField>
 
-			<FormField label="요약" hint="AI 자동 요약 대신 수동 입력할 때">
+			<FormField label="요약" hint="생략하면 제목으로 대체됩니다">
 				<textarea
 					className={textareaClass}
 					rows={3}
@@ -88,7 +116,7 @@ function Content({
 					onChange={(e) => setForm({ ...form, topicId: e.target.value })}
 				>
 					<option value="__general__">전체 공용</option>
-					{availableTopics.map((t) => (
+					{topics.map((t) => (
 						<option key={t.id} value={t.id}>
 							{t.title}
 						</option>
@@ -104,16 +132,14 @@ function isValidUrl(s: string): boolean {
 }
 
 export class ResourceUploadModal extends BaseReactModal {
-	private readonly topics: TopicOption[];
-
-	constructor(app: App, topics: TopicOption[]) {
+	constructor(
+		app: App,
+		private readonly args: ResourceUploadModalArgs,
+	) {
 		super(app);
-		this.topics = topics;
 	}
 
 	renderContent() {
-		return (
-			<Content availableTopics={this.topics} onClose={() => this.close()} />
-		);
+		return <Content args={this.args} onClose={() => this.close()} />;
 	}
 }

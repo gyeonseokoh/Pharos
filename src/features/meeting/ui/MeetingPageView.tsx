@@ -19,6 +19,7 @@ import {
 	Loader2,
 	Paperclip,
 	Pencil,
+	Plus,
 	Sparkles,
 	Users,
 } from "lucide-react";
@@ -61,6 +62,8 @@ export interface MeetingPageViewProps {
 	/** PO-3 "AI 자료 자동 수집" 버튼. 수집 진행 중에는 collectingResources=true. */
 	onCollectResources?: () => void;
 	collectingResources?: boolean;
+	/** PO-8 "수동 자료 추가" 버튼. */
+	onAddResource?: () => void;
 }
 
 export function MeetingPageView({
@@ -74,6 +77,7 @@ export function MeetingPageView({
 	onOpenTopic,
 	onCollectResources,
 	collectingResources,
+	onAddResource,
 }: MeetingPageViewProps) {
 	const navItems: BackNavItem[] = [];
 	if (onBackToMeetingsList)
@@ -120,6 +124,7 @@ export function MeetingPageView({
 					status={data.status}
 					collecting={collectingResources}
 					onCollectResources={onCollectResources}
+					onAddResource={onAddResource}
 				/>
 
 				<MinutesSection minutes={data.minutes} onEditMinutes={onEditMinutes} />
@@ -395,12 +400,14 @@ function ResourcesSection({
 	status,
 	collecting,
 	onCollectResources,
+	onAddResource,
 }: {
 	resources: MeetingResource[];
 	topics: MeetingTopic[];
 	status: MeetingStatus;
 	collecting?: boolean;
 	onCollectResources?: () => void;
+	onAddResource?: () => void;
 }) {
 	const topicTitleById = new Map(topics.map((t) => [t.id, t.title]));
 	const canCollect = status !== "completed" && topics.length > 0;
@@ -417,26 +424,34 @@ function ResourcesSection({
 								: "AI 자동 수집 또는 수동 업로드로 자료를 모을 수 있습니다"}
 						</CardDescription>
 					</div>
-					{canCollect && onCollectResources && (
-						<Button
-							variant="outline"
-							size="sm"
-							onClick={onCollectResources}
-							disabled={collecting}
-						>
-							{collecting ? (
-								<>
-									<Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" />
-									수집 중...
-								</>
-							) : (
-								<>
-									<Sparkles className="mr-1 h-3.5 w-3.5" />
-									AI 자동 수집
-								</>
-							)}
-						</Button>
-					)}
+					<div className="flex items-center gap-2">
+						{canCollect && onCollectResources && (
+							<Button
+								variant="outline"
+								size="sm"
+								onClick={onCollectResources}
+								disabled={collecting}
+							>
+								{collecting ? (
+									<>
+										<Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" />
+										수집 중...
+									</>
+								) : (
+									<>
+										<Sparkles className="mr-1 h-3.5 w-3.5" />
+										AI 자동 수집
+									</>
+								)}
+							</Button>
+						)}
+						{onAddResource && (
+							<Button variant="outline" size="sm" onClick={onAddResource}>
+								<Plus className="mr-1 h-3.5 w-3.5" />
+								수동 추가
+							</Button>
+						)}
+					</div>
 				</div>
 			</CardHeader>
 			<CardContent>

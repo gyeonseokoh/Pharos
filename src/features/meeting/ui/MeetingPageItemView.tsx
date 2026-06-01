@@ -14,6 +14,7 @@ import { VIEW_TYPE_PHAROS_MINUTES_ARCHIVE } from "./MinutesArchiveItemView";
 import { VIEW_TYPE_PHAROS_TOPIC_PAGE } from "./TopicPageItemView";
 import { VIEW_TYPE_PHAROS_DASHBOARD } from "../../progress/ui/DashboardItemView";
 import { AiTopicModal } from "./AiTopicModal";
+import { ResourceUploadModal } from "./ResourceUploadModal";
 import { getMeetingPageMock } from "./meetingPageMock";
 import { mockCalendarData } from "./calendarMock";
 import type { MeetingPageData } from "../domain/meetingPageData";
@@ -203,6 +204,7 @@ export class MeetingPageItemView extends ItemView {
 				onOpenTopic={(topicId) => void this.openTopic(topicId)}
 				onCollectResources={() => void this.runCollectResources()}
 				collectingResources={this.collectingResources}
+				onAddResource={() => this.openResourceUpload()}
 			/>,
 		);
 	}
@@ -257,10 +259,20 @@ export class MeetingPageItemView extends ItemView {
 		}
 	}
 
-	/**
-	 * 회의록 .md 파일을 Obsidian 네이티브 에디터로 열기.
-	 * VaultMeetingRepository와 동일한 경로 규칙: {projectRoot}/Meetings/{date}_{slug}.md
-	 */
+	/** PO-8 수동 자료 추가 모달 열기. */
+	private openResourceUpload(): void {
+		if (!this.meetingId || !this.meetingData) return;
+		const topics = this.meetingData.topics.map((t) => ({
+			id: t.id,
+			title: t.title,
+		}));
+		new ResourceUploadModal(this.app, {
+			plugin: this.plugin,
+			meetingId: this.meetingId,
+			topics,
+		}).open();
+	}
+
 	/**
 	 * 회의록 .md 파일을 Obsidian 네이티브 에디터로 열기.
 	 * 파일이 없으면 새로 생성 후 오픈.

@@ -162,8 +162,18 @@ export default class PharosPlugin extends Plugin {
 			this.app.workspace.trigger("pharos:state-changed");
 		};
 		eventBus.on("project:created", triggerStateChanged);
+		eventBus.on("project:reset", triggerStateChanged);
+		eventBus.on("meeting:created", triggerStateChanged);
 		eventBus.on("meeting:updated", triggerStateChanged);
 		eventBus.on("minutes:attached", triggerStateChanged);
+		eventBus.on("roadmap:planning-generated", triggerStateChanged);
+		eventBus.on("roadmap:development-generated", triggerStateChanged);
+		eventBus.on("roadmap:development-deleted", triggerStateChanged);
+		eventBus.on("task:created", triggerStateChanged);
+		eventBus.on("task:updated", triggerStateChanged);
+		eventBus.on("task:checked", triggerStateChanged);
+		eventBus.on("team:member-added", triggerStateChanged);
+		eventBus.on("team:member-removed", triggerStateChanged);
 
 		this.app.workspace.onLayoutReady(() => {
 			void runMigrationIfNeeded(this);
