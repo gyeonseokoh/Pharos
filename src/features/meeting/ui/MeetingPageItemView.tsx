@@ -262,14 +262,13 @@ export class MeetingPageItemView extends ItemView {
 	/** PO-8 수동 자료 추가 모달 열기. */
 	private openResourceUpload(): void {
 		if (!this.meetingId || !this.meetingData) return;
-		const topics = this.meetingData.topics.map((t) => ({
-			id: t.id,
-			title: t.title,
-		}));
 		new ResourceUploadModal(this.app, {
 			plugin: this.plugin,
 			meetingId: this.meetingId,
-			topics,
+			topics: this.meetingData.topics.map((t) => ({
+				id: t.id,
+				title: t.title,
+			})),
 		}).open();
 	}
 
@@ -290,7 +289,6 @@ export class MeetingPageItemView extends ItemView {
 		const root = this.plugin.settings.projectRoot;
 		const filePath = `${root}/Meetings/${date}_${slug}.md`;
 
-		// 파일이 없으면 올바른 frontmatter로 생성 (빈 파일 생성 시 파싱 에러 방지)
 		if (!this.app.vault.getAbstractFileByPath(filePath)) {
 			try {
 				await this.plugin.meetingsService.ensureVaultFile({
@@ -311,13 +309,12 @@ export class MeetingPageItemView extends ItemView {
 			}
 		}
 
-		let file = this.app.vault.getAbstractFileByPath(filePath) as TFile | null;
+		const file = this.app.vault.getAbstractFileByPath(filePath) as TFile | null;
 		if (!file) {
 			new Notice(`회의 파일을 찾을 수 없습니다: ${filePath}`);
 			return;
 		}
 
-		// 이미 열린 탭이 있으면 재사용
 		const existing = this.app.workspace
 			.getLeavesOfType("markdown")
 			.find((leaf) => (leaf.view as MarkdownView).file?.path === filePath);
@@ -329,6 +326,7 @@ export class MeetingPageItemView extends ItemView {
 		const leaf = this.app.workspace.getLeaf("tab");
 		await leaf.openFile(file);
 	}
+
 
 	private async openView(viewType: string): Promise<void> {
 		const { workspace } = this.app;

@@ -53,7 +53,7 @@ function Content({
 		isValidUrl(form.url);
 
 	const handleSubmit = async (): Promise<void> => {
-		if (submitting) return;
+		if (!canSubmit) return;
 		setSubmitting(true);
 		try {
 			await plugin.meetingsService.appendResources(meetingId, [
@@ -61,7 +61,7 @@ function Content({
 					topicId: form.topicId === "__general__" ? null : form.topicId,
 					title: form.title.trim(),
 					summary: form.summary.trim() || form.title.trim(),
-					sourceUrl: form.url,
+					sourceUrl: form.url.trim(),
 				},
 			]);
 			new Notice(`자료 "${form.title.trim()}" 추가됨`);
@@ -100,7 +100,7 @@ function Content({
 				/>
 			</FormField>
 
-			<FormField label="요약" hint="생략하면 제목으로 대체됩니다">
+			<FormField label="요약" hint="간단한 내용 설명 (선택)">
 				<textarea
 					className={textareaClass}
 					rows={3}

@@ -49,6 +49,7 @@ function Content({
 	const [phase, setPhase] = useState<Phase>("progress");
 	const [currentStepIndex, setCurrentStepIndex] = useState(0);
 	const [roadmap, setRoadmap] = useState<RoadmapData | null>(null);
+	const [genError, setGenError] = useState<string | null>(null);
 
 	// 5단계 애니메이션: 각 단계 ~1000ms
 	useEffect(() => {
@@ -56,21 +57,83 @@ function Content({
 		let cancelled = false;
 
 		const run = async () => {
+			setGenError(null);
 			for (let i = 0; i < DEV_ROADMAP_STEPS.length; i++) {
 				if (cancelled) return;
 				setCurrentStepIndex(i);
 				await sleep(1000);
 			}
 			if (cancelled) return;
-			// 최종 계산은 즉시 (순수 함수)
-			const result = generateDevelopmentRoadmap({
-				report: args.report,
-				meetings: args.meetings,
-				members: args.members,
-				planningEndIso: args.planningEndIso,
-			});
-			setRoadmap(result);
-			setPhase("preview");
+
+			try {
+				let result: RoadmapData;
+				if (isDemo) {
+					result = generateDevelopmentRoadmap({
+						report: args.report,
+						meetings: args.meetings,
+						members: args.members,
+						planningEndIso: args.planningEndIso,
+					});
+				} else {
+					const agentResult = await args.plugin.agentService.generateDevRoadmap({
+						projectName: args.report.name,
+						projectDescription: args.report.description,
+						deadline: args.report.deadline,
+						planningEndIso: args.planningEndIso,
+						members: args.members.map((m) => ({
+							id: m.id,
+							name: m.name,
+							role: m.role,
+							techStacks: m.techStacks,
+						})),
+						meetingSummaries: args.meetings
+							.filter((m) => m.analysis !== null)
+							.map((m) => ({
+								title: m.title,
+								date: m.date,
+								decisions: m.analysis?.decisions ?? [],
+								keywords: m.analysis?.keywords ?? [],
+							})),
+					});
+					if (agentResult.phases.length === 0) {
+						throw new Error("AI가 유효한 로드맵을 생성하지 못했습니다. 다시 시도해주세요.");
+					}
+					result = {
+						project: {
+							name: args.report.name,
+							start: agentResult.phases[0]?.start ?? args.planningEndIso,
+							end: args.report.deadline,
+						},
+						phases: agentResult.phases.map((p) => ({
+							id: p.id,
+							name: p.name,
+							start: p.start,
+							end: p.end,
+							status: "todo" as const,
+							activities: p.activities,
+							icon: "code" as const,
+							color: p.color,
+						})),
+						tasks: agentResult.tasks.map((t) => ({
+							id: t.id,
+							name: t.name,
+							kind: "task" as const,
+							status: "todo" as const,
+							start: t.start,
+							end: t.end,
+							progress: 0,
+							assignee: t.assignee ?? undefined,
+							dependsOn: t.dependsOn,
+						})),
+					};
+				}
+				setRoadmap(result);
+				setPhase("preview");
+			} catch (err) {
+				if (!cancelled) {
+					setGenError((err as Error).message ?? "로드맵 생성 중 오류가 발생했습니다.");
+				}
+			}
 		};
 
 		void run();
@@ -100,11 +163,20 @@ function Content({
 				widthClass="max-w-xl"
 			>
 				<ProgressList currentIndex={currentStepIndex} />
-				<p className="mt-4 text-[11px] text-text-faint">
-					{isDemo
-						? "[DEMO] 시연용 시뮬레이터 — 실제 AI 호출 없이 회의록 기반 로드맵 생성"
-						: `회의록 ${args.meetings.length}건을 분석해 개발 로드맵을 자동 생성합니다.`}
-				</p>
+				{genError ? (
+					<div className="mt-4 space-y-2">
+						<p className="text-xs text-[color:var(--color-red)]">⚠️ {genError}</p>
+						<Button variant="outline" onClick={regenerate} className="w-full text-xs">
+							다시 시도
+						</Button>
+					</div>
+				) : (
+					<p className="mt-4 text-[11px] text-text-faint">
+						{isDemo
+							? "[DEMO] 시연용 시뮬레이터 — 실제 AI 호출 없이 회의록 기반 로드맵 생성"
+							: `회의록 ${args.meetings.length}건을 분석해 개발 로드맵을 자동 생성합니다.`}
+					</p>
+				)}
 			</ModalLayout>
 		);
 	}

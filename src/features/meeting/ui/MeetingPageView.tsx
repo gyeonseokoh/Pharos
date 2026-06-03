@@ -425,6 +425,12 @@ function ResourcesSection({
 						</CardDescription>
 					</div>
 					<div className="flex items-center gap-2">
+						{onAddResource && (
+							<Button variant="outline" size="sm" onClick={onAddResource}>
+								<Plus className="mr-1 h-3.5 w-3.5" />
+								수동 추가
+							</Button>
+						)}
 						{canCollect && onCollectResources && (
 							<Button
 								variant="outline"
@@ -443,12 +449,6 @@ function ResourcesSection({
 										AI 자동 수집
 									</>
 								)}
-							</Button>
-						)}
-						{onAddResource && (
-							<Button variant="outline" size="sm" onClick={onAddResource}>
-								<Plus className="mr-1 h-3.5 w-3.5" />
-								수동 추가
 							</Button>
 						)}
 					</div>

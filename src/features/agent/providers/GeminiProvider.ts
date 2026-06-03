@@ -16,9 +16,14 @@ export class GeminiProvider implements ILLMProvider {
 
 	constructor(
 		private readonly getApiKey: () => string,
-		private readonly model = "gemini-2.0-flash",
+		private readonly getModel: string | (() => string) = "gemini-2.0-flash",
 	) {
-		this.id = `gemini/${model}`;
+		const modelId = typeof getModel === "function" ? getModel() : getModel;
+		this.id = `gemini/${modelId}`;
+	}
+
+	private get model(): string {
+		return typeof this.getModel === "function" ? this.getModel() : this.getModel;
 	}
 
 	async complete(request: LLMRequest): Promise<LLMResponse> {
