@@ -83,6 +83,9 @@ function NewProjectModalContent({ onClose, onSubmit }: NewProjectModalProps) {
 					type="date"
 					className={inputClass}
 					value={form.deadline}
+					// KST 로컬 날짜 기준 min 설정 (toISOString은 UTC라 KST에서 날짜 어긋남)
+					min={(() => { const n = new Date(); return `${n.getFullYear()}-${String(n.getMonth()+1).padStart(2,"0")}-${String(n.getDate()).padStart(2,"0")}`; })()}
+					max="2099-12-31"
 					onChange={(e) =>
 						setForm({ ...form, deadline: e.target.value })
 					}
