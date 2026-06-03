@@ -157,13 +157,23 @@ export default class PharosPlugin extends Plugin {
 		});
 
 		// eventBus → pharos:state-changed 브릿지
-		// meeting:updated, minutes:attached 등 내부 이벤트를 모든 View가 수신하도록 전파
-		eventBus.on("meeting:updated", () => {
+		// 내부 이벤트를 모든 View가 수신하도록 전파
+		const triggerStateChanged = () => {
 			this.app.workspace.trigger("pharos:state-changed");
-		});
-		eventBus.on("minutes:attached", () => {
-			this.app.workspace.trigger("pharos:state-changed");
-		});
+		};
+		eventBus.on("project:created", triggerStateChanged);
+		eventBus.on("project:reset", triggerStateChanged);
+		eventBus.on("meeting:created", triggerStateChanged);
+		eventBus.on("meeting:updated", triggerStateChanged);
+		eventBus.on("minutes:attached", triggerStateChanged);
+		eventBus.on("roadmap:planning-generated", triggerStateChanged);
+		eventBus.on("roadmap:development-generated", triggerStateChanged);
+		eventBus.on("roadmap:development-deleted", triggerStateChanged);
+		eventBus.on("task:created", triggerStateChanged);
+		eventBus.on("task:updated", triggerStateChanged);
+		eventBus.on("task:checked", triggerStateChanged);
+		eventBus.on("team:member-added", triggerStateChanged);
+		eventBus.on("team:member-removed", triggerStateChanged);
 
 		this.app.workspace.onLayoutReady(() => {
 			void runMigrationIfNeeded(this);

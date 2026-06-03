@@ -20,16 +20,38 @@ export interface ProjectSettings {
 }
 
 function Content({
+	plugin,
 	initial,
 	// 저장 로직은 Modal 클래스에서 비동기로 처리 — Content는 UI만 담당
 	onSave,
 	onClose,
 }: {
+	plugin: PharosPluginLike;
 	initial: ProjectSettings;
 	onSave: (form: ProjectSettings) => Promise<void>;
 	onClose: () => void;
 }) {
 	const [form, setForm] = useState<ProjectSettings>(initial);
+	const [submitting, setSubmitting] = useState(false);
+
+	const canSubmit = !submitting && form.topic.trim().length > 0 && form.deadline.length > 0;
+
+	const handleSubmit = async (): Promise<void> => {
+		if (!canSubmit) return;
+		setSubmitting(true);
+		try {
+			await plugin.projectService.update({
+				name: form.topic.trim(),
+				description: form.description.trim(),
+				deadline: form.deadline,
+			});
+			new Notice("프로젝트 설정이 저장됐습니다");
+			onClose();
+		} catch (err) {
+			new Notice(`저장 실패: ${(err as Error).message}`);
+			setSubmitting(false);
+		}
+	};
 
 	// toISOString()은 UTC 기준이므로 KST(+9)에서 날짜가 어긋남 → 로컬 날짜 직접 계산
 	const now = new Date();
@@ -41,16 +63,9 @@ function Content({
 		<ModalLayout
 			title="⚙️ 프로젝트 설정"
 			description="프로젝트 정보를 수정합니다"
-			submitLabel="저장"
-			submitDisabled={isPastDeadline}
-			onSubmit={() => {
-				// 저장 성공 후 Modal 닫기, 실패 시 Modal 유지 (오류 Notice는 handleSave에서)
-				void onSave(form)
-					.then(() => onClose())
-					.catch((err: unknown) =>
-						new Notice(`[오류] 프로젝트 설정 저장 실패: ${String(err)}`),
-					);
-			}}
+			submitLabel={submitting ? "저장 중..." : "저장"}
+			submitDisabled={!canSubmit || isPastDeadline}
+			onSubmit={() => void handleSubmit()}
 			onCancel={onClose}
 		>
 			<FormField label="프로젝트 주제" required>
@@ -132,6 +147,7 @@ export class ProjectSettingsModal extends BaseReactModal {
 	renderContent() {
 		return (
 			<Content
+				plugin={this.plugin}
 				initial={this.initial}
 				onSave={(form) => this.handleSave(form)}
 				onClose={() => this.close()}

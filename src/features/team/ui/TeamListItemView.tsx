@@ -109,9 +109,7 @@ export class TeamListItemView extends ItemView {
 			<TeamListView
 				data={this.teamData}
 				onInvite={() => new InviteMemberModal(this.app, this.plugin).open()}
-				onChangePermission={(id) =>
-					new Notice(`[미구현] ${id} 권한 변경 Modal 예정`)
-				}
+				onChangePermission={(id) => void this.handleChangePermission(id)}
 				onDeactivate={(id) =>
 					new Notice(`[미구현] ${id} 이탈 처리 확인 Modal 예정 (PO-14, v2)`)
 				}
@@ -123,6 +121,38 @@ export class TeamListItemView extends ItemView {
 	async onClose(): Promise<void> {
 		this.root?.unmount();
 		this.root = null;
+	}
+
+	private async handleChangePermission(memberId: string): Promise<void> {
+		if (!this.teamData) return;
+		const member = this.teamData.members.find((m) => m.id === memberId);
+		if (!member) return;
+
+		const order: Array<"ADMIN" | "WRITE" | "READ"> = ["ADMIN", "WRITE", "READ"];
+		const cur = member.permission as "ADMIN" | "WRITE" | "READ";
+		const idx = order.indexOf(cur);
+		const next = order[(idx === -1 ? 0 : idx + 1) % order.length] as "ADMIN" | "WRITE" | "READ";
+		const label = { ADMIN: "관리자", WRITE: "편집", READ: "읽기" }[next];
+
+		try {
+			if (this.plugin.settings.demoMode) {
+				// demoMode: vault 저장 없이 메모리 상태만 업데이트 후 재렌더
+				this.teamData = {
+					...this.teamData,
+					members: this.teamData.members.map((m) =>
+						m.id === memberId ? { ...m, permission: next } : m,
+					),
+				};
+				new Notice(`${member.name}의 권한이 "${label}"으로 변경됐습니다`);
+				this.render();
+			} else {
+				await this.plugin.teamService.updatePermission(memberId, next);
+				new Notice(`${member.name}의 권한이 "${label}"으로 변경됐습니다`);
+				await this.loadAndRender();
+			}
+		} catch (err) {
+			new Notice(`권한 변경 실패: ${(err as Error).message}`);
+		}
 	}
 
 	private async openView(viewType: string): Promise<void> {

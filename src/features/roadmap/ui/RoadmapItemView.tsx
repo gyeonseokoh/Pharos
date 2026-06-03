@@ -264,7 +264,7 @@ export class RoadmapItemView extends ItemView {
 
 		await this.plugin.roadmapService.savePlanning(input);
 		await this.plugin.projectService.markPlanningGenerated();
-		// savePlanning → eventBus "roadmap:planning-generated" → pharos:state-changed → loadAndRender
+		// savePlanning + markPlanningGenerated → eventBus "roadmap:planning-generated" → pharos:state-changed → loadAndRender
 	}
 
 	/**
@@ -354,13 +354,15 @@ export class RoadmapItemView extends ItemView {
 			})),
 		};
 		await this.plugin.roadmapService.saveDevelopment(input);
-		// saveDevelopment → eventBus → pharos:state-changed → loadAndRender
+		await this.plugin.projectService.markDevelopmentGenerated();
+		// saveDevelopment + markDevelopmentGenerated → eventBus → pharos:state-changed → loadAndRender
 	}
 
 	/** 테스트 전용 — 개발 로드맵 삭제 후 🔒 잠금 상태 복귀. */
 	private async deleteDevelopmentRoadmap(): Promise<void> {
 		await this.plugin.roadmapService.deleteDevelopment();
-		// deleteDevelopment → eventBus → pharos:state-changed → loadAndRender
+		await this.plugin.projectService.markDevelopmentDeleted();
+		// deleteDevelopment + markDevelopmentDeleted → eventBus → pharos:state-changed → loadAndRender
 	}
 
 	private async openView(viewType: string): Promise<void> {

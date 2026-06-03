@@ -5,7 +5,7 @@
  * meetingId → meetingsService.getById() → MeetingPageData 렌더.
  */
 
-import { ItemView, WorkspaceLeaf, type ViewStateResult, Notice } from "obsidian";
+import { ItemView, WorkspaceLeaf, type ViewStateResult, Notice, type TFile, MarkdownView } from "obsidian";
 import { createRoot, type Root } from "react-dom/client";
 import { MeetingPageView } from "./MeetingPageView";
 import { VIEW_TYPE_PHAROS_CALENDAR } from "./CalendarItemView";
@@ -15,6 +15,8 @@ import { VIEW_TYPE_PHAROS_TOPIC_PAGE } from "./TopicPageItemView";
 import { VIEW_TYPE_PHAROS_DASHBOARD } from "../../progress/ui/DashboardItemView";
 import { AiTopicModal } from "./AiTopicModal";
 import { ResourceUploadModal } from "./ResourceUploadModal";
+import { getMeetingPageMock } from "./meetingPageMock";
+import { mockCalendarData } from "./calendarMock";
 import type { MeetingPageData } from "../domain/meetingPageData";
 import type { PharosPluginLike } from "../../../app/settings";
 
@@ -126,6 +128,18 @@ export class MeetingPageItemView extends ItemView {
 			return;
 		}
 
+		if (this.plugin.settings.demoMode) {
+			const cal = mockCalendarData.meetings.find((m) => m.id === this.meetingId);
+			this.meetingData = getMeetingPageMock(this.meetingId, cal ? {
+				title: cal.title,
+				date: cal.date,
+				time: cal.time,
+				type: cal.type,
+			} : undefined);
+			this.render();
+			return;
+		}
+
 		const meeting = await this.plugin.meetingsService.getById(this.meetingId);
 		if (!meeting) {
 			this.meetingData = null;
@@ -186,15 +200,11 @@ export class MeetingPageItemView extends ItemView {
 							}).open()
 						: undefined
 				}
-				onEditMinutes={() =>
-					new Notice(
-						"[미구현] 회의록 편집은 Obsidian 네이티브 에디터로 열 예정",
-					)
-				}
+				onEditMinutes={() => void this.openMinutesInEditor()}
 				onOpenTopic={(topicId) => void this.openTopic(topicId)}
 				onCollectResources={() => void this.runCollectResources()}
 				collectingResources={this.collectingResources}
-				onAddResource={() => this.openResourceUploadModal()}
+				onAddResource={() => this.openResourceUpload()}
 			/>,
 		);
 	}
@@ -250,7 +260,7 @@ export class MeetingPageItemView extends ItemView {
 	}
 
 	/** PO-8 수동 자료 추가 모달 열기. */
-	private openResourceUploadModal(): void {
+	private openResourceUpload(): void {
 		if (!this.meetingId || !this.meetingData) return;
 		new ResourceUploadModal(this.app, {
 			plugin: this.plugin,
@@ -261,6 +271,62 @@ export class MeetingPageItemView extends ItemView {
 			})),
 		}).open();
 	}
+
+	/**
+	 * 회의록 .md 파일을 Obsidian 네이티브 에디터로 열기.
+	 * 파일이 없으면 새로 생성 후 오픈.
+	 * 이미 열린 탭이 있으면 재사용.
+	 */
+	private async openMinutesInEditor(): Promise<void> {
+		if (!this.meetingData) return;
+
+		const { date, title } = this.meetingData;
+		const slug = title
+			.toLowerCase()
+			.replace(/\s+/g, "-")
+			.replace(/[^\w가-힣-]/g, "")
+			.slice(0, 40);
+		const root = this.plugin.settings.projectRoot;
+		const filePath = `${root}/Meetings/${date}_${slug}.md`;
+
+		if (!this.app.vault.getAbstractFileByPath(filePath)) {
+			try {
+				await this.plugin.meetingsService.ensureVaultFile({
+					id: this.meetingData.id,
+					title: this.meetingData.title,
+					date: this.meetingData.date,
+					time: this.meetingData.time,
+					durationMinutes: this.meetingData.durationMinutes,
+					type: this.meetingData.type,
+					status: this.meetingData.status,
+					attendees: this.meetingData.attendees,
+					topics: this.meetingData.topics,
+					resources: this.meetingData.resources,
+				});
+			} catch {
+				new Notice(`회의 파일 생성 실패: ${filePath}`);
+				return;
+			}
+		}
+
+		const file = this.app.vault.getAbstractFileByPath(filePath) as TFile | null;
+		if (!file) {
+			new Notice(`회의 파일을 찾을 수 없습니다: ${filePath}`);
+			return;
+		}
+
+		const existing = this.app.workspace
+			.getLeavesOfType("markdown")
+			.find((leaf) => (leaf.view as MarkdownView).file?.path === filePath);
+		if (existing) {
+			this.app.workspace.revealLeaf(existing);
+			return;
+		}
+
+		const leaf = this.app.workspace.getLeaf("tab");
+		await leaf.openFile(file);
+	}
+
 
 	private async openView(viewType: string): Promise<void> {
 		const { workspace } = this.app;
