@@ -14,6 +14,7 @@ import { VIEW_TYPE_PHAROS_MINUTES_ARCHIVE } from "./MinutesArchiveItemView";
 import { VIEW_TYPE_PHAROS_TOPIC_PAGE } from "./TopicPageItemView";
 import { VIEW_TYPE_PHAROS_DASHBOARD } from "../../progress/ui/DashboardItemView";
 import { AiTopicModal } from "./AiTopicModal";
+import { ResourceUploadModal } from "./ResourceUploadModal";
 import type { MeetingPageData } from "../domain/meetingPageData";
 import type { PharosPluginLike } from "../../../app/settings";
 
@@ -193,6 +194,7 @@ export class MeetingPageItemView extends ItemView {
 				onOpenTopic={(topicId) => void this.openTopic(topicId)}
 				onCollectResources={() => void this.runCollectResources()}
 				collectingResources={this.collectingResources}
+				onAddResource={() => this.openResourceUploadModal()}
 			/>,
 		);
 	}
@@ -245,6 +247,19 @@ export class MeetingPageItemView extends ItemView {
 			this.collectingResources = false;
 			await this.loadAndRender();
 		}
+	}
+
+	/** PO-8 수동 자료 추가 모달 열기. */
+	private openResourceUploadModal(): void {
+		if (!this.meetingId || !this.meetingData) return;
+		new ResourceUploadModal(this.app, {
+			plugin: this.plugin,
+			meetingId: this.meetingId,
+			topics: this.meetingData.topics.map((t) => ({
+				id: t.id,
+				title: t.title,
+			})),
+		}).open();
 	}
 
 	private async openView(viewType: string): Promise<void> {

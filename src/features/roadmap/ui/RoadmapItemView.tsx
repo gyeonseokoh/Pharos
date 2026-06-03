@@ -8,7 +8,7 @@
  *   4) 둘 다 있음                      → 탭 2개 활성, 기본 = 개발
  */
 
-import { ItemView, WorkspaceLeaf } from "obsidian";
+import { ItemView, Notice, WorkspaceLeaf } from "obsidian";
 import { createRoot, type Root } from "react-dom/client";
 import { RoadmapView } from "./RoadmapView";
 import { RoadmapEmptyView } from "./RoadmapEmptyView";
@@ -205,26 +205,65 @@ export class RoadmapItemView extends ItemView {
 				onGenerate={() => {}}
 			/>,
 		);
-		await sleep(2500);
 
-		// ── [DEMO] AI 연동 전 임시 mock 로드맵 데이터 ──────────────────────────────
-		// AI 연동 PR 시 아래 import와 input 구성 블록을 삭제하고,
-		// llmClient.generatePlanningRoadmap(project) 결과로 교체하세요.
-		// ────────────────────────────────────────────────────────────────────────────
-		const { mockRoadmapData } = await import("./mock");
-		const input: RoadmapInput = {
-			roadmapKind: "planning",
-			phases: mockRoadmapData.phases.map((p) => ({
-				id: p.id,
-				name: p.name,
-				start: p.start,
-				end: p.end,
-				status: p.status === "done" ? "completed" : p.status,
-				activities: p.activities,
-				color: p.color,
-			})),
-		};
+		let input: RoadmapInput;
+
+		if (this.plugin.settings.demoMode) {
+			await sleep(2500);
+			const { mockRoadmapData } = await import("./mock");
+			input = {
+				roadmapKind: "planning",
+				phases: mockRoadmapData.phases.map((p) => ({
+					id: p.id,
+					name: p.name,
+					start: p.start,
+					end: p.end,
+					status: p.status === "done" ? "completed" : p.status,
+					activities: p.activities,
+					color: p.color,
+				})),
+			};
+		} else {
+			try {
+				const result = await this.plugin.agentService.generatePlanningRoadmap({
+					projectName: project.name,
+					projectDescription: project.description,
+					startDate: new Date().toISOString().slice(0, 10),
+					deadline: project.deadline,
+					memberCount: (await this.plugin.teamService.list()).length,
+				});
+				if (result.phases.length === 0) {
+					throw new Error("AI가 유효한 기획 로드맵을 생성하지 못했습니다.");
+				}
+				input = {
+					roadmapKind: "planning",
+					phases: result.phases.map((p) => ({
+						id: p.id,
+						name: p.name,
+						start: p.start,
+						end: p.end,
+						status: "todo" as const,
+						activities: p.activities,
+						color: p.color,
+					})),
+				};
+			} catch (err) {
+				new Notice(`기획 로드맵 생성 실패: ${(err as Error).message}`);
+				if (this.root) {
+					this.root.render(
+						<RoadmapGenerateView
+							kind="planning"
+							onGenerate={() => void this.handleGeneratePlanning()}
+							onBackToHome={() => void this.openView(VIEW_TYPE_PHAROS_DASHBOARD)}
+						/>,
+					);
+				}
+				return;
+			}
+		}
+
 		await this.plugin.roadmapService.savePlanning(input);
+		await this.plugin.projectService.markPlanningGenerated();
 		// savePlanning → eventBus "roadmap:planning-generated" → pharos:state-changed → loadAndRender
 	}
 
