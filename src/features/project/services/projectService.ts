@@ -30,7 +30,6 @@ export class ProjectService {
 	 *
 	 * 책임:
 	 *   - 입력값으로 Project 엔티티 구성
-	 *   - workspaceId UUID 자동 발급
 	 *   - 로드맵 플래그 초기화
 	 *   - Repository 저장
 	 *   - "project:created" 이벤트 발행
@@ -49,7 +48,6 @@ export class ProjectService {
 			fixedMeetingTime: input.fixedMeetingTime,
 			planningRoadmapGenerated: false,
 			developmentRoadmapGenerated: false,
-			workspaceId: generateWorkspaceId(),
 			createdAt: now,
 			updatedAt: now,
 		};
@@ -60,7 +58,7 @@ export class ProjectService {
 
 	/**
 	 * 프로젝트 정보 수정. (PO-0 설정 수정)
-	 * 로드맵 플래그·workspaceId·createdAt 은 유지.
+	 * 로드맵 플래그·createdAt 은 유지.
 	 */
 	async update(input: Pick<ProjectInput, "name" | "description" | "deadline">): Promise<void> {
 		const project = await this.repo.get();
@@ -107,19 +105,4 @@ export class ProjectService {
 		await this.repo.delete();
 		eventBus.emit("project:reset", {});
 	}
-}
-
-/**
- * Hocuspocus 동기화용 workspace 식별자 생성.
- *
- * 같은 workspaceId를 가진 사용자끼리 .md 파일 실시간 동기화.
- * 초대 링크에 포함되어 팀원이 자동 세팅 (TODO: 초대 링크 기능 추가 시).
- */
-function generateWorkspaceId(): string {
-	if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
-		return `ws-${crypto.randomUUID()}`;
-	}
-	const ts = Date.now().toString(36);
-	const rnd = Math.random().toString(36).slice(2, 10);
-	return `ws-${ts}-${rnd}`;
 }
