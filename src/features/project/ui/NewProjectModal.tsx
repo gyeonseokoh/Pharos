@@ -205,19 +205,46 @@ export class NewProjectModal extends BaseReactModal {
 	}
 
 	private async handleSubmit(data: FormState): Promise<void> {
-		const project = await this.plugin.projectService.create({
-			name: data.topic,
-			description: data.description,
-			deadline: data.deadline,
-			fixedMeetingMode: data.fixedMeetingToggle ? "auto" : "manual",
-			fixedMeetingDay: data.fixedMeetingToggle
-				? undefined
-				: data.fixedMeetingDay,
-			fixedMeetingTime: data.fixedMeetingToggle
-				? undefined
-				: data.fixedMeetingTime,
-		});
-		await this.plugin.saveSettings();
-		new Notice(`프로젝트 "${project.name}" 생성 완료`);
-	}
+    const { settings } = this.plugin;
+    const serverUrl = settings.hocuspocusServerUrl;
+    const authToken = settings.authToken;
+
+    // 1. 로컬 프로젝트 생성
+    const project = await this.plugin.projectService.create({
+		name: data.topic,
+		description: data.description,
+		deadline: data.deadline,
+		fixedMeetingMode: data.fixedMeetingToggle ? "auto" : "manual",
+		fixedMeetingDay: data.fixedMeetingToggle
+			? undefined
+			: data.fixedMeetingDay,
+		fixedMeetingTime: data.fixedMeetingToggle
+			? undefined
+			: data.fixedMeetingTime,
+	});
+
+    // 2. 서버 워크스페이스 등록 (인증된 경우만)
+    if (serverUrl && authToken) {
+        try {
+            const res = await fetch(`${serverUrl}/workspaces`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json",
+                           Authorization: `Bearer ${authToken}` },
+                body: JSON.stringify({ name: project.name }),
+            });
+            if (!res.ok) throw new Error(`HTTP ${res.status}`);
+            const { id } = await res.json();
+            settings.workspaceId = id;
+            await this.plugin.saveSettings();
+            this.plugin.reconnectSync();      // ← refactor-1에서 확보한 public 메서드
+        } catch (err) {
+            await this.plugin.projectService.reset(); // 롤백
+            new Notice(`워크스페이스 등록 실패: ...`);
+            return;
+        }
+    } else {
+        await this.plugin.saveSettings();    // 시연 모드 — 로컬만
+    }
+    new Notice(`프로젝트 "${project.name}" 생성 완료`);
+}
 }
