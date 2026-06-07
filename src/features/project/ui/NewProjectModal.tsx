@@ -238,7 +238,6 @@ export class NewProjectModal extends BaseReactModal {
             await this.plugin.saveSettings();
             this.plugin.reconnectSync();      // ← refactor-1에서 확보한 public 메서드
         } catch (err) {
-            await this.plugin.projectService.reset(); // 롤백
             new Notice(`워크스페이스 등록 실패: ...`);
             return;
         }
