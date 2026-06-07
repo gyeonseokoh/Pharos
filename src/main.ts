@@ -179,7 +179,7 @@ export default class PharosPlugin extends Plugin {
 			void runMigrationIfNeeded(this);
 
 			// 동기화 초기화 (인증 정보가 이미 있을 때만 연결)
-			this.initSync();
+			this.reconnectSync();
 
 			// ─── 파일 열기 → DocumentSync 바인딩 ──────────────────────
 			this.registerEvent(
@@ -313,7 +313,7 @@ export default class PharosPlugin extends Plugin {
 		await this.saveSettings();
 
 		// 로그인 완료 -> 동기화 재초기화
-		this.initSync();
+		this.reconnectSync();
 
 		new Notice(`✅ GitHub 로그인 성공: @${login}`);
 	}
@@ -322,8 +322,10 @@ export default class PharosPlugin extends Plugin {
 	 * 동기화 인프라 초기화.
 	 * onLayoutReady / handleAuthCallback 두 진입점에서 호출.
 	 * 인증 토큰 또는 workspaceId 없으면 조용히 종료.
+	 * 
+	 * 2026-6-7 의미론적으로 재사용이 빈번한 탓에 의미론적으로 어울리게 reconnect로 변경함
 	 */
-	private initSync(): void {
+	reconnectSync(): void {
 		const { authToken, workspaceId, hocuspocusServerUrl } = this.settings;
 		if (!authToken || !workspaceId || !hocuspocusServerUrl) {
 			console.log("[Pharos] initSync: 인증 정보 부족 — 동기화 생략");

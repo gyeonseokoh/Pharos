@@ -21,7 +21,7 @@ import { GeminiProvider } from "features/agent/providers/GeminiProvider";
 import { TavilySearchProvider } from "features/agent/search/TavilySearchProvider";
 
 // 상수
-const SERVER_HTTP_URL = "https://pharos-backend.onrender.com"
+const SERVER_HTTP_URL = "https://pharos-backend-5eew.onrender.com"
 
 /**
  * PO-5 업로드로 저장된 회의록 + 분석 결과.
@@ -180,6 +180,7 @@ export const DEFAULT_SETTINGS: PharosSettings = {
 export interface PharosPluginLike extends Plugin {
 	settings: PharosSettings;
 	saveSettings(): Promise<void>;
+	reconnectSync(): void; // 다른 곳에서도 써야 함
 	/** ProjectService — features/project/services/projectService.ts */
 	projectService: import("../features/project/services/projectService").ProjectService;
 	/** MeetingsService — features/meeting/services/meetingsService.ts */
@@ -302,63 +303,63 @@ export class PharosSettingsTab extends PluginSettingTab {
 			);
 
 		// ─── GitHub ───
-		containerEl.createEl("h3", { text: "GitHub 연동" });
+		// containerEl.createEl("h3", { text: "GitHub 연동" });
 
-		new Setting(containerEl)
-			.setName("GitHub Personal Access Token")
-			.setDesc("커밋 조회용. repo 권한 필요. 미입력 시 커밋 검증 비활성.")
-			.addText((text) =>
-				text
-					.setPlaceholder("ghp_...")
-					.setValue(this.plugin.settings.githubToken)
-					.onChange(async (value) => {
-						this.plugin.settings.githubToken = value;
-						await this.plugin.saveSettings();
-					}),
-			);
+		// new Setting(containerEl)
+		// 	.setName("GitHub Personal Access Token")
+		// 	.setDesc("커밋 조회용. repo 권한 필요. 미입력 시 커밋 검증 비활성.")
+		// 	.addText((text) =>
+		// 		text
+		// 			.setPlaceholder("ghp_...")
+		// 			.setValue(this.plugin.settings.githubToken)
+		// 			.onChange(async (value) => {
+		// 				this.plugin.settings.githubToken = value;
+		// 				await this.plugin.saveSettings();
+		// 			}),
+		// 	);
 
-		new Setting(containerEl)
-			.setName("GitHub 레포")
-			.setDesc("owner/repo 형식 (예: gyeonseokoh/Pharos)")
-			.addText((text) =>
-				text
-					.setPlaceholder("owner/repo")
-					.setValue(this.plugin.settings.githubRepo)
-					.onChange(async (value) => {
-						this.plugin.settings.githubRepo = value;
-						await this.plugin.saveSettings();
-					}),
-			);
+		// new Setting(containerEl)
+		// 	.setName("GitHub 레포")
+		// 	.setDesc("owner/repo 형식 (예: gyeonseokoh/Pharos)")
+		// 	.addText((text) =>
+		// 		text
+		// 			.setPlaceholder("owner/repo")
+		// 			.setValue(this.plugin.settings.githubRepo)
+		// 			.onChange(async (value) => {
+		// 				this.plugin.settings.githubRepo = value;
+		// 				await this.plugin.saveSettings();
+		// 			}),
+		// 	);
 
-		new Setting(containerEl)
-			.setName("커밋 컨벤션 정규식")
-			.setDesc(
-				"Task 자동 연결용. 기본: feat|fix(TASK-XXX): pattern. 그룹 2가 Task 번호.",
-			)
-			.addText((text) =>
-				text
-					.setValue(this.plugin.settings.commitPattern)
-					.onChange(async (value) => {
-						this.plugin.settings.commitPattern = value;
-						await this.plugin.saveSettings();
-					}),
-			);
+		// new Setting(containerEl)
+		// 	.setName("커밋 컨벤션 정규식")
+		// 	.setDesc(
+		// 		"Task 자동 연결용. 기본: feat|fix(TASK-XXX): pattern. 그룹 2가 Task 번호.",
+		// 	)
+		// 	.addText((text) =>
+		// 		text
+		// 			.setValue(this.plugin.settings.commitPattern)
+		// 			.onChange(async (value) => {
+		// 				this.plugin.settings.commitPattern = value;
+		// 				await this.plugin.saveSettings();
+		// 			}),
+		// 	);
 
-		// ─── Tavily ───
-		containerEl.createEl("h3", { text: "웹 검색 (Tavily)" });
+		// // ─── Tavily ───
+		// containerEl.createEl("h3", { text: "웹 검색 (Tavily)" });
 
-		new Setting(containerEl)
-			.setName("Tavily API 키")
-			.setDesc("회의 자료 수집(PO-3) 용. 미입력 시 자료 수집 비활성.")
-			.addText((text) =>
-				text
-					.setPlaceholder("tvly-...")
-					.setValue(this.plugin.settings.tavilyApiKey)
-					.onChange(async (value) => {
-						this.plugin.settings.tavilyApiKey = value;
-						await this.plugin.saveSettings();
-					}),
-			);
+		// new Setting(containerEl)
+		// 	.setName("Tavily API 키")
+		// 	.setDesc("회의 자료 수집(PO-3) 용. 미입력 시 자료 수집 비활성.")
+		// 	.addText((text) =>
+		// 		text
+		// 			.setPlaceholder("tvly-...")
+		// 			.setValue(this.plugin.settings.tavilyApiKey)
+		// 			.onChange(async (value) => {
+		// 				this.plugin.settings.tavilyApiKey = value;
+		// 				await this.plugin.saveSettings();
+		// 			}),
+		// 	);
 
 		// ─── 스케줄러 ───
 		containerEl.createEl("h3", { text: "자동 실행 일정" });
