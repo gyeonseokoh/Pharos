@@ -150,10 +150,7 @@ export default class PharosPlugin extends Plugin {
 
 		this.inviteService = new LocalInviteService({
 			inviteRepo: this.inviteRepository,
-			getWorkspaceId: async () => {
-				const p = await this.projectService.get();
-				return p?.workspaceId ?? null;
-			},
+			getWorkspaceId: async () => this.settings.workspaceId ?? null,
 		});
 
 		// eventBus → pharos:state-changed 브릿지
