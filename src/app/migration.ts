@@ -153,7 +153,6 @@ async function migrate(plugin: PharosPluginLike): Promise<void> {
 				fixedMeetingTime: r.fixedMeetingTime,
 				planningRoadmapGenerated: plugin.settings.planningRoadmapGenerated,
 				developmentRoadmapGenerated: plugin.settings.developmentRoadmapGenerated,
-				workspaceId: "",
 				createdAt: r.createdAt,
 				updatedAt: r.createdAt,
 			});

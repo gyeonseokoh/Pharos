@@ -67,7 +67,7 @@ export class ServerInviteService implements InviteService {
 		);
 	}
 
-	async consumeToken(token: string): Promise<void> {
+	async consumeToken(token: string): Promise<{ workspaceId: number }> {
 		// TODO(경석): POST {baseUrl}/invites/{token}/consume
 		// 서버가 일회용 처리 + 신규 팀원 정보를 PO 워크스페이스에 등록
 		throw new Error(

@@ -46,7 +46,7 @@ export interface VerifiedInvite {
 	token: string;
 	permission: MemberPermission;
 	/** 어느 workspace 에 합류할지. 시연 시엔 로컬 workspaceId. */
-	workspaceId: string;
+	workspaceId: number;
 	/** 만료 시각 (UI 표시용). */
 	expiresAt: string;
 }
@@ -78,7 +78,7 @@ export interface InviteService {
 	 * 토큰 소비 처리. JoinProjectModal 제출 직후 호출.
 	 * 일회용 처리로 같은 링크로 두 번 가입 못하게 함.
 	 */
-	consumeToken(token: string): Promise<void>;
+	consumeToken(token: string): Promise<{ workspaceId: number }>;
 
 	/**
 	 * 발급됐지만 아직 사용되지 않은 토큰 목록 (관리·디버깅용).
@@ -98,7 +98,7 @@ export interface InviteService {
  * URL 형식: obsidian://pharos-join?token=<token>&workspace=<workspaceId>
  * 옵시디언이 OS 에 등록한 obsidian:// 스킴 → 우리 protocol handler 호출.
  */
-export function buildInviteUrl(token: string, workspaceId: string): string {
+export function buildInviteUrl(token: string, workspaceId: number): string {
 	const t = encodeURIComponent(token);
 	const w = encodeURIComponent(workspaceId);
 	return `obsidian://pharos-join?token=${t}&workspace=${w}`;

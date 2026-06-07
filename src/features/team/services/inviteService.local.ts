@@ -30,14 +30,14 @@ import {
 export interface LocalInviteServiceDeps {
 	inviteRepo: InviteRepository;
 	/** 현재 프로젝트의 workspaceId (URL 에 포함). */
-	getWorkspaceId: () => Promise<string | null>;
+	getWorkspaceId: () => Promise<number | null>;
 }
 
 export class LocalInviteService implements InviteService {
 	constructor(private readonly deps: LocalInviteServiceDeps) {}
 
 	async issueToken(input: IssueTokenInput): Promise<IssuedInvite> {
-		const workspaceId = (await this.deps.getWorkspaceId()) ?? "ws-local";
+		const workspaceId = (await this.deps.getWorkspaceId()) ?? 0;
 		const token = generateToken();
 		const now = Date.now();
 		const expiresAt = new Date(now + DEFAULT_INVITE_TTL_MS).toISOString();
@@ -75,7 +75,7 @@ export class LocalInviteService implements InviteService {
 			return null;
 		}
 
-		const workspaceId = (await this.deps.getWorkspaceId()) ?? "ws-local";
+		const workspaceId = (await this.deps.getWorkspaceId()) ?? 0;
 		return {
 			token,
 			permission: invite.permission,
@@ -84,14 +84,15 @@ export class LocalInviteService implements InviteService {
 		};
 	}
 
-	async consumeToken(token: string): Promise<void> {
+	async consumeToken(token: string): Promise<{ workspaceId: number }> {
 		// 일회용 — 가입 완료 시 즉시 삭제
 		await this.deps.inviteRepo.delete(token);
+		return { workspaceId: (await this.deps.getWorkspaceId()) ?? 0 };
 	}
 
 	async listPending(): Promise<IssuedInvite[]> {
 		const all = await this.deps.inviteRepo.listActive();
-		const workspaceId = (await this.deps.getWorkspaceId()) ?? "ws-local";
+		const workspaceId = (await this.deps.getWorkspaceId()) ?? 0;
 		return all.map((inv) => ({
 			token: inv.id,
 			expiresAt: inv.expiresAt,
