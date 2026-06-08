@@ -112,6 +112,7 @@ export class TeamListItemView extends ItemView {
 			<TeamListView
 				data={this.teamData}
 				onInvite={() => new InviteMemberModal(this.app, this.plugin).open()}
+				onRefresh={() => void this.loadAndRender()}
 				onChangePermission={(id) => void this.handleChangePermission(id)}
 				onDeactivate={(id) => void this.handleDeactivate(id)}
 				onRevokeInvite={(token) => void this.handleRevokeInvite(token)}

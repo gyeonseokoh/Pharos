@@ -4,13 +4,14 @@
 
 import { useMemo } from "react";
 import {
-	AlertTriangle,
-	Clock,
-	Copy,
-	Mail,
-	Shield,
-	Trash2,
-	UserPlus,
+    AlertTriangle,
+    Clock,
+    Copy,
+    Mail,
+    RefreshCw,
+    Shield,
+    Trash2,
+    UserPlus,
 } from "lucide-react";
 import { BackNav, type BackNavItem } from "shared/ui/BackNav";
 import { Button } from "shared/ui/Button";
@@ -30,21 +31,19 @@ import type {
 } from "../domain/teamListData";
 
 export interface TeamListViewProps {
-	data: TeamListData;
-	/** "팀원 초대" 버튼 → Invite Modal 오픈. */
-	onInvite?: () => void;
-	/** 팀원 카드 "권한 변경" 버튼. */
-	onChangePermission?: (memberId: string) => void;
-	/** 팀원 카드 "이탈 처리" 버튼 (PO-14, MVP 외). */
-	onDeactivate?: (memberId: string) => void;
-	onBackToHome?: () => void;
-	/** 초대 취소 버튼. */
-	onRevokeInvite?: (token: string) => void;
+    data: TeamListData;
+    onInvite?: () => void;
+    onRefresh?: () => void; // 추ㄱㅏ
+    onChangePermission?: (memberId: string) => void;
+    onDeactivate?: (memberId: string) => void;
+    onBackToHome?: () => void;
+    onRevokeInvite?: (token: string) => void;
 }
 
 export function TeamListView({
 	data,
 	onInvite,
+	onRefresh,
 	onChangePermission,
 	onDeactivate,
 	onBackToHome,
@@ -67,7 +66,7 @@ export function TeamListView({
 		<div className="pharos-root min-h-full w-full overflow-y-auto bg-bg-primary p-6">
 			<div className="mx-auto max-w-4xl space-y-6">
 				{navItems.length > 0 && <BackNav items={navItems} />}
-				<Header activeCount={activeMembers.length} workspaceId={data.workspaceId} onInvite={onInvite} />
+				<Header activeCount={activeMembers.length} workspaceId={data.workspaceId} onInvite={onInvite} onRefresh={onRefresh} />
 
 				<StatSummary data={data} />
 
@@ -128,10 +127,12 @@ function Header({
 	activeCount,
 	workspaceId,
 	onInvite,
+	onRefresh
 }: {
 	activeCount: number;
 	workspaceId: number | null;
 	onInvite?: () => void;
+	onRefresh?: () => void;
 }) {
 	const handleCopyId = () => {
 		if (!workspaceId) return;
@@ -159,12 +160,21 @@ function Header({
 					</button>
 				)}
 			</div>
-			{onInvite && (
-				<Button onClick={onInvite}>
-					<UserPlus className="mr-1 h-4 w-4" />
-					팀원 초대
-				</Button>
-			)}
+			
+			{/* 버튼 그룹 래퍼 */}
+			<div className="flex gap-2">
+                {onRefresh && (
+                    <Button variant="ghost" onClick={onRefresh} title="목록 새로고침">
+                        <RefreshCw className="h-4 w-4" />
+                    </Button>
+                )}
+                {onInvite && (
+                    <Button onClick={onInvite}>
+                        <UserPlus className="mr-1 h-4 w-4" />
+                        팀원 초대
+                    </Button>
+                )}
+            </div>
 		</header>
 	);
 }
