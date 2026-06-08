@@ -102,10 +102,25 @@ function Content({
 				permission: args.permission ?? "WRITE",
 				techStacks,
 			});
-			// 가입 완료 → 토큰 소비 (일회용)
+
+			// 토큰 소비 → workspaceId 획득 → 동기화 재연결
 			if (args.token) {
-				await plugin.inviteService.consumeToken(args.token).catch(() => {});
+				try {
+					const { workspaceId } = await plugin.inviteService.consumeToken(args.token);
+					plugin.settings.workspaceId = workspaceId;
+					await plugin.saveSettings();
+					plugin.reconnectSync();
+				} catch (err) {
+					const msg = (err as Error).message ?? "";
+					if (msg.includes("410")) {
+						new Notice("⚠️ 이미 사용된 초대 링크입니다");
+					} else {
+						new Notice(`⚠️ 초대 토큰 소비 실패 (동기화 연결 지연될 수 있음): ${msg}`);
+					}
+					// 멤버 등록은 완료됐으므로 모달은 닫음
+				}
 			}
+
 			// PM-1: 가입 시 선택한 고정 가용시간을 이번 주 기준으로 저장
 			await plugin.availabilityService.saveMemberSlots(
 				currentWeekMonday(),
