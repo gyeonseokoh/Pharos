@@ -16,7 +16,7 @@ import type { MemberPermission } from "../domain/teamSchema";
 
 export interface ServerInviteServiceDeps {
 	/** 서버 base URL (e.g. https://pharos-backend-5eew.onrender.com). */
-	baseUrl: string;
+	baseUrl: () => string;
 	/** 인증 토큰 getter — 항상 최신 JWT 반환. */
 	getAuthToken: () => string | null;
 	/** 현재 settings.workspaceId getter. */
@@ -37,7 +37,7 @@ export class ServerInviteService implements InviteService {
 		path: string,
 		init: RequestInit = {},
 	): Promise<T> {
-		const res = await fetch(`${this.deps.baseUrl}${path}`, {
+		const res = await fetch(`${this.deps.baseUrl()}${path}`, {
 			...init,
 			headers: {
 				"Content-Type": "application/json",
@@ -82,27 +82,23 @@ export class ServerInviteService implements InviteService {
 
 	// ── GET /invites/:token ───────────────────────────────────────
 	async verifyToken(token: string): Promise<VerifiedInvite | null> {
-		try {
-			const res = await fetch(`${this.deps.baseUrl}/invites/${encodeURIComponent(token)}`);
-			if (res.status === 404 || res.status === 410) return null;
-			if (!res.ok) throw new Error(`HTTP ${res.status}`);
+		// 예외는 호출자(handleJoinLink)로 전파 — null은 "만료·미존재", 예외는 "통신 오류"를 의미
+		const res = await fetch(`${this.deps.baseUrl()}/invites/${encodeURIComponent(token)}`);
+		if (res.status === 404 || res.status === 410) return null;
+		if (!res.ok) throw new Error(`HTTP ${res.status}`);
 
-			const data = (await res.json()) as {
-				token:        string;
-				permission:   string;
-				workspace_id: number;
-				expires_at:   string;
-			};
-			return {
-				token:       data.token,
-				permission:  data.permission as MemberPermission,
-				workspaceId: data.workspace_id,
-				expiresAt:   data.expires_at,
-			};
-		} catch (err) {
-			console.error("[ServerInviteService] verifyToken error:", err);
-			return null;
-		}
+		const data = (await res.json()) as {
+			token:        string;
+			permission:   string;
+			workspace_id: number;
+			expires_at:   string;
+		};
+		return {
+			token:       data.token,
+			permission:  data.permission as MemberPermission,
+			workspaceId: data.workspace_id,
+			expiresAt:   data.expires_at,
+		};
 	}
 
 	// ── POST /invites/:token/consume ──────────────────────────────
