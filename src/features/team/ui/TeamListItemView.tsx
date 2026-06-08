@@ -108,12 +108,19 @@ export class TeamListItemView extends ItemView {
 	private render(): void {
 		if (!this.root) return;
 		if (!this.teamData) return;
+		// 현재 로그인 사용자의 permission 확인 — ADMIN만 권한 변경 가능
+		const currentMember = this.teamData.members.find(
+			(m) => m.id === this.teamData!.currentUserId,
+		);
+		const isAdmin = currentMember?.permission === "ADMIN";
 		this.root.render(
 			<TeamListView
 				data={this.teamData}
 				onInvite={() => new InviteMemberModal(this.app, this.plugin).open()}
 				onRefresh={() => void this.loadAndRender()}
-				onChangePermission={(id) => void this.handleChangePermission(id)}
+				onChangePermission={isAdmin
+					? (id) => void this.handleChangePermission(id)
+					: undefined}
 				onDeactivate={(id) => void this.handleDeactivate(id)}
 				onRevokeInvite={(token) => void this.handleRevokeInvite(token)}
 				onBackToHome={() => void this.openView(VIEW_TYPE_PHAROS_DASHBOARD)}

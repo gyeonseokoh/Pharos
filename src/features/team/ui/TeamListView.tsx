@@ -80,6 +80,9 @@ export function TeamListView({
 								key={m.id}
 								member={m}
 								isMe={m.id === data.currentUserId}
+								currentUserPermission={
+									data.members.find((x) => x.id === data.currentUserId)?.permission
+								}
 								onChangePermission={onChangePermission}
 								onDeactivate={onDeactivate}
 							/>
@@ -210,11 +213,13 @@ function StatSummary({ data }: { data: TeamListData }) {
 function MemberCard({
 	member,
 	isMe,
+	currentUserPermission,
 	onChangePermission,
 	onDeactivate,
 }: {
 	member: TeamMember;
 	isMe: boolean;
+	currentUserPermission?: MemberPermission;
 	onChangePermission?: (id: string) => void;
 	onDeactivate?: (id: string) => void;
 }) {
@@ -271,7 +276,7 @@ function MemberCard({
 					)}
 				</div>
 
-				{member.isActive && !isMe && (onChangePermission || onDeactivate) && (
+				{member.isActive && !isMe && currentUserPermission === "ADMIN" && (onChangePermission || onDeactivate) && (
 					<div className="flex shrink-0 gap-1">
 						{onChangePermission && (
 							<Button
