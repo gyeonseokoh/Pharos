@@ -205,45 +205,54 @@ export class NewProjectModal extends BaseReactModal {
 	}
 
 	private async handleSubmit(data: FormState): Promise<void> {
-    const { settings } = this.plugin;
-    const serverUrl = settings.hocuspocusServerUrl;
-    const authToken = settings.authToken;
+		const { settings } = this.plugin;
+		const serverUrl = settings.hocuspocusServerUrl;
+		const authToken = settings.authToken;
 
-    // 1. 로컬 프로젝트 생성
-    const project = await this.plugin.projectService.create({
-		name: data.topic,
-		description: data.description,
-		deadline: data.deadline,
-		fixedMeetingMode: data.fixedMeetingToggle ? "auto" : "manual",
-		fixedMeetingDay: data.fixedMeetingToggle
-			? undefined
-			: data.fixedMeetingDay,
-		fixedMeetingTime: data.fixedMeetingToggle
-			? undefined
-			: data.fixedMeetingTime,
-	});
+		// 1. 로컬 프로젝트 생성
+		const project = await this.plugin.projectService.create({
+			name: data.topic,
+			description: data.description,
+			deadline: data.deadline,
+			fixedMeetingMode: data.fixedMeetingToggle ? "auto" : "manual",
+			fixedMeetingDay: data.fixedMeetingToggle
+				? undefined
+				: data.fixedMeetingDay,
+			fixedMeetingTime: data.fixedMeetingToggle
+				? undefined
+				: data.fixedMeetingTime,
+		});
 
-    // 2. 서버 워크스페이스 등록 (인증된 경우만)
-    if (serverUrl && authToken) {
-        try {
-            const res = await fetch(`${serverUrl}/workspaces`, {
-                method: "POST",
-                headers: { "Content-Type": "application/json",
-                           Authorization: `Bearer ${authToken}` },
-                body: JSON.stringify({ name: project.name }),
-            });
-            if (!res.ok) throw new Error(`HTTP ${res.status}`);
-            const { id } = await res.json();
-            settings.workspaceId = id;
-            await this.plugin.saveSettings();
-            this.plugin.reconnectSync();      // ← refactor-1에서 확보한 public 메서드
-        } catch (err) {
-            new Notice(`워크스페이스 등록 실패: ...`);
-            return;
-        }
-    } else {
-        await this.plugin.saveSettings();    // 시연 모드 — 로컬만
-    }
-    new Notice(`프로젝트 "${project.name}" 생성 완료`);
-}
+		// 2. 서버 워크스페이스 등록 (인증된 경우만)
+		if (serverUrl && authToken) {
+			try {
+				const res = await fetch(`${serverUrl}/workspaces`, {
+					method: "POST",
+					headers: { "Content-Type": "application/json",
+							Authorization: `Bearer ${authToken}` },
+					body: JSON.stringify({ name: project.name }),
+				});
+				if (!res.ok) throw new Error(`HTTP ${res.status}`);
+				const { id } = await res.json();
+				settings.workspaceId = id;
+				await this.plugin.saveSettings();
+				// 3. 팀장 본인을 Vault Member로 등록        ← 🆕
+				//    TeamListItemView는 Vault만 읽으므로 여기서 저장하지 않으면 팀장이 목록에 표시되지 않음
+				//    addMember() 내부 dupName 체크로 중복 등록 방지
+				await this.plugin.teamService.addMember({  // ← 🆕
+					name: settings.githubLogin,             // ← 🆕
+					role: "PO",                             // ← 🆕
+					permission: "ADMIN",                    // ← 🆕
+					techStacks: [],                         // ← 🆕
+				});                                         // ← 🆕
+				this.plugin.reconnectSync();
+			} catch (err) {
+				new Notice(`워크스페이스 등록 실패: ...`);
+				return;
+			}
+		} else {
+			await this.plugin.saveSettings();    // 시연 모드 — 로컬만
+		}
+		new Notice(`프로젝트 "${project.name}" 생성 완료`);
+	}
 }
