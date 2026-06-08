@@ -25,12 +25,16 @@ export interface TeamMember {
 export interface TeamListData {
 	/** 현재 로그인한 사용자 ID (본인 표시용). */
 	currentUserId: string;
+	/** 서버 워크스페이스 ID (초대 링크 표시용). null이면 미등록 상태. */
+	workspaceId: number | null;
 	members: TeamMember[];
 	/** 대기 중인 초대 (발송됐지만 아직 수락 안 된 것). */
 	pendingInvites: PendingInvite[];
 }
 
 export interface PendingInvite {
+	/** 초대 취소용 토큰. */
+	token: string;
 	id: string;
 	/** 초대받은 이메일 (있는 경우). */
 	email: string | null;

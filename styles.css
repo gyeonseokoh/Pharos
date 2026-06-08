@@ -1111,6 +1111,9 @@
 .hover\:text-\[color\:var\(--interactive-accent\)\]:hover{
 	color: var(--interactive-accent);
 }
+.hover\:text-text-muted:hover{
+	color: var(--text-muted);
+}
 .hover\:text-text-normal:hover{
 	color: var(--text-normal);
 }
