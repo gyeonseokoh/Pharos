@@ -74,6 +74,7 @@ import { runMigrationIfNeeded } from "./app/migration";
 import { Notice, MarkdownView } from "obsidian";
 import type { InviteService } from "./features/team/services/inviteService";
 import { LocalInviteService } from "./features/team/services/inviteService.local";
+import { ServerInviteService } from "features/team/services/inviteService.server";
 import { JoinProjectModal } from "./features/team/ui/JoinProjectModal";
 import { AgentService } from "./features/agent/services/agentService";
 import { GeminiProvider } from "./features/agent/providers/GeminiProvider";
@@ -148,10 +149,11 @@ export default class PharosPlugin extends Plugin {
 			searchProvider,
 		);
 
-		this.inviteService = new LocalInviteService({
-			inviteRepo: this.inviteRepository,
-			getWorkspaceId: async () => this.settings.workspaceId ?? null,
-		});
+		this.inviteService = new ServerInviteService({
+			baseUrl: this.settings.hocuspocusServerUrl,
+			getAuthToken: () => this.settings.authToken || null,
+			getWorkspaceId: async () => this.settings.workspaceId ?? null
+		})
 
 		// eventBus → pharos:state-changed 브릿지
 		// 내부 이벤트를 모든 View가 수신하도록 전파
