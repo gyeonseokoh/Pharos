@@ -1,13 +1,9 @@
-import { ItemView, Notice, WorkspaceLeaf } from "obsidian";
+import { ItemView, Modal, Notice, WorkspaceLeaf } from "obsidian";
 import { createRoot, type Root } from "react-dom/client";
 import { ProjectRequiredEmpty } from "shared/ui";
 import { TeamListView } from "./TeamListView";
 import { InviteMemberModal } from "./InviteMemberModal";
 import { VIEW_TYPE_PHAROS_DASHBOARD } from "../../progress/ui/DashboardItemView";
-// ── [DEMO] AI·서버·깃허브 연동 전 임시 데모 시연용 하드코딩 연결 ──────────────────
-// 연동 완료 후 이 import 줄을 삭제하세요.
-import { mockTeamListData } from "./teamListMock";
-// ──────────────────────────────────────────────────────────────────────────────
 import type { PharosPluginLike } from "../../../app/settings";
 import type { TeamListData } from "../domain/teamListData";
 
@@ -51,19 +47,6 @@ export class TeamListItemView extends ItemView {
 	}
 
 	private async loadAndRender(): Promise<void> {
-		// ── [DEMO] AI·서버·깃허브 연동 전 임시 데모 시연용 하드코딩 연결 ──────────────
-		// 연동 완료 후 이 블록 전체(if 문 포함)를 삭제하세요.
-		if (this.plugin.settings.demoMode) {
-			this.teamData = mockTeamListData;
-			this.render();
-			return;
-		}
-		// ──────────────────────────────────────────────────────────────────────────────
-
-		// ── [연동 후 실행되는 실서비스 흐름] ────────────────────────────────────────────
-		// demoMode 블록을 삭제하면 아래 코드가 실행됩니다.
-		// settings.projectReport(레거시) 대신 projectService.get()으로 프로젝트를 확인합니다.
-		// ────────────────────────────────────────────────────────────────────────────────
 		const project = await this.plugin.projectService.get();
 		if (!project) {
 			this.root?.render(
@@ -74,12 +57,31 @@ export class TeamListItemView extends ItemView {
 			);
 			return;
 		}
+
 		const [members, invites] = await Promise.all([
 			this.plugin.teamService.list(),
 			this.plugin.teamService.listInvites(),
 		]);
+
+		// 현재 로그인 사용자 ID — githubLogin으로 멤버 목록에서 매핑
+		const githubLogin = this.plugin.settings.githubLogin;
+		const currentUserId =
+			members.find((m) => m.name === githubLogin)?.id ?? "";
+
+		// 가용시간 입력 여부 — 멤버별 슬롯 존재 여부 병렬 조회
+		const availabilityFlags = await Promise.all(
+			members.map(async (m) => {
+				const slots = await this.plugin.availabilityService.listByMember(m.id);
+				return { id: m.id, filled: slots.length > 0 };
+			}),
+		);
+		const filledSet = new Set(
+			availabilityFlags.filter((f) => f.filled).map((f) => f.id),
+		);
+
 		this.teamData = {
-			currentUserId: "",
+			currentUserId,
+			workspaceId: this.plugin.settings.workspaceId ?? null,
 			members: members.map((m) => ({
 				id: m.id,
 				name: m.name,
@@ -89,9 +91,10 @@ export class TeamListItemView extends ItemView {
 				techStacks: m.techStacks,
 				isActive: m.status === "active",
 				joinedAt: m.joinedAt,
-				hasFilledAvailability: false,
+				hasFilledAvailability: filledSet.has(m.id),
 			})),
 			pendingInvites: invites.map((inv) => ({
+				token: inv.id,
 				id: inv.id,
 				email: inv.email,
 				permission: inv.permission,
@@ -110,9 +113,8 @@ export class TeamListItemView extends ItemView {
 				data={this.teamData}
 				onInvite={() => new InviteMemberModal(this.app, this.plugin).open()}
 				onChangePermission={(id) => void this.handleChangePermission(id)}
-				onDeactivate={(id) =>
-					new Notice(`[미구현] ${id} 이탈 처리 확인 Modal 예정 (PO-14, v2)`)
-				}
+				onDeactivate={(id) => void this.handleDeactivate(id)}
+				onRevokeInvite={(token) => void this.handleRevokeInvite(token)}
 				onBackToHome={() => void this.openView(VIEW_TYPE_PHAROS_DASHBOARD)}
 			/>,
 		);
@@ -135,23 +137,56 @@ export class TeamListItemView extends ItemView {
 		const label = { ADMIN: "관리자", WRITE: "편집", READ: "읽기" }[next];
 
 		try {
-			if (this.plugin.settings.demoMode) {
-				// demoMode: vault 저장 없이 메모리 상태만 업데이트 후 재렌더
-				this.teamData = {
-					...this.teamData,
-					members: this.teamData.members.map((m) =>
-						m.id === memberId ? { ...m, permission: next } : m,
-					),
-				};
-				new Notice(`${member.name}의 권한이 "${label}"으로 변경됐습니다`);
-				this.render();
-			} else {
-				await this.plugin.teamService.updatePermission(memberId, next);
-				new Notice(`${member.name}의 권한이 "${label}"으로 변경됐습니다`);
-				await this.loadAndRender();
-			}
+			await this.plugin.teamService.updatePermission(memberId, next);
+			new Notice(`${member.name}의 권한이 "${label}"으로 변경됐습니다`);
+			await this.loadAndRender();
 		} catch (err) {
 			new Notice(`권한 변경 실패: ${(err as Error).message}`);
+		}
+	}
+
+	private async handleDeactivate(memberId: string): Promise<void> {
+		if (!this.teamData) return;
+		const member = this.teamData.members.find((m) => m.id === memberId);
+		if (!member) return;
+
+		// Obsidian Modal API로 확인 다이얼로그 표시
+		const confirmed = await new Promise<boolean>((resolve) => {
+			const modal = new (class extends Modal {
+				onOpen() {
+					this.contentEl.createEl("h3", { text: "팀원 이탈 처리" });
+					this.contentEl.createEl("p", {
+						text: `${member.name} 님을 비활성 처리하시겠습니까?`,
+					});
+					const btnRow = this.contentEl.createDiv({ cls: "modal-button-container" });
+					const confirmBtn = btnRow.createEl("button", { text: "확인", cls: "mod-cta" });
+					const cancelBtn  = btnRow.createEl("button", { text: "취소" });
+					confirmBtn.addEventListener("click", () => { this.close(); resolve(true); });
+					cancelBtn.addEventListener("click",  () => { this.close(); resolve(false); });
+				}
+				onClose() { resolve(false); }
+			})(this.app);
+			modal.open();
+		});
+
+		if (!confirmed) return;
+
+		try {
+			await this.plugin.teamService.setStatus(memberId, "left");
+			new Notice(`${member.name} 님이 비활성 처리됐습니다`);
+			await this.loadAndRender();
+		} catch (err) {
+			new Notice(`이탈 처리 실패: ${(err as Error).message}`);
+		}
+	}
+
+	private async handleRevokeInvite(token: string): Promise<void> {
+		try {
+			await this.plugin.inviteService.revokeToken(token);
+			new Notice("초대가 취소됐습니다");
+			await this.loadAndRender();
+		} catch (err) {
+			new Notice(`초대 취소 실패: ${(err as Error).message}`);
 		}
 	}
 

@@ -6,6 +6,7 @@ import type { TeamListData } from "../domain/teamListData";
 
 export const mockTeamListData: TeamListData = {
 	currentUserId: "m1",
+	workspaceId: null,
 	members: [
 		{
 			id: "m1",
@@ -65,6 +66,7 @@ export const mockTeamListData: TeamListData = {
 	],
 	pendingInvites: [
 		{
+			token: "inv-1",
 			id: "inv-1",
 			email: "intern@example.com",
 			permission: "READ",

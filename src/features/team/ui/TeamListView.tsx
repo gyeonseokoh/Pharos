@@ -6,8 +6,10 @@ import { useMemo } from "react";
 import {
 	AlertTriangle,
 	Clock,
+	Copy,
 	Mail,
 	Shield,
+	Trash2,
 	UserPlus,
 } from "lucide-react";
 import { BackNav, type BackNavItem } from "shared/ui/BackNav";
@@ -36,6 +38,8 @@ export interface TeamListViewProps {
 	/** 팀원 카드 "이탈 처리" 버튼 (PO-14, MVP 외). */
 	onDeactivate?: (memberId: string) => void;
 	onBackToHome?: () => void;
+	/** 초대 취소 버튼. */
+	onRevokeInvite?: (token: string) => void;
 }
 
 export function TeamListView({
@@ -44,6 +48,7 @@ export function TeamListView({
 	onChangePermission,
 	onDeactivate,
 	onBackToHome,
+	onRevokeInvite,
 }: TeamListViewProps) {
 	const activeMembers = useMemo(
 		() => data.members.filter((m) => m.isActive),
@@ -62,7 +67,7 @@ export function TeamListView({
 		<div className="pharos-root min-h-full w-full overflow-y-auto bg-bg-primary p-6">
 			<div className="mx-auto max-w-4xl space-y-6">
 				{navItems.length > 0 && <BackNav items={navItems} />}
-				<Header activeCount={activeMembers.length} onInvite={onInvite} />
+				<Header activeCount={activeMembers.length} workspaceId={data.workspaceId} onInvite={onInvite} />
 
 				<StatSummary data={data} />
 
@@ -90,7 +95,7 @@ export function TeamListView({
 						</h2>
 						<div className="space-y-2">
 							{data.pendingInvites.map((inv) => (
-								<PendingInviteCard key={inv.id} invite={inv} />
+								<PendingInviteCard key={inv.id} invite={inv} onRevokeInvite={onRevokeInvite} />
 							))}
 						</div>
 					</section>
@@ -121,11 +126,18 @@ export function TeamListView({
 
 function Header({
 	activeCount,
+	workspaceId,
 	onInvite,
 }: {
 	activeCount: number;
+	workspaceId: number | null;
 	onInvite?: () => void;
 }) {
+	const handleCopyId = () => {
+		if (!workspaceId) return;
+		navigator.clipboard.writeText(String(workspaceId)).catch(() => {});
+	};
+
 	return (
 		<header className="flex items-start justify-between">
 			<div>
@@ -136,6 +148,16 @@ function Header({
 					👥 팀원 목록
 				</h1>
 				<p className="mt-1 text-xs text-text-muted">활성 팀원 {activeCount}명</p>
+				{workspaceId && (
+					<button
+						className="mt-1 flex items-center gap-1 text-[11px] text-text-faint hover:text-text-muted"
+						onClick={handleCopyId}
+						title="워크스페이스 ID 복사"
+					>
+						<Copy className="h-3 w-3" />
+						WS #{workspaceId}
+					</button>
+				)}
 			</div>
 			{onInvite && (
 				<Button onClick={onInvite}>
@@ -294,7 +316,7 @@ function PermissionBadge({ permission }: { permission: MemberPermission }) {
 
 // ───────────────────────── Pending Invite ─────────────────────────
 
-function PendingInviteCard({ invite }: { invite: PendingInvite }) {
+function PendingInviteCard({ invite, onRevokeInvite }: { invite: PendingInvite; onRevokeInvite?: (token: string) => void }) {
 	const expiresIn = useMemo(
 		() => formatExpiresIn(invite.expiresAt),
 		[invite.expiresAt],
@@ -314,6 +336,16 @@ function PendingInviteCard({ invite }: { invite: PendingInvite }) {
 						{expiresIn}
 					</p>
 				</div>
+				{onRevokeInvite && (
+					<Button
+						variant="ghost"
+						size="sm"
+						onClick={() => onRevokeInvite(invite.token)}
+						title="초대 취소"
+					>
+						<Trash2 className="h-3.5 w-3.5 text-text-faint" />
+					</Button>
+				)}
 			</CardContent>
 		</Card>
 	);
