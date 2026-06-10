@@ -18,6 +18,7 @@ import type {
 	TopicSource,
 } from "../domain/meetingSchema";
 import type { MeetingRepository } from "../repositories/meetingRepository";
+import type { Project } from "../../project/domain/projectSchema";
 
 export class MeetingsService {
 	constructor(private readonly repo: MeetingRepository) {}
@@ -207,6 +208,83 @@ export class MeetingsService {
 		return added;
 	}
 
+	/**
+	 * PO-1-1 정기 회의 자동 생성.
+	 *
+	 * project 의 fixedMeetingDay (0=일 ~ 6=토) + fixedMeetingTime (HH:MM) 기준으로
+	 * 오늘부터 weeksAhead 주 분량의 정기 회의 인스턴스를 미리 생성한다.
+	 *
+	 * 정책:
+	 *   - 같은 date + time + meetingType=regular 가 이미 있으면 skip (멱등)
+	 *   - 과거 날짜는 생성하지 않음
+	 *   - deadline 이후 날짜도 생성하지 않음
+	 *   - fixedMeetingDay/Time 미지정이면 no-op
+	 *
+	 * 호출 시점: Calendar / MeetingsList ItemView 의 loadAndRender 진입 시.
+	 * 매번 호출해도 안전 (멱등) — 새 주차 진입 시 자동으로 다음 회의 생성.
+	 *
+	 * @returns 새로 생성된 회의 수
+	 */
+	async ensureRegularMeetings(
+		project: Project,
+		weeksAhead = 8,
+	): Promise<number> {
+		if (
+			project.fixedMeetingDay === undefined ||
+			project.fixedMeetingTime === undefined
+		) {
+			return 0;
+		}
+
+		const day = project.fixedMeetingDay;
+		const time = project.fixedMeetingTime;
+
+		const today = new Date();
+		today.setHours(0, 0, 0, 0);
+		const deadline = new Date(project.deadline + "T00:00:00");
+
+		// 오늘 기준 가장 가까운 미래의 day-of-week 찾기
+		const firstDate = new Date(today);
+		const diff = (day - today.getDay() + 7) % 7;
+		firstDate.setDate(today.getDate() + diff);
+
+		// 다음 weeksAhead 주 동안 매주 같은 요일의 ISO date 목록
+		const candidateDates: string[] = [];
+		for (let i = 0; i < weeksAhead; i++) {
+			const d = new Date(firstDate);
+			d.setDate(firstDate.getDate() + i * 7);
+			if (d > deadline) break;
+			candidateDates.push(toIsoDate(d));
+		}
+
+		if (candidateDates.length === 0) return 0;
+
+		// 기존 정기 회의 (날짜·시간 일치) 인덱싱
+		const existing = await this.repo.list({
+			dateFrom: candidateDates[0],
+			dateTo: candidateDates[candidateDates.length - 1],
+			meetingType: "regular",
+		});
+		const existingKeys = new Set(
+			existing.map((m) => `${m.date}T${m.time}`),
+		);
+
+		let created = 0;
+		for (const date of candidateDates) {
+			const key = `${date}T${time}`;
+			if (existingKeys.has(key)) continue;
+			await this.create({
+				title: "정기 회의",
+				date,
+				time,
+				durationMinutes: 60,
+				meetingType: "regular",
+			});
+			created++;
+		}
+		return created;
+	}
+
 	/** 회의록 삭제 (시연·테스트용). 회의 자체는 유지, attachedMinutes만 제거. */
 	async detachMinutes(meetingId: string): Promise<void> {
 		await this.repo.delete(meetingId);
@@ -253,6 +331,14 @@ export class MeetingsService {
 		};
 		await this.repo.save(meeting);
 	}
+}
+
+/** Local timezone 기준 Date → "YYYY-MM-DD". */
+function toIsoDate(d: Date): string {
+	const y = d.getFullYear();
+	const m = String(d.getMonth() + 1).padStart(2, "0");
+	const day = String(d.getDate()).padStart(2, "0");
+	return `${y}-${m}-${day}`;
 }
 
 /** "mtg-2026-05-25-ui-review-a1b2" 형태의 id 생성. */
