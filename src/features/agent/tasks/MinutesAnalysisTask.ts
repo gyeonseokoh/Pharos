@@ -61,8 +61,8 @@ export class MinutesAnalysisTask
 		input: MinutesAnalysisInput,
 		ctx: AgentContext,
 	): Promise<LLMRequest> {
-		if (input.minutesText.trim().length < 50) {
-			throw new Error("회의록 내용이 부족합니다. 최소 50자 이상 입력해주세요.");
+		if (input.minutesText.trim().length < 10) {
+			throw new Error("회의록 내용이 너무 짧습니다. 최소 10자 이상 입력해주세요.");
 		}
 
 		const meeting = await ctx.meetingsService.getById(input.meetingId);

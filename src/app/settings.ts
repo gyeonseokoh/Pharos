@@ -345,21 +345,21 @@ export class PharosSettingsTab extends PluginSettingTab {
 		// 			}),
 		// 	);
 
-		// // ─── Tavily ───
-		// containerEl.createEl("h3", { text: "웹 검색 (Tavily)" });
+		// ─── Tavily ───
+		containerEl.createEl("h3", { text: "웹 검색 (Tavily)" });
 
-		// new Setting(containerEl)
-		// 	.setName("Tavily API 키")
-		// 	.setDesc("회의 자료 수집(PO-3) 용. 미입력 시 자료 수집 비활성.")
-		// 	.addText((text) =>
-		// 		text
-		// 			.setPlaceholder("tvly-...")
-		// 			.setValue(this.plugin.settings.tavilyApiKey)
-		// 			.onChange(async (value) => {
-		// 				this.plugin.settings.tavilyApiKey = value;
-		// 				await this.plugin.saveSettings();
-		// 			}),
-		// 	);
+		new Setting(containerEl)
+			.setName("Tavily API 키")
+			.setDesc("회의 자료 수집(PO-3) 용. 미입력 시 자료 수집 비활성.")
+			.addText((text) =>
+				text
+					.setPlaceholder("tvly-...")
+					.setValue(this.plugin.settings.tavilyApiKey)
+					.onChange(async (value) => {
+						this.plugin.settings.tavilyApiKey = value;
+						await this.plugin.saveSettings();
+					}),
+			);
 
 		// ─── 스케줄러 ───
 		containerEl.createEl("h3", { text: "자동 실행 일정" });

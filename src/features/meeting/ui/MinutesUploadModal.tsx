@@ -89,7 +89,7 @@ function Content({
 	const canSubmit =
 		selectedMeeting !== null &&
 		authorName.trim().length > 0 &&
-		content.trim().length >= 20;
+		content.trim().length >= 10;
 
 	// 분석 (애니메이션 + 실제 분석 병행). cancelled 가드로 unmount 안전.
 	useEffect(() => {
@@ -234,7 +234,7 @@ function Content({
 				</FormField>
 
 				{mode === "direct" ? (
-					<FormField label="본문" required hint="20자 이상 권장">
+					<FormField label="본문" required hint="10자 이상 (제한 없음)">
 						<textarea
 							className={cn(textareaClass, "min-h-[220px]")}
 							value={content}
