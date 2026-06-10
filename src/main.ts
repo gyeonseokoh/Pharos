@@ -72,8 +72,9 @@ import type { CommitRepository } from "./features/commit/repositories/commitRepo
 import { CommitService } from "./features/commit/services/commitService";
 import { runMigrationIfNeeded } from "./app/migration";
 import { Notice, MarkdownView } from "obsidian";
-import type { InviteService } from "./features/team/services/inviteService";
+import type { InviteService, VerifiedInvite } from "./features/team/services/inviteService";
 import { LocalInviteService } from "./features/team/services/inviteService.local";
+import { ServerInviteService } from "features/team/services/inviteService.server";
 import { JoinProjectModal } from "./features/team/ui/JoinProjectModal";
 import { AgentService } from "./features/agent/services/agentService";
 import { GeminiProvider } from "./features/agent/providers/GeminiProvider";
@@ -83,6 +84,7 @@ import { DocumentSync } from "./shared/infra/sync/DocumentSync";
 import { shouldSync } from "./shared/infra/sync/syncFilter";
 import { TavilySearchProvider } from "./features/agent/search/TavilySearchProvider";
 import { BatchSyncService } from "./shared/infra/sync/BatchSyncService";
+import { eventBus } from "./shared/repo/eventBus";
 
 export default class PharosPlugin extends Plugin {
 	settings: PharosSettings = { ...DEFAULT_SETTINGS };
@@ -134,7 +136,7 @@ export default class PharosPlugin extends Plugin {
 		this.roadmapService = new RoadmapService(this.roadmapRepository);
 		this.teamService = new TeamService(this.teamRepository, this.inviteRepository);
 		this.progressService = new ProgressService(this.taskRepository);
-		const llmProvider = new GeminiProvider(() => this.settings.llmApikey, this.settings.llmModel);
+		const llmProvider = new GeminiProvider(() => this.settings.llmApikey, () => this.settings.llmModel || "gemini-2.0-flash");
 		const searchProvider = new TavilySearchProvider(() => this.settings.tavilyApiKey);
 		this.agentService = new AgentService(
 			this.teamService,
@@ -147,19 +149,36 @@ export default class PharosPlugin extends Plugin {
 			searchProvider,
 		);
 
-		this.inviteService = new LocalInviteService({
-			inviteRepo: this.inviteRepository,
-			getWorkspaceId: async () => {
-				const p = await this.projectService.get();
-				return p?.workspaceId ?? null;
-			},
-		});
+		this.inviteService = new ServerInviteService({
+			baseUrl: () => this.settings.hocuspocusServerUrl,
+			getAuthToken: () => this.settings.authToken || null,
+			getWorkspaceId: async () => this.settings.workspaceId ?? null
+		})
+
+		// eventBus → pharos:state-changed 브릿지
+		// 내부 이벤트를 모든 View가 수신하도록 전파
+		const triggerStateChanged = () => {
+			this.app.workspace.trigger("pharos:state-changed");
+		};
+		eventBus.on("project:created", triggerStateChanged);
+		eventBus.on("project:reset", triggerStateChanged);
+		eventBus.on("meeting:created", triggerStateChanged);
+		eventBus.on("meeting:updated", triggerStateChanged);
+		eventBus.on("minutes:attached", triggerStateChanged);
+		eventBus.on("roadmap:planning-generated", triggerStateChanged);
+		eventBus.on("roadmap:development-generated", triggerStateChanged);
+		eventBus.on("roadmap:development-deleted", triggerStateChanged);
+		eventBus.on("task:created", triggerStateChanged);
+		eventBus.on("task:updated", triggerStateChanged);
+		eventBus.on("task:checked", triggerStateChanged);
+		eventBus.on("team:member-added", triggerStateChanged);
+		eventBus.on("team:member-removed", triggerStateChanged);
 
 		this.app.workspace.onLayoutReady(() => {
 			void runMigrationIfNeeded(this);
 
 			// 동기화 초기화 (인증 정보가 이미 있을 때만 연결)
-			this.initSync();
+			this.reconnectSync();
 
 			// ─── 파일 열기 → DocumentSync 바인딩 ──────────────────────
 			this.registerEvent(
@@ -263,9 +282,15 @@ export default class PharosPlugin extends Plugin {
 
 	private async handleJoinLink(token: string): Promise<void> {
 		if (!token) { new Notice("초대 링크에 토큰이 없습니다"); return; }
-		const invite = await this.inviteService.verifyToken(token);
-		if (!invite) { new Notice("초대 링크가 유효하지 않거나 만료되었습니다 (24h)"); return; }
-		new JoinProjectModal(this.app, this, { token }).open();
+		let invite: VerifiedInvite | null;
+		try {
+			invite = await this.inviteService.verifyToken(token);
+		} catch (err) {
+			new Notice(`초대 링크 확인 실패: ${(err as Error).message}`);
+			return;
+		}
+		if (!invite) { new Notice("초대 링크가 만료됐거나 이미 사용됐습니다"); return; }
+		new JoinProjectModal(this.app, this, { token, permission: invite.permission }).open();
 	}
 
 	private async handleAuthCallback(token: string): Promise<void> {
@@ -293,7 +318,7 @@ export default class PharosPlugin extends Plugin {
 		await this.saveSettings();
 
 		// 로그인 완료 -> 동기화 재초기화
-		this.initSync();
+		this.reconnectSync();
 
 		new Notice(`✅ GitHub 로그인 성공: @${login}`);
 	}
@@ -302,8 +327,10 @@ export default class PharosPlugin extends Plugin {
 	 * 동기화 인프라 초기화.
 	 * onLayoutReady / handleAuthCallback 두 진입점에서 호출.
 	 * 인증 토큰 또는 workspaceId 없으면 조용히 종료.
+	 * 
+	 * 2026-6-7 의미론적으로 재사용이 빈번한 탓에 의미론적으로 어울리게 reconnect로 변경함
 	 */
-	private initSync(): void {
+	reconnectSync(): void {
 		const { authToken, workspaceId, hocuspocusServerUrl } = this.settings;
 		if (!authToken || !workspaceId || !hocuspocusServerUrl) {
 			console.log("[Pharos] initSync: 인증 정보 부족 — 동기화 생략");

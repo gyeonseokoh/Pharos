@@ -4,11 +4,14 @@
 
 import { useMemo } from "react";
 import {
-	AlertTriangle,
-	Clock,
-	Mail,
-	Shield,
-	UserPlus,
+    AlertTriangle,
+    Clock,
+    Copy,
+    Mail,
+    RefreshCw,
+    Shield,
+    Trash2,
+    UserPlus,
 } from "lucide-react";
 import { BackNav, type BackNavItem } from "shared/ui/BackNav";
 import { Button } from "shared/ui/Button";
@@ -28,22 +31,23 @@ import type {
 } from "../domain/teamListData";
 
 export interface TeamListViewProps {
-	data: TeamListData;
-	/** "팀원 초대" 버튼 → Invite Modal 오픈. */
-	onInvite?: () => void;
-	/** 팀원 카드 "권한 변경" 버튼. */
-	onChangePermission?: (memberId: string) => void;
-	/** 팀원 카드 "이탈 처리" 버튼 (PO-14, MVP 외). */
-	onDeactivate?: (memberId: string) => void;
-	onBackToHome?: () => void;
+    data: TeamListData;
+    onInvite?: () => void;
+    onRefresh?: () => void; // 추ㄱㅏ
+    onChangePermission?: (memberId: string) => void;
+    onDeactivate?: (memberId: string) => void;
+    onBackToHome?: () => void;
+    onRevokeInvite?: (token: string) => void;
 }
 
 export function TeamListView({
 	data,
 	onInvite,
+	onRefresh,
 	onChangePermission,
 	onDeactivate,
 	onBackToHome,
+	onRevokeInvite,
 }: TeamListViewProps) {
 	const activeMembers = useMemo(
 		() => data.members.filter((m) => m.isActive),
@@ -62,7 +66,7 @@ export function TeamListView({
 		<div className="pharos-root min-h-full w-full overflow-y-auto bg-bg-primary p-6">
 			<div className="mx-auto max-w-4xl space-y-6">
 				{navItems.length > 0 && <BackNav items={navItems} />}
-				<Header activeCount={activeMembers.length} onInvite={onInvite} />
+				<Header activeCount={activeMembers.length} workspaceId={data.workspaceId} onInvite={onInvite} onRefresh={onRefresh} />
 
 				<StatSummary data={data} />
 
@@ -76,6 +80,9 @@ export function TeamListView({
 								key={m.id}
 								member={m}
 								isMe={m.id === data.currentUserId}
+								currentUserPermission={
+									data.members.find((x) => x.id === data.currentUserId)?.permission
+								}
 								onChangePermission={onChangePermission}
 								onDeactivate={onDeactivate}
 							/>
@@ -90,7 +97,7 @@ export function TeamListView({
 						</h2>
 						<div className="space-y-2">
 							{data.pendingInvites.map((inv) => (
-								<PendingInviteCard key={inv.id} invite={inv} />
+								<PendingInviteCard key={inv.id} invite={inv} onRevokeInvite={onRevokeInvite} />
 							))}
 						</div>
 					</section>
@@ -121,11 +128,20 @@ export function TeamListView({
 
 function Header({
 	activeCount,
+	workspaceId,
 	onInvite,
+	onRefresh
 }: {
 	activeCount: number;
+	workspaceId: number | null;
 	onInvite?: () => void;
+	onRefresh?: () => void;
 }) {
+	const handleCopyId = () => {
+		if (!workspaceId) return;
+		navigator.clipboard.writeText(String(workspaceId)).catch(() => {});
+	};
+
 	return (
 		<header className="flex items-start justify-between">
 			<div>
@@ -136,13 +152,32 @@ function Header({
 					👥 팀원 목록
 				</h1>
 				<p className="mt-1 text-xs text-text-muted">활성 팀원 {activeCount}명</p>
+				{workspaceId && (
+					<button
+						className="mt-1 flex items-center gap-1 text-[11px] text-text-faint hover:text-text-muted"
+						onClick={handleCopyId}
+						title="워크스페이스 ID 복사"
+					>
+						<Copy className="h-3 w-3" />
+						WS #{workspaceId}
+					</button>
+				)}
 			</div>
-			{onInvite && (
-				<Button onClick={onInvite}>
-					<UserPlus className="mr-1 h-4 w-4" />
-					팀원 초대
-				</Button>
-			)}
+			
+			{/* 버튼 그룹 래퍼 */}
+			<div className="flex gap-2">
+                {onRefresh && (
+                    <Button variant="ghost" onClick={onRefresh} title="목록 새로고침">
+                        <RefreshCw className="h-4 w-4" />
+                    </Button>
+                )}
+                {onInvite && (
+                    <Button onClick={onInvite}>
+                        <UserPlus className="mr-1 h-4 w-4" />
+                        팀원 초대
+                    </Button>
+                )}
+            </div>
 		</header>
 	);
 }
@@ -178,11 +213,13 @@ function StatSummary({ data }: { data: TeamListData }) {
 function MemberCard({
 	member,
 	isMe,
+	currentUserPermission,
 	onChangePermission,
 	onDeactivate,
 }: {
 	member: TeamMember;
 	isMe: boolean;
+	currentUserPermission?: MemberPermission;
 	onChangePermission?: (id: string) => void;
 	onDeactivate?: (id: string) => void;
 }) {
@@ -239,7 +276,7 @@ function MemberCard({
 					)}
 				</div>
 
-				{member.isActive && !isMe && (onChangePermission || onDeactivate) && (
+				{member.isActive && !isMe && currentUserPermission === "ADMIN" && (onChangePermission || onDeactivate) && (
 					<div className="flex shrink-0 gap-1">
 						{onChangePermission && (
 							<Button
@@ -294,7 +331,7 @@ function PermissionBadge({ permission }: { permission: MemberPermission }) {
 
 // ───────────────────────── Pending Invite ─────────────────────────
 
-function PendingInviteCard({ invite }: { invite: PendingInvite }) {
+function PendingInviteCard({ invite, onRevokeInvite }: { invite: PendingInvite; onRevokeInvite?: (token: string) => void }) {
 	const expiresIn = useMemo(
 		() => formatExpiresIn(invite.expiresAt),
 		[invite.expiresAt],
@@ -314,6 +351,16 @@ function PendingInviteCard({ invite }: { invite: PendingInvite }) {
 						{expiresIn}
 					</p>
 				</div>
+				{onRevokeInvite && (
+					<Button
+						variant="ghost"
+						size="sm"
+						onClick={() => onRevokeInvite(invite.token)}
+						title="초대 취소"
+					>
+						<Trash2 className="h-3.5 w-3.5 text-text-faint" />
+					</Button>
+				)}
 			</CardContent>
 		</Card>
 	);

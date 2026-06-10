@@ -249,6 +249,9 @@
 .mr-1{
 	margin-right: 0.25rem;
 }
+.mr-2{
+	margin-right: 0.5rem;
+}
 .mt-0\.5{
 	margin-top: 0.125rem;
 }
@@ -507,6 +510,9 @@
 }
 .grid-cols-7{
 	grid-template-columns: repeat(7, minmax(0, 1fr));
+}
+.flex-row{
+	flex-direction: row;
 }
 .flex-col{
 	flex-direction: column;
@@ -1101,6 +1107,12 @@
 }
 .hover\:text-\[color\:var\(--color-red\)\]:hover{
 	color: var(--color-red);
+}
+.hover\:text-\[color\:var\(--interactive-accent\)\]:hover{
+	color: var(--interactive-accent);
+}
+.hover\:text-text-muted:hover{
+	color: var(--text-muted);
 }
 .hover\:text-text-normal:hover{
 	color: var(--text-normal);

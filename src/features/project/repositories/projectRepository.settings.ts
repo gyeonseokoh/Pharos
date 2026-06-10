@@ -49,9 +49,8 @@ export class SettingsProjectRepository implements ProjectRepository {
 			fixedMeetingTime: report.fixedMeetingTime,
 			planningRoadmapGenerated: s.planningRoadmapGenerated,
 			developmentRoadmapGenerated: s.developmentRoadmapGenerated,
-			workspaceId: "", // settings에 아직 저장 안 함 (다음 phase에서 추가)
 			createdAt: report.createdAt,
-			updatedAt: report.createdAt, // settings 모델엔 별도 updatedAt 없음
+			updatedAt: report.createdAt,
 		};
 		return project;
 	}

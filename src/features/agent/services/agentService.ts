@@ -15,6 +15,10 @@ import type { TeamService } from "../../team/services/teamService";
 import type { ILLMProvider } from "../providers/ILLMProvider";
 import type { ISearchProvider } from "../search/ISearchProvider";
 import type {
+	GenerateDevRoadmapInput,
+	GenerateDevRoadmapResult,
+	GeneratePlanningRoadmapInput,
+	GeneratePlanningRoadmapResult,
 	MinutesAnalysisInput,
 	MinutesAnalysisResult,
 	MinutesSummaryInput,
@@ -36,6 +40,8 @@ import { ProgressAnalysisTask } from "../tasks/ProgressAnalysisTask";
 import { ResourceCollectionTask } from "../tasks/ResourceCollectionTask";
 import { TaskBreakdownTask } from "../tasks/TaskBreakdownTask";
 import { MinutesSummaryTask } from "../tasks/MinutesSummaryTask";
+import { GenerateDevRoadmapTask } from "../tasks/GenerateDevRoadmapTask";
+import { GeneratePlanningRoadmapTask } from "../tasks/GeneratePlanningRoadmapTask";
 
 // 일정 조율 UI(PO-4 달력·가용시간 표시)에서 사용하는 날짜·시간 헬퍼
 export {
@@ -55,6 +61,8 @@ export class AgentService {
 		collectResources: ResourceCollectionTask;
 		breakdownTask: TaskBreakdownTask;
 		summarizeMinutes: MinutesSummaryTask;
+		generateDevRoadmap: GenerateDevRoadmapTask;
+		generatePlanningRoadmap: GeneratePlanningRoadmapTask;
 	};
 
 	constructor(
@@ -83,6 +91,8 @@ export class AgentService {
 			collectResources: new ResourceCollectionTask(searchProvider, llmProvider),
 			breakdownTask: new TaskBreakdownTask(),
 			summarizeMinutes: new MinutesSummaryTask(),
+			generateDevRoadmap: new GenerateDevRoadmapTask(),
+			generatePlanningRoadmap: new GeneratePlanningRoadmapTask(),
 		};
 	}
 
@@ -118,5 +128,17 @@ export class AgentService {
 		input: MinutesSummaryInput,
 	): Promise<MinutesSummaryResult> {
 		return this.executor.execute(this.tasks.summarizeMinutes, input);
+	}
+
+	async generateDevRoadmap(
+		input: GenerateDevRoadmapInput,
+	): Promise<GenerateDevRoadmapResult> {
+		return this.executor.execute(this.tasks.generateDevRoadmap, input);
+	}
+
+	async generatePlanningRoadmap(
+		input: GeneratePlanningRoadmapInput,
+	): Promise<GeneratePlanningRoadmapResult> {
+		return this.executor.execute(this.tasks.generatePlanningRoadmap, input);
 	}
 }

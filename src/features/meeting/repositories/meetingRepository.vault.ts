@@ -151,8 +151,7 @@ export class VaultMeetingRepository implements MeetingRepository {
 
 			const result = MeetingV1.safeParse(fullMeta);
 			if (!result.success) {
-				console.error(`[Pharos] ${file.path} 파싱 실패:`, result.error.flatten());
-				new Notice(`[Pharos] ${file.name} 형식이 잘못됐습니다. 해당 회의를 건너뜁니다.`);
+				console.warn(`[Pharos] ${file.path} 파싱 실패:`, result.error.flatten());
 				return null;
 			}
 			return result.data;

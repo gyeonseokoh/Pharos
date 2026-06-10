@@ -1,32 +1,9 @@
 /**
- * ServerInviteService — 백엔드 합류 시 사용할 구현체 (현재는 스텁).
+ * ServerInviteService
+ * 초대용 API 엔드포인트와 통신하는 실구현체.
  *
- * 회의 합의(2026-05-17):
- *   - 옵시디언 안쪽 (UI·protocol handler) 은 유석 영역
- *   - 서버 측 토큰 발급·검증·메일·다른 PC 로 전달은 경석 영역
- *
- * 경석님이 합류해서 채울 부분:
- *   1. baseUrl + 인증 헤더 (워크스페이스 secret 또는 PO 토큰)
- *   2. POST /invites          — issueToken 구현
- *   3. GET  /invites/:token   — verifyToken 구현
- *   4. POST /invites/:token/consume — consumeToken 구현
- *   5. GET  /invites?status=active  — listPending
- *   6. DELETE /invites/:token  — revokeToken
- *
- * 메일 발송은 백엔드에서 POST /invites 시 자동으로 트리거 (input.email 이 있을 때).
- *
- * 사용 (백엔드 합류 시 main.ts 한 줄만 교체):
- *   // 시연용 (현재)
- *   this.inviteService = new LocalInviteService({ inviteRepo, getWorkspaceId });
- *
- *   // 백엔드 통합 시
- *   this.inviteService = new ServerInviteService({
- *     baseUrl: settings.hocuspocusServerUrl,
- *     getAuthToken: () => settings.apiToken,  // 또는 OAuth 토큰
- *     getWorkspaceId,
- *   });
- *
- * UI · protocol handler 코드는 일체 수정 없음 (InviteService 인터페이스만 알면 됨).
+ * main.ts 에서 LocalInviteService 대신 이 클래스를 주입하면
+ * 시연 모드 → 실서버 모드로 전환됨. UI·protocol handler 코드 수정 없음.
  */
 
 import type {
@@ -35,57 +12,120 @@ import type {
 	IssueTokenInput,
 	VerifiedInvite,
 } from "./inviteService";
+import type { MemberPermission } from "../domain/teamSchema";
 
 export interface ServerInviteServiceDeps {
-	/** 서버 base URL. settings.hocuspocusServerUrl 등에서. */
-	baseUrl: string;
-	/** 인증 토큰 (Bearer). PO 토큰 또는 워크스페이스 secret. */
+	/** 서버 base URL (e.g. https://pharos-backend-5eew.onrender.com). */
+	baseUrl: () => string;
+	/** 인증 토큰 getter — 항상 최신 JWT 반환. */
 	getAuthToken: () => string | null;
-	/** 현재 프로젝트 workspaceId. */
-	getWorkspaceId: () => Promise<string | null>;
+	/** 현재 settings.workspaceId getter. */
+	getWorkspaceId: () => Promise<number | null>;
 }
 
 export class ServerInviteService implements InviteService {
 	constructor(private readonly deps: ServerInviteServiceDeps) {}
 
+	/** Authorization 헤더 객체 생성. */
+	private authHeader(): Record<string, string> {
+		const token = this.deps.getAuthToken();
+		return token ? { Authorization: `Bearer ${token}` } : {};
+	}
+
+	/** fetch wrapper — 4xx/5xx를 Error로 변환. */
+	private async request<T>(
+		path: string,
+		init: RequestInit = {},
+	): Promise<T> {
+		const res = await fetch(`${this.deps.baseUrl()}${path}`, {
+			...init,
+			headers: {
+				"Content-Type": "application/json",
+				...this.authHeader(),
+				...(init.headers as Record<string, string> ?? {}),
+			},
+		});
+		if (!res.ok) {
+			const body = await res.text().catch(() => "");
+			throw new Error(`[ServerInviteService] ${init.method ?? "GET"} ${path} → ${res.status}: ${body}`);
+		}
+		if (res.status === 204) return undefined as T;
+		return res.json() as Promise<T>;
+	}
+
+	// ── POST /invites ─────────────────────────────────────────────
 	async issueToken(input: IssueTokenInput): Promise<IssuedInvite> {
-		// TODO(경석): POST {baseUrl}/invites
-		// body: { workspaceId, permission, email }
-		// auth: Authorization: Bearer {getAuthToken()}
-		// response: { token, expiresAt, inviteUrl }
-		throw new Error(
-			"ServerInviteService.issueToken 미구현 — 경석님이 백엔드 합류 시 채울 부분",
-		);
+		const workspaceId = await this.deps.getWorkspaceId();
+		if (!workspaceId) throw new Error("워크스페이스 ID 없음 — 프로젝트를 먼저 생성하세요");
+
+		const data = await this.request<{
+			token:      string;
+			expires_at: string;
+			invite_url: string;
+			permission: string;
+		}>("/invites", {
+			method: "POST",
+			body: JSON.stringify({
+				workspace_id: workspaceId,
+				permission:   input.permission,
+				email:        input.email,
+			}),
+		});
+
+		return {
+			token:      data.token,
+			expiresAt:  data.expires_at,
+			inviteUrl:  data.invite_url,
+			permission: data.permission as MemberPermission,
+		};
 	}
 
+	// ── GET /invites/:token ───────────────────────────────────────
 	async verifyToken(token: string): Promise<VerifiedInvite | null> {
-		// TODO(경석): GET {baseUrl}/invites/{token}
-		// response (200): { token, permission, workspaceId, expiresAt }
-		// response (404/410): null 반환 (무효·만료)
-		throw new Error(
-			"ServerInviteService.verifyToken 미구현 — 경석님이 백엔드 합류 시 채울 부분",
-		);
+		// 예외는 호출자(handleJoinLink)로 전파 — null은 "만료·미존재", 예외는 "통신 오류"를 의미
+		const res = await fetch(`${this.deps.baseUrl()}/invites/${encodeURIComponent(token)}`);
+		if (res.status === 404 || res.status === 410) return null;
+		if (!res.ok) throw new Error(`HTTP ${res.status}`);
+
+		const data = (await res.json()) as {
+			token:        string;
+			permission:   string;
+			workspace_id: number;
+			expires_at:   string;
+		};
+		return {
+			token:       data.token,
+			permission:  data.permission as MemberPermission,
+			workspaceId: data.workspace_id,
+			expiresAt:   data.expires_at,
+		};
 	}
 
-	async consumeToken(token: string): Promise<void> {
-		// TODO(경석): POST {baseUrl}/invites/{token}/consume
-		// 서버가 일회용 처리 + 신규 팀원 정보를 PO 워크스페이스에 등록
-		throw new Error(
-			"ServerInviteService.consumeToken 미구현 — 경석님이 백엔드 합류 시 채울 부분",
+	// ── POST /invites/:token/consume ──────────────────────────────
+	async consumeToken(token: string): Promise<{ workspaceId: number }> {
+		const data = await this.request<{ workspace_id: number }>(
+			`/invites/${encodeURIComponent(token)}/consume`,
+			{ method: "POST" },
 		);
+		return { workspaceId: data.workspace_id };
 	}
 
+	// ── GET /invites?workspace_id=N ───────────────────────────────
 	async listPending(): Promise<IssuedInvite[]> {
-		// TODO(경석): GET {baseUrl}/invites?status=active&workspaceId=...
-		throw new Error(
-			"ServerInviteService.listPending 미구현 — 경석님이 백엔드 합류 시 채울 부분",
+		const workspaceId = await this.deps.getWorkspaceId();
+		if (!workspaceId) return [];
+
+		const data = await this.request<{ invites: IssuedInvite[] }>(
+			`/invites?workspace_id=${workspaceId}`,
 		);
+		return data.invites;
 	}
 
+	// ── DELETE /invites/:token ────────────────────────────────────
 	async revokeToken(token: string): Promise<void> {
-		// TODO(경석): DELETE {baseUrl}/invites/{token}
-		throw new Error(
-			"ServerInviteService.revokeToken 미구현 — 경석님이 백엔드 합류 시 채울 부분",
+		await this.request<void>(
+			`/invites/${encodeURIComponent(token)}`,
+			{ method: "DELETE" },
 		);
 	}
 }

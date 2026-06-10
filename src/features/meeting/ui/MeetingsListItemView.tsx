@@ -115,7 +115,7 @@ export class MeetingsListItemView extends ItemView {
 				data={this.meetingsListData}
 				onOpenMeeting={(id) => void this.openMeetingPage(id)}
 				onOpenCalendar={() => void this.openCalendar()}
-				onAddAdhocMeeting={() => new AdhocMeetingModal(this.app).open()}
+				onAddAdhocMeeting={() => new AdhocMeetingModal(this.app, this.plugin).open()}
 				onOpenMinutesArchive={() =>
 					void this.openView(VIEW_TYPE_PHAROS_MINUTES_ARCHIVE)
 				}

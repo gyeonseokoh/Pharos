@@ -18,6 +18,38 @@ import {
 import { When2MeetGrid } from "./When2MeetGrid";
 import type { MemberRole, MemberPermission } from "../domain/teamSchema";
 import type { PharosPluginLike } from "../../../app/settings";
+import type { MemberSlotInput } from "../../availability/services/availabilityService";
+
+/** When2MeetGrid 셀 키("day-slotIndex") → MemberSlotInput[] 변환. WeeklyAvailabilityModal 동일 패턴. */
+function slotsToMemberSlotInputs(selected: Set<string>): MemberSlotInput[] {
+	return [...selected].map((key) => {
+		const [dayStr, siStr] = key.split("-");
+		const day = Number(dayStr);
+		const si = Number(siStr);
+		const pad = (n: number) => String(n).padStart(2, "0");
+		const startH = Math.floor(si / 2);
+		const startM = (si % 2) * 30;
+		const endSi = si + 1;
+		const endH = Math.floor(endSi / 2);
+		const endM = (endSi % 2) * 30;
+		return {
+			day,
+			start: `${pad(startH)}:${pad(startM)}`,
+			end: `${pad(endH)}:${pad(endM)}`,
+		};
+	});
+}
+
+/** 이번 주 월요일 ISO date (로컬 기준). */
+function currentWeekMonday(): string {
+	const today = new Date();
+	const dayOfWeek = today.getDay();
+	const daysToMonday = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
+	const monday = new Date(today);
+	monday.setDate(today.getDate() + daysToMonday);
+	const pad = (n: number) => String(n).padStart(2, "0");
+	return `${monday.getFullYear()}-${pad(monday.getMonth() + 1)}-${pad(monday.getDate())}`;
+}
 
 export interface JoinProjectModalArgs {
 	/** 초대 토큰 (있으면 검증된 상태로 들어옴). 없으면 시연·테스트 모드. */
@@ -64,17 +96,37 @@ function Content({
 				.split(",")
 				.map((s) => s.trim())
 				.filter(Boolean);
-			await plugin.teamService.addMember({
+			const member = await plugin.teamService.addMember({
 				name: form.name.trim(),
 				role: form.role,
 				permission: args.permission ?? "WRITE",
 				techStacks,
 			});
-			// 가입 완료 → 토큰 소비 (일회용)
+
+			// 토큰 소비 → workspaceId 획득 → 동기화 재연결
 			if (args.token) {
-				await plugin.inviteService.consumeToken(args.token).catch(() => {});
+				try {
+					const { workspaceId } = await plugin.inviteService.consumeToken(args.token);
+					plugin.settings.workspaceId = workspaceId;
+					await plugin.saveSettings();
+					plugin.reconnectSync();
+				} catch (err) {
+					const msg = (err as Error).message ?? "";
+					if (msg.includes("410")) {
+						new Notice("⚠️ 이미 사용된 초대 링크입니다");
+					} else {
+						new Notice(`⚠️ 초대 토큰 소비 실패 (동기화 연결 지연될 수 있음): ${msg}`);
+					}
+					// 멤버 등록은 완료됐으므로 모달은 닫음
+				}
 			}
-			// TODO(PM-1): availability를 AvailabilityService로 저장
+
+			// PM-1: 가입 시 선택한 고정 가용시간을 이번 주 기준으로 저장
+			await plugin.availabilityService.saveMemberSlots(
+				currentWeekMonday(),
+				member.id,
+				slotsToMemberSlotInputs(form.availability),
+			);
 			new Notice(`${form.name} 님 가입 완료`);
 			onClose();
 		} catch (err) {

@@ -247,3 +247,78 @@ export interface MinutesSummaryResult {
 	 */
 	suggestedTopics: string[];
 }
+
+// ─── 8. 기획 로드맵 생성 ────────────────────────────────────────────────────────
+
+/** 기획 로드맵 생성 에이전트 입력. */
+export interface GeneratePlanningRoadmapInput {
+	projectName: string;
+	projectDescription: string;
+	/** 프로젝트 시작일 (ISO date, 오늘). */
+	startDate: string;
+	/** 프로젝트 마감일 (ISO date). */
+	deadline: string;
+	/** 팀원 수. */
+	memberCount: number;
+}
+
+/** 기획 로드맵 생성 에이전트 결과. */
+export interface GeneratePlanningRoadmapResult {
+	phases: Array<{
+		id: string;
+		name: string;
+		start: string;
+		end: string;
+		color: string;
+		activities: string[];
+	}>;
+	summary: string;
+}
+
+// ─── 9. 개발 로드맵 생성 ────────────────────────────────────────────────────────
+
+/** 개발 로드맵 생성 에이전트 입력. */
+export interface GenerateDevRoadmapInput {
+	/** 프로젝트명. */
+	projectName: string;
+	/** 프로젝트 설명. */
+	projectDescription: string;
+	/** 프로젝트 마감일 (ISO date). */
+	deadline: string;
+	/** 기획 단계 종료일 (ISO date). */
+	planningEndIso: string;
+	/** 팀원 목록 (기술스택 포함). */
+	members: Array<{ id: string; name: string; role: string; techStacks: string[] }>;
+	/** 분석할 회의록 요약 목록. */
+	meetingSummaries: Array<{ title: string; date: string; decisions: string[]; keywords: string[] }>;
+}
+
+/** 생성된 단일 Task. */
+export interface DevRoadmapTask {
+	id: string;
+	name: string;
+	/** ISO date. */
+	start: string;
+	/** ISO date. */
+	end: string;
+	assignee: string | null;
+	phaseId: string;
+	dependsOn: string[];
+}
+
+/** 생성된 단일 Phase. */
+export interface DevRoadmapPhase {
+	id: string;
+	name: string;
+	start: string;
+	end: string;
+	color: string;
+	activities: string[];
+}
+
+/** 개발 로드맵 생성 에이전트 결과. */
+export interface GenerateDevRoadmapResult {
+	phases: DevRoadmapPhase[];
+	tasks: DevRoadmapTask[];
+	summary: string;
+}

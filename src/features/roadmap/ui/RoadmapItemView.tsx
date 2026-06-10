@@ -8,7 +8,7 @@
  *   4) 둘 다 있음                      → 탭 2개 활성, 기본 = 개발
  */
 
-import { ItemView, WorkspaceLeaf } from "obsidian";
+import { ItemView, Notice, WorkspaceLeaf } from "obsidian";
 import { createRoot, type Root } from "react-dom/client";
 import { RoadmapView } from "./RoadmapView";
 import { RoadmapEmptyView } from "./RoadmapEmptyView";
@@ -23,6 +23,7 @@ import { mockRoadmapData } from "./mock";
 import type { PharosPluginLike, ProjectReport } from "../../../app/settings";
 import type { RoadmapData } from "../domain/roadmapData";
 import type { RoadmapInput } from "../domain/roadmapSchema";
+import type { MeetingPageData } from "../../meeting/domain/meetingPageData";
 
 export const VIEW_TYPE_PHAROS_ROADMAP = "pharos-roadmap-view";
 
@@ -204,27 +205,66 @@ export class RoadmapItemView extends ItemView {
 				onGenerate={() => {}}
 			/>,
 		);
-		await sleep(2500);
 
-		// ── [DEMO] AI 연동 전 임시 mock 로드맵 데이터 ──────────────────────────────
-		// AI 연동 PR 시 아래 import와 input 구성 블록을 삭제하고,
-		// llmClient.generatePlanningRoadmap(project) 결과로 교체하세요.
-		// ────────────────────────────────────────────────────────────────────────────
-		const { mockRoadmapData } = await import("./mock");
-		const input: RoadmapInput = {
-			roadmapKind: "planning",
-			phases: mockRoadmapData.phases.map((p) => ({
-				id: p.id,
-				name: p.name,
-				start: p.start,
-				end: p.end,
-				status: p.status === "done" ? "completed" : p.status,
-				activities: p.activities,
-				color: p.color,
-			})),
-		};
+		let input: RoadmapInput;
+
+		if (this.plugin.settings.demoMode) {
+			await sleep(2500);
+			const { mockRoadmapData } = await import("./mock");
+			input = {
+				roadmapKind: "planning",
+				phases: mockRoadmapData.phases.map((p) => ({
+					id: p.id,
+					name: p.name,
+					start: p.start,
+					end: p.end,
+					status: p.status === "done" ? "completed" : p.status,
+					activities: p.activities,
+					color: p.color,
+				})),
+			};
+		} else {
+			try {
+				const result = await this.plugin.agentService.generatePlanningRoadmap({
+					projectName: project.name,
+					projectDescription: project.description,
+					startDate: new Date().toISOString().slice(0, 10),
+					deadline: project.deadline,
+					memberCount: (await this.plugin.teamService.list()).length,
+				});
+				if (result.phases.length === 0) {
+					throw new Error("AI가 유효한 기획 로드맵을 생성하지 못했습니다.");
+				}
+				input = {
+					roadmapKind: "planning",
+					phases: result.phases.map((p) => ({
+						id: p.id,
+						name: p.name,
+						start: p.start,
+						end: p.end,
+						status: "todo" as const,
+						activities: p.activities,
+						color: p.color,
+					})),
+				};
+			} catch (err) {
+				new Notice(`기획 로드맵 생성 실패: ${(err as Error).message}`);
+				if (this.root) {
+					this.root.render(
+						<RoadmapGenerateView
+							kind="planning"
+							onGenerate={() => void this.handleGeneratePlanning()}
+							onBackToHome={() => void this.openView(VIEW_TYPE_PHAROS_DASHBOARD)}
+						/>,
+					);
+				}
+				return;
+			}
+		}
+
 		await this.plugin.roadmapService.savePlanning(input);
-		// savePlanning → eventBus "roadmap:planning-generated" → pharos:state-changed → loadAndRender
+		await this.plugin.projectService.markPlanningGenerated();
+		// savePlanning + markPlanningGenerated → eventBus "roadmap:planning-generated" → pharos:state-changed → loadAndRender
 	}
 
 	/**
@@ -249,7 +289,11 @@ export class RoadmapItemView extends ItemView {
 			planning.phases.find((p) => p.id === "phase-plan")?.end ??
 			new Date().toISOString().slice(0, 10);
 
-		const memberEntities = await this.plugin.teamService.list();
+		const [memberEntities, meetingEntities] = await Promise.all([
+			this.plugin.teamService.list(),
+			this.plugin.meetingsService.list(),
+		]);
+
 		const members = memberEntities.map((m) => ({
 			id: m.id,
 			name: m.name,
@@ -262,9 +306,25 @@ export class RoadmapItemView extends ItemView {
 			hasFilledAvailability: false,
 		}));
 
+		const meetings: MeetingPageData[] = meetingEntities.map((m) => ({
+			id: m.id,
+			title: m.title,
+			date: m.date,
+			time: m.time,
+			durationMinutes: m.durationMinutes,
+			type: m.meetingType,
+			status: m.status,
+			attendees: m.attendees,
+			topics: m.topics,
+			resources: m.resources,
+			minutes: m.minutes,
+			analysis: m.analysis,
+		}));
+
 		new DevRoadmapGenerateModal(this.app, {
+			plugin: this.plugin,
 			report,
-			meetings: [],
+			meetings,
 			members,
 			planningEndIso,
 			onApprove: (roadmap: RoadmapData) =>
@@ -294,13 +354,15 @@ export class RoadmapItemView extends ItemView {
 			})),
 		};
 		await this.plugin.roadmapService.saveDevelopment(input);
-		// saveDevelopment → eventBus → pharos:state-changed → loadAndRender
+		await this.plugin.projectService.markDevelopmentGenerated();
+		// saveDevelopment + markDevelopmentGenerated → eventBus → pharos:state-changed → loadAndRender
 	}
 
 	/** 테스트 전용 — 개발 로드맵 삭제 후 🔒 잠금 상태 복귀. */
 	private async deleteDevelopmentRoadmap(): Promise<void> {
 		await this.plugin.roadmapService.deleteDevelopment();
-		// deleteDevelopment → eventBus → pharos:state-changed → loadAndRender
+		await this.plugin.projectService.markDevelopmentDeleted();
+		// deleteDevelopment + markDevelopmentDeleted → eventBus → pharos:state-changed → loadAndRender
 	}
 
 	private async openView(viewType: string): Promise<void> {

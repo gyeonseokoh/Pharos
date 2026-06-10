@@ -97,12 +97,33 @@ export const MeetingV1 = z.object({
 export type Meeting = z.infer<typeof MeetingV1>;
 
 /**
- * 회의록 첨부 시 받는 입력. Service.attachMinutes 가 이걸로 분석·저장 처리.
+ * 회의록 첨부 시 받는 입력.
+ *
+ * 분석 책임은 호출자(MinutesUploadModal)에게 있음:
+ *   - 모달이 demoMode 분기로 시뮬레이터 / agentService.analyzeMinutes 중 선택해 분석
+ *   - 그 결과를 analysis 로 전달하면 Service 는 순수 저장만 담당
+ *
+ * 이렇게 분리하면 MeetingsService 가 AgentService 에 직접 의존하지 않게 됨.
  */
 export interface AttachMinutesInput {
 	meetingId: string;
 	content: string;
 	authorName: string;
+	analysis: MeetingAnalysis;
+}
+
+/**
+ * 회의 생성 시 받는 입력. Service.create 가 메타 필드(version·type·id 등) 채움.
+ * PO-4 임시 회의 / PO-1-1 정기 회의 양쪽에서 사용.
+ */
+export interface CreateMeetingInput {
+	title: string;
+	date: string;
+	time: string;
+	durationMinutes?: number;
+	meetingType: MeetingType;
+	attendees?: MeetingAttendee[];
+	topics?: MeetingTopic[];
 }
 
 /**
