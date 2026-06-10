@@ -17,6 +17,7 @@ import { VIEW_TYPE_PHAROS_MY_TASKS } from "./MyTasksItemView";
 import { VIEW_TYPE_PHAROS_PROGRESS } from "./ProgressPageItemView";
 import { VIEW_TYPE_PHAROS_CALENDAR } from "../../meeting/ui/CalendarItemView";
 import { VIEW_TYPE_PHAROS_MEETINGS_LIST } from "../../meeting/ui/MeetingsListItemView";
+import { VIEW_TYPE_PHAROS_MINUTES_ARCHIVE } from "../../meeting/ui/MinutesArchiveItemView";
 import { VIEW_TYPE_PHAROS_MEETING_PAGE } from "../../meeting/ui/MeetingPageItemView";
 import { AiTopicModal } from "../../meeting/ui/AiTopicModal";
 import { NewProjectModal } from "../../project/ui/NewProjectModal";
@@ -140,6 +141,7 @@ export class DashboardItemView extends ItemView {
 					}}
 					onOpenRoadmap={() => void this.openView(VIEW_TYPE_PHAROS_ROADMAP)}
 					onOpenMeetings={() => void this.openView(VIEW_TYPE_PHAROS_MEETINGS_LIST)}
+					onOpenMinutesArchive={() => void this.openView(VIEW_TYPE_PHAROS_MINUTES_ARCHIVE)}
 					onOpenMeeting={(id) => void this.openMeeting(id)}
 					onOpenProgress={() => void this.openView(VIEW_TYPE_PHAROS_PROGRESS)}
 					onOpenMyTasks={() => void this.openView(VIEW_TYPE_PHAROS_MY_TASKS)}
@@ -179,6 +181,9 @@ export class DashboardItemView extends ItemView {
 				}
 				onOpenMeetings={() =>
 					void this.openView(VIEW_TYPE_PHAROS_MEETINGS_LIST)
+				}
+				onOpenMinutesArchive={() =>
+					void this.openView(VIEW_TYPE_PHAROS_MINUTES_ARCHIVE)
 				}
 				onOpenMeeting={(id) => void this.openMeeting(id)}
 				onOpenProgress={() =>

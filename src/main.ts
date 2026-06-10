@@ -72,9 +72,8 @@ import type { CommitRepository } from "./features/commit/repositories/commitRepo
 import { CommitService } from "./features/commit/services/commitService";
 import { runMigrationIfNeeded } from "./app/migration";
 import { Notice, MarkdownView } from "obsidian";
-import type { InviteService, VerifiedInvite } from "./features/team/services/inviteService";
+import type { InviteService } from "./features/team/services/inviteService";
 import { LocalInviteService } from "./features/team/services/inviteService.local";
-import { ServerInviteService } from "features/team/services/inviteService.server";
 import { JoinProjectModal } from "./features/team/ui/JoinProjectModal";
 import { AgentService } from "./features/agent/services/agentService";
 import { GeminiProvider } from "./features/agent/providers/GeminiProvider";
@@ -149,11 +148,10 @@ export default class PharosPlugin extends Plugin {
 			searchProvider,
 		);
 
-		this.inviteService = new ServerInviteService({
-			baseUrl: () => this.settings.hocuspocusServerUrl,
-			getAuthToken: () => this.settings.authToken || null,
-			getWorkspaceId: async () => this.settings.workspaceId ?? null
-		})
+		this.inviteService = new LocalInviteService({
+			inviteRepo: this.inviteRepository,
+			getWorkspaceId: async () => this.settings.workspaceId ?? null,
+		});
 
 		// eventBus → pharos:state-changed 브릿지
 		// 내부 이벤트를 모든 View가 수신하도록 전파
@@ -240,6 +238,10 @@ export default class PharosPlugin extends Plugin {
 			void this.activateView(VIEW_TYPE_PHAROS_DASHBOARD);
 		});
 
+		this.addRibbonIcon("library", "Pharos 회의록 관리", () => {
+			void this.activateView(VIEW_TYPE_PHAROS_MINUTES_ARCHIVE);
+		});
+
 		this.addCommand({ id: "open-dashboard",       name: "Open Pharos Dashboard",    callback: () => void this.activateView(VIEW_TYPE_PHAROS_DASHBOARD) });
 		this.addCommand({ id: "open-roadmap",          name: "Open Pharos Roadmap",      callback: () => void this.activateView(VIEW_TYPE_PHAROS_ROADMAP) });
 		this.addCommand({ id: "open-progress",         name: "Open Team Progress",       callback: () => void this.activateView(VIEW_TYPE_PHAROS_PROGRESS) });
@@ -282,15 +284,9 @@ export default class PharosPlugin extends Plugin {
 
 	private async handleJoinLink(token: string): Promise<void> {
 		if (!token) { new Notice("초대 링크에 토큰이 없습니다"); return; }
-		let invite: VerifiedInvite | null;
-		try {
-			invite = await this.inviteService.verifyToken(token);
-		} catch (err) {
-			new Notice(`초대 링크 확인 실패: ${(err as Error).message}`);
-			return;
-		}
-		if (!invite) { new Notice("초대 링크가 만료됐거나 이미 사용됐습니다"); return; }
-		new JoinProjectModal(this.app, this, { token, permission: invite.permission }).open();
+		const invite = await this.inviteService.verifyToken(token);
+		if (!invite) { new Notice("초대 링크가 유효하지 않거나 만료되었습니다 (24h)"); return; }
+		new JoinProjectModal(this.app, this, { token }).open();
 	}
 
 	private async handleAuthCallback(token: string): Promise<void> {

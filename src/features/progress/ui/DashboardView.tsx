@@ -69,6 +69,8 @@ export interface DashboardViewProps {
 	onGenerateMeetingTopics?: () => void;
 	/** PO-12 AI 진행 분석 트리거. 사용자가 "AI 분석 받기" 버튼 클릭 시 호출. */
 	onAnalyzeProgress?: () => void;
+	/** 회의록 관리(아카이브) 페이지 열기. */
+	onOpenMinutesArchive?: () => void;
 }
 
 export function DashboardView({
@@ -83,6 +85,7 @@ export function DashboardView({
 	onOpenSettings,
 	onGenerateMeetingTopics,
 	onAnalyzeProgress,
+	onOpenMinutesArchive,
 }: DashboardViewProps) {
 	const progressPercent = useMemo(
 		() =>
@@ -136,6 +139,7 @@ export function DashboardView({
 					onOpenRoadmap={onOpenRoadmap}
 					onOpenCalendar={onOpenCalendar}
 					onOpenMeetings={onOpenMeetings}
+					onOpenMinutesArchive={onOpenMinutesArchive}
 					onOpenMyTasks={onOpenMyTasks}
 					onOpenProgress={onOpenProgress}
 					onOpenTeam={onOpenTeam}
@@ -706,6 +710,7 @@ function QuickActions({
 	onOpenRoadmap,
 	onOpenCalendar,
 	onOpenMeetings,
+	onOpenMinutesArchive,
 	onOpenMyTasks,
 	onOpenProgress,
 	onOpenTeam,
@@ -715,6 +720,7 @@ function QuickActions({
 	onOpenRoadmap?: () => void;
 	onOpenCalendar?: () => void;
 	onOpenMeetings?: () => void;
+	onOpenMinutesArchive?: () => void;
 	onOpenMyTasks?: () => void;
 	onOpenProgress?: () => void;
 	onOpenTeam?: () => void;
@@ -726,6 +732,9 @@ function QuickActions({
 			<Button variant="secondary" onClick={onOpenRoadmap}>📊 로드맵 보기</Button>
 			<Button variant="secondary" onClick={onOpenMeetings}>
 				📋 회의 보기
+			</Button>
+			<Button variant="secondary" onClick={onOpenMinutesArchive}>
+				📝 회의록 보기
 			</Button>
 			<Button variant="secondary" onClick={onOpenCalendar}>
 				📅 캘린더 열기

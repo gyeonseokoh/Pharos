@@ -55,8 +55,10 @@ export interface MeetingPageViewProps {
 	onBackToHome?: () => void;
 	/** "AI 주제 생성" 버튼. */
 	onGenerateTopics?: () => void;
-	/** "회의록 작성하기" 버튼. */
+	/** "회의록 편집" 버튼 — 옵시디언 네이티브 에디터로 .md 파일 열기. */
 	onEditMinutes?: () => void;
+	/** PO-5 "회의록 직접 업로드" 버튼 — MinutesUploadModal 진입. */
+	onUploadMinutes?: () => void;
 	/** 주제 링크 클릭 → Topic Page. */
 	onOpenTopic?: (topicId: string) => void;
 	/** PO-3 "AI 자료 자동 수집" 버튼. 수집 진행 중에는 collectingResources=true. */
@@ -74,6 +76,7 @@ export function MeetingPageView({
 	onBackToHome,
 	onGenerateTopics,
 	onEditMinutes,
+	onUploadMinutes,
 	onOpenTopic,
 	onCollectResources,
 	collectingResources,
@@ -127,7 +130,11 @@ export function MeetingPageView({
 					onAddResource={onAddResource}
 				/>
 
-				<MinutesSection minutes={data.minutes} onEditMinutes={onEditMinutes} />
+				<MinutesSection
+					minutes={data.minutes}
+					onEditMinutes={onEditMinutes}
+					onUploadMinutes={onUploadMinutes}
+				/>
 
 				<AnalysisSection
 					analysis={data.analysis}
@@ -502,9 +509,11 @@ function ResourcesSection({
 function MinutesSection({
 	minutes,
 	onEditMinutes,
+	onUploadMinutes,
 }: {
 	minutes: MeetingMinutes | null;
 	onEditMinutes?: () => void;
+	onUploadMinutes?: () => void;
 }) {
 	return (
 		<Card>
@@ -518,10 +527,20 @@ function MinutesSection({
 								: "회의 후 작성해주세요"}
 						</CardDescription>
 					</div>
-					<Button variant="secondary" size="sm" onClick={onEditMinutes}>
-						<Pencil className="mr-1 h-3.5 w-3.5" />
-						{minutes ? "편집" : "작성하기"}
-					</Button>
+					<div className="flex items-center gap-2">
+						{!minutes && onUploadMinutes && (
+							<Button variant="outline" size="sm" onClick={onUploadMinutes}>
+								<Plus className="mr-1 h-3.5 w-3.5" />
+								직접 업로드
+							</Button>
+						)}
+						{onEditMinutes && (
+							<Button variant="secondary" size="sm" onClick={onEditMinutes}>
+								<Pencil className="mr-1 h-3.5 w-3.5" />
+								{minutes ? "편집" : "작성하기"}
+							</Button>
+						)}
+					</div>
 				</div>
 			</CardHeader>
 			<CardContent>

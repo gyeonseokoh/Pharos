@@ -15,6 +15,7 @@ import { VIEW_TYPE_PHAROS_TOPIC_PAGE } from "./TopicPageItemView";
 import { VIEW_TYPE_PHAROS_DASHBOARD } from "../../progress/ui/DashboardItemView";
 import { AiTopicModal } from "./AiTopicModal";
 import { ResourceUploadModal } from "./ResourceUploadModal";
+import { MinutesUploadModal } from "./MinutesUploadModal";
 import { getMeetingPageMock } from "./meetingPageMock";
 import { mockCalendarData } from "./calendarMock";
 import type { MeetingPageData } from "../domain/meetingPageData";
@@ -172,15 +173,14 @@ export class MeetingPageItemView extends ItemView {
 			return;
 		}
 
+		// 회의록 관리 / 회의 목록은 source 무관하게 항상 진입 가능하도록 노출.
+		// (캘린더 진입한 회의에서도 회의록 관리로 빠르게 점프하려는 UX 요구)
+		// 단 source 와 같은 뷰는 "돌아가기" 시맨틱이 명확하니 우선순위 표시.
 		const backProps = {
-			onBackToMeetingsList:
-				this.source === "meetings-list"
-					? () => void this.openView(VIEW_TYPE_PHAROS_MEETINGS_LIST)
-					: undefined,
-			onBackToMinutesArchive:
-				this.source === "minutes-archive"
-					? () => void this.openView(VIEW_TYPE_PHAROS_MINUTES_ARCHIVE)
-					: undefined,
+			onBackToMeetingsList: () =>
+				void this.openView(VIEW_TYPE_PHAROS_MEETINGS_LIST),
+			onBackToMinutesArchive: () =>
+				void this.openView(VIEW_TYPE_PHAROS_MINUTES_ARCHIVE),
 			onBackToCalendar:
 				this.source === "calendar"
 					? () => void this.openView(VIEW_TYPE_PHAROS_CALENDAR)
@@ -201,6 +201,7 @@ export class MeetingPageItemView extends ItemView {
 						: undefined
 				}
 				onEditMinutes={() => void this.openMinutesInEditor()}
+				onUploadMinutes={() => this.openMinutesUploadModal()}
 				onOpenTopic={(topicId) => void this.openTopic(topicId)}
 				onCollectResources={() => void this.runCollectResources()}
 				collectingResources={this.collectingResources}
@@ -277,6 +278,31 @@ export class MeetingPageItemView extends ItemView {
 	 * 파일이 없으면 새로 생성 후 오픈.
 	 * 이미 열린 탭이 있으면 재사용.
 	 */
+	/**
+	 * PO-5 회의록 직접 업로드.
+	 *
+	 * 현재 회의 페이지에서 클릭 시 MinutesUploadModal 을 그 회의 하나만 후보로 열어
+	 * 본문 입력·파일 업로드 → AI 분석 → 승인 흐름 진입.
+	 */
+	private openMinutesUploadModal(): void {
+		if (!this.meetingData) return;
+		const m = this.meetingData;
+		new MinutesUploadModal(this.app, {
+			plugin: this.plugin,
+			candidates: [m],
+			defaultAuthorName: "",
+			onApprove: async (meetingId, attached) => {
+				await this.plugin.meetingsService.attachMinutes({
+					meetingId,
+					content: attached.minutes.content,
+					authorName: attached.minutes.authorName,
+					analysis: attached.analysis,
+				});
+				await this.loadAndRender();
+			},
+		}).open();
+	}
+
 	private async openMinutesInEditor(): Promise<void> {
 		if (!this.meetingData) return;
 
