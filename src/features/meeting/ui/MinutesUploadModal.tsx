@@ -209,6 +209,7 @@ function Content({
 				<FormField label="대상 회의" required>
 					<select
 						className={inputClass}
+						style={{ height: "38px", lineHeight: "1.5" }}
 						value={meetingId}
 						onChange={(e) => setMeetingId(e.target.value)}
 					>

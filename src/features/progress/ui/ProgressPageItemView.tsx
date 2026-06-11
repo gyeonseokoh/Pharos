@@ -7,7 +7,9 @@
 
 import { ItemView, WorkspaceLeaf } from "obsidian";
 import { createRoot, type Root } from "react-dom/client";
-import { ProjectRequiredEmpty } from "shared/ui";
+import { PhaseLockedView, ProjectRequiredEmpty } from "shared/ui";
+import { VIEW_TYPE_PHAROS_ROADMAP } from "../../roadmap/ui/RoadmapItemView";
+import { getProjectPhase } from "../../project/domain/projectSchema";
 import { ProgressPageView } from "./ProgressPageView";
 import { VIEW_TYPE_PHAROS_DASHBOARD } from "./DashboardItemView";
 // ── [DEMO] AI·서버·깃허브 연동 전 임시 데모 시연용 하드코딩 연결 ──────────────────
@@ -89,6 +91,20 @@ export class ProgressPageItemView extends ItemView {
 			this.root?.render(
 				<ProjectRequiredEmpty
 					viewName="팀 진행도"
+					onOpenDashboard={() => void this.openView(VIEW_TYPE_PHAROS_DASHBOARD)}
+				/>,
+			);
+			return;
+		}
+
+		// PO 단계 게이트: 개발 단계 이전엔 Task 가 없어 의미있는 진행도 집계 불가.
+		if (getProjectPhase(project) !== "development") {
+			this.root?.render(
+				<PhaseLockedView
+					viewName="팀 진행도"
+					reason="개발 로드맵 생성 후 이용 가능합니다."
+					hint="Roadmap 탭에서 개발 로드맵을 생성하면 팀원별 체크리스트 완료율과 GitHub 커밋 통계가 여기에 표시됩니다."
+					onOpenRoadmap={() => void this.openView(VIEW_TYPE_PHAROS_ROADMAP)}
 					onOpenDashboard={() => void this.openView(VIEW_TYPE_PHAROS_DASHBOARD)}
 				/>,
 			);

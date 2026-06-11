@@ -20,3 +20,4 @@ export {
 	ProjectRequiredEmpty,
 	type ProjectRequiredEmptyProps,
 } from "./ProjectRequiredEmpty";
+export { PhaseLockedView, type PhaseLockedViewProps } from "./PhaseLockedView";

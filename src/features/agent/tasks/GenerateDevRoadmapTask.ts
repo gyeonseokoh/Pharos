@@ -42,7 +42,13 @@ const SYSTEM_PROMPT = `당신은 소프트웨어 프로젝트 개발 로드맵�
 - 각 task의 assignee는 팀원 이름 중 기술스택에 맞는 사람으로 배정. 없으면 null
 - 날짜는 planningEndIso 다음날부터 deadline 이전까지 배분
 - phase color는 HEX 색상 코드
-- 모든 텍스트는 한국어`;
+- 모든 텍스트는 한국어
+
+JSON 형식 엄수 (필수):
+- 응답은 순수 JSON 만. 마크다운 코드 펜스, 주석, 설명 텍스트 절대 포함 금지
+- 모든 키와 문자열 값은 큰따옴표(")로만 감싸기. 작은따옴표(') 사용 금지
+- 객체·배열 마지막 항목 뒤에 쉼표(,) 절대 붙이지 말 것 (trailing comma 금지)
+- JavaScript 식 객체 표기 금지 (key 따옴표 생략 등)`;
 
 function buildPrompt(input: GenerateDevRoadmapInput): string {
 	const lines: string[] = [
@@ -59,23 +65,46 @@ function buildPrompt(input: GenerateDevRoadmapInput): string {
 	];
 
 	if (input.meetingSummaries.length > 0) {
-		lines.push("", "=== 회의록 요약 ===");
+		lines.push("", "=== 회의록 ===");
 		for (const m of input.meetingSummaries) {
 			lines.push(`[${m.date}] ${m.title}`);
+			if (m.summary) {
+				lines.push(`  요약: ${m.summary}`);
+			}
 			if (m.decisions.length > 0) {
-				lines.push(`  결정사항: ${m.decisions.slice(0, 3).join(", ")}`);
+				lines.push(`  결정사항: ${m.decisions.slice(0, 5).join(" / ")}`);
 			}
 			if (m.keywords.length > 0) {
-				lines.push(`  키워드: ${m.keywords.slice(0, 5).join(", ")}`);
+				lines.push(`  키워드: ${m.keywords.slice(0, 8).join(", ")}`);
+			}
+			if (m.techStacks && m.techStacks.length > 0) {
+				lines.push(`  기술스택: ${m.techStacks.slice(0, 8).join(", ")}`);
+			}
+			if (
+				m.contentSnippet &&
+				m.decisions.length === 0 &&
+				m.keywords.length === 0
+			) {
+				lines.push(`  본문 발췌:`);
+				lines.push(m.contentSnippet.split("\n").map((l) => `    ${l}`).join("\n"));
 			}
 		}
+	} else {
+		lines.push(
+			"",
+			"=== 회의록 ===",
+			"(회의록이 아직 없습니다. 프로젝트명·설명·팀원 정보만으로 합리적인 기본 개발 로드맵을 생성하세요.)",
+		);
 	}
 
 	lines.push(
 		"",
 		"=== 요청 ===",
 		`기획 완료일(${input.planningEndIso}) 다음날부터 마감일(${input.deadline})까지의 개발 로드맵을 생성해주세요.`,
-		"회의록 결정사항과 키워드를 기반으로 구체적인 Task를 만들어주세요.",
+		"회의록 결정사항·키워드·요약·본문 발췌를 종합해 구체적인 Task 를 만들어주세요.",
+		"회의록이 부족하면 프로젝트 설명·팀원 기술스택을 바탕으로 일반적인 소프트웨어 개발 흐름(요구사항 정리 → 설계 → 핵심 기능 구현 → 통합 테스트 → 배포 준비)에 맞춰 추정해 주세요.",
+		"",
+		"중요: phases 는 반드시 최소 2개 이상, tasks 는 최소 5개 이상 생성. 빈 배열 반환 금지.",
 	);
 
 	return lines.join("\n");
@@ -110,11 +139,75 @@ export class GenerateDevRoadmapTask
 		};
 
 		let parsed: RawResult = {};
-		try {
-			parsed = JSON.parse(raw) as RawResult;
-		} catch {
-			console.warn("[Pharos Agent] GenerateDevRoadmapTask JSON parse failed");
+		let parseError = "";
+
+		// 1차 시도: 코드 펜스만 제거하고 그대로 파싱
+		const stripFence = (s: string): string =>
+			s
+				.trim()
+				.replace(/^```(?:json)?\s*/i, "")
+				.replace(/\s*```$/, "")
+				.trim();
+
+		const tryParse = (input: string): RawResult | null => {
+			try {
+				return JSON.parse(input) as RawResult;
+			} catch {
+				return null;
+			}
+		};
+
+		const cleaned = stripFence(raw);
+		let result = tryParse(cleaned);
+
+		if (!result) {
+			// 2차 시도: Gemini 흔한 오류 자동 보정
+			//   - 스마트 인용부호 / 한글 인용부호 → ASCII 쌍따옴표
+			//   - 객체·배열 끝의 trailing comma 제거: `,}` `,]`
+			//   - 단일 인용부호로 감싼 키 → 쌍따옴표: `'name':` → `"name":`
+			//   - 줄 끝에 붙은 // 주석 제거
+			//   - 줄간 /* ... */ 주석 제거
+			//   - 값 안의 줄바꿈 문자 escape
+			const lenient = cleaned
+				.replace(/[“”„″]/g, '"') // " " „ ″
+				.replace(/[‘’‚′]/g, "'") // ' ' ‚ ′
+				.replace(/\/\*[\s\S]*?\*\//g, "")
+				.replace(/\/\/[^\n\r]*/g, "")
+				.replace(/'([A-Za-z_][\w-]*)'\s*:/g, '"$1":')
+				.replace(/,(\s*[}\]])/g, "$1");
+			result = tryParse(lenient);
 		}
+
+		if (!result) {
+			// 3차 시도: 본문에서 첫 JSON 객체 부분만 추출 (꼬리에 잡문 붙은 경우)
+			const start = cleaned.indexOf("{");
+			const end = cleaned.lastIndexOf("}");
+			if (start !== -1 && end > start) {
+				result = tryParse(cleaned.slice(start, end + 1));
+			}
+		}
+
+		if (result) {
+			parsed = result;
+		} else {
+			try {
+				JSON.parse(cleaned);
+			} catch (e) {
+				parseError = (e as Error).message;
+			}
+			console.warn(
+				"[Pharos Agent] GenerateDevRoadmapTask JSON parse failed. Raw response:",
+				raw,
+			);
+		}
+
+		console.debug(
+			"[Pharos Agent] GenerateDevRoadmapTask parsed:",
+			"phases:",
+			parsed.phases?.length ?? 0,
+			"tasks:",
+			parsed.tasks?.length ?? 0,
+		);
 
 		const phases: DevRoadmapPhase[] = (parsed.phases ?? [])
 			.filter((p) => p.id && p.name && p.start && p.end)
@@ -138,6 +231,34 @@ export class GenerateDevRoadmapTask
 				phaseId: t.phaseId ?? (phases[0]?.id ?? "dev-mvp"),
 				dependsOn: t.dependsOn ?? [],
 			}));
+
+		// 실패 시 진단 정보를 throw 메시지에 박아 모달 UI 에 그대로 노출.
+		// (콘솔 못 보는 환경에서도 사용자가 원인을 바로 확인 가능)
+		if (phases.length === 0) {
+			const rawPhases = parsed.phases ?? [];
+			const rawTasks = parsed.tasks ?? [];
+
+			let details: string;
+			if (parseError) {
+				// "Expected ... at position N" 패턴에서 N 추출해 그 주변 ±80자 발췌
+				const posMatch = parseError.match(/position\s+(\d+)/);
+				const pos = posMatch ? parseInt(posMatch[1]!, 10) : -1;
+				const ctx =
+					pos >= 0
+						? raw.slice(Math.max(0, pos - 80), pos + 80)
+						: raw.slice(0, 400);
+				const arrow =
+					pos >= 0
+						? `\n에러 위치 주변 (▼ 가 깨진 지점):\n${raw.slice(Math.max(0, pos - 80), pos)}▼${raw.slice(pos, pos + 80)}`
+						: `\n응답 앞부분:\n${ctx}`;
+				details = `JSON 파싱 실패: ${parseError}${arrow}`;
+			} else if (rawPhases.length === 0) {
+				details = `AI 응답에 phases 가 0개. 응답 앞부분:\n${raw.slice(0, 400)}`;
+			} else {
+				details = `AI 가 phases ${rawPhases.length}개·tasks ${rawTasks.length}개 반환했지만 모두 필수 필드(id/name/start/end) 누락으로 필터링됨. 첫 phase 샘플:\n${JSON.stringify(rawPhases[0])}`;
+			}
+			throw new Error(`AI 가 유효한 로드맵을 생성하지 못했습니다.\n\n[진단]\n${details}`);
+		}
 
 		return { phases, tasks, summary: parsed.summary ?? "" };
 	}

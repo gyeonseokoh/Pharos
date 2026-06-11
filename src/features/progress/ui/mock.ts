@@ -8,6 +8,7 @@
 import type { DashboardData } from "../domain/dashboardData";
 
 export const mockDashboardData: DashboardData = {
+	phase: "development",
 	project: {
 		name: "AI 프로젝트 매니저",
 		deadline: "2026-06-30",

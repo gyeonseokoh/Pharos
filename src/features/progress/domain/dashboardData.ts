@@ -101,9 +101,30 @@ export interface ProgressAnalysisCardResult {
 }
 
 /**
+ * 최근 회의록 카드 view-model (PO-5 진입점).
+ *
+ * Dashboard 의 회의록 카드 → "회의록 관리" 진입 + 최근 3건 빠른 미리보기.
+ */
+export interface RecentMinutesEntry {
+	meetingId: string;
+	meetingTitle: string;
+	meetingDate: string; // ISO date
+	authorName: string;
+	writtenAt: string; // ISO datetime
+	preview: string; // 첫 ~120자
+}
+
+/**
  * DashboardView가 받는 데이터 전체 묶음.
  */
 export interface DashboardData {
+	/**
+	 * 프로젝트 진행 단계.
+	 * setup       : 기획 로드맵 미생성
+	 * planning    : 기획 로드맵 생성됨, 개발 로드맵 미생성
+	 * development : 개발 로드맵 생성됨 (전체 UI)
+	 */
+	phase: "setup" | "planning" | "development";
 	project: ProjectSummary;
 	progress: ProgressSummary;
 	/** 프로토타입이 없는 프로젝트면 `null`. */
@@ -116,4 +137,6 @@ export interface DashboardData {
 	alerts: DashboardAlert[];
 	/** PO-12 AI 진행 분석. null 이면 카드 영역 자체 생략. */
 	progressAnalysis?: ProgressAnalysisCard | null;
+	/** 회의록 관리 카드용 최근 회의록 N건. 비어있으면 카드 표시 안 함. */
+	recentMinutes?: RecentMinutesEntry[];
 }

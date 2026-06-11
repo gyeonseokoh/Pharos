@@ -86,13 +86,19 @@ function Content({
 							role: m.role,
 							techStacks: m.techStacks,
 						})),
+						// 회의록 (minutes) 가 있는 회의는 분석 유무 무관하게 모두 전달.
+						// analysis 가 없거나 decisions/keywords 가 비었어도 contentSnippet
+						// (원문 일부) 으로 LLM 이 Task 를 추출할 수 있음.
 						meetingSummaries: args.meetings
-							.filter((m) => m.analysis !== null)
+							.filter((m) => m.minutes !== null || m.analysis !== null)
 							.map((m) => ({
 								title: m.title,
 								date: m.date,
 								decisions: m.analysis?.decisions ?? [],
 								keywords: m.analysis?.keywords ?? [],
+								summary: m.analysis?.summary,
+								techStacks: m.analysis?.techStacks,
+								contentSnippet: m.minutes?.content.slice(0, 1500),
 							})),
 					});
 					if (agentResult.phases.length === 0) {
@@ -148,6 +154,23 @@ function Content({
 		setPhase("progress");
 	};
 
+	/**
+	 * AI 호출 실패 시 fallback. 기존 demoMode 시뮬레이터를 그대로 사용해
+	 * 회의록·기획 기간·팀원 정보를 바탕으로 기본 개발 로드맵을 결정형으로 생성.
+	 * 외부 API 호출 0건이라 quota 와 무관하게 항상 동작.
+	 */
+	const generateWithoutAi = () => {
+		const result = generateDevelopmentRoadmap({
+			report: args.report,
+			meetings: args.meetings,
+			members: args.members,
+			planningEndIso: args.planningEndIso,
+		});
+		setGenError(null);
+		setRoadmap(result);
+		setPhase("preview");
+	};
+
 	const approve = async () => {
 		if (!roadmap) return;
 		await args.onApprove(roadmap);
@@ -165,10 +188,23 @@ function Content({
 				<ProgressList currentIndex={currentStepIndex} />
 				{genError ? (
 					<div className="mt-4 space-y-2">
-						<p className="text-xs text-[color:var(--color-red)]">⚠️ {genError}</p>
+						<pre className="max-h-[280px] overflow-auto whitespace-pre-wrap break-words rounded-md border border-[color:var(--color-red)]/30 bg-[color:var(--color-red)]/5 p-3 text-[11px] text-[color:var(--color-red)]">
+							⚠️ {genError}
+						</pre>
 						<Button variant="outline" onClick={regenerate} className="w-full text-xs">
-							다시 시도
+							🔄 AI 로 다시 시도
 						</Button>
+						<Button
+							variant="secondary"
+							onClick={generateWithoutAi}
+							className="w-full text-xs"
+						>
+							⚡ AI 없이 기본 템플릿으로 생성 (시연용)
+						</Button>
+						<p className="text-[10px] text-text-faint">
+							AI 호출이 계속 실패하면 회의록·팀원 정보를 바탕으로 결정형
+							템플릿으로 로드맵을 만듭니다. 외부 API 호출 없음.
+						</p>
 					</div>
 				) : (
 					<p className="mt-4 text-[11px] text-text-faint">
