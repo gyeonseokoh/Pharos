@@ -133,6 +133,7 @@ export class GenerateDevRoadmapTask
 		};
 
 		let parsed: RawResult = {};
+		let parseError = "";
 		try {
 			// Gemini 가 ```json ... ``` 코드 펜스로 감쌀 때 대비 한 번 더 정제
 			const cleaned = raw
@@ -141,7 +142,8 @@ export class GenerateDevRoadmapTask
 				.replace(/\s*```$/, "")
 				.trim();
 			parsed = JSON.parse(cleaned) as RawResult;
-		} catch {
+		} catch (e) {
+			parseError = (e as Error).message;
 			console.warn(
 				"[Pharos Agent] GenerateDevRoadmapTask JSON parse failed. Raw response:",
 				raw,
@@ -179,11 +181,18 @@ export class GenerateDevRoadmapTask
 				dependsOn: t.dependsOn ?? [],
 			}));
 
-		if (phases.length === 0 && (parsed.phases?.length ?? 0) > 0) {
-			console.warn(
-				"[Pharos Agent] GenerateDevRoadmapTask: phases 가 응답에 있었으나 모두 필수 필드(id/name/start/end) 누락으로 필터링됨. Raw phases:",
-				parsed.phases,
-			);
+		// 실패 시 진단 정보를 throw 메시지에 박아 모달 UI 에 그대로 노출.
+		// (콘솔 못 보는 환경에서도 사용자가 원인을 바로 확인 가능)
+		if (phases.length === 0) {
+			const rawPhases = parsed.phases ?? [];
+			const rawTasks = parsed.tasks ?? [];
+			const head = raw.slice(0, 400);
+			const details = parseError
+				? `JSON 파싱 실패: ${parseError}\n응답 앞부분:\n${head}`
+				: rawPhases.length === 0
+					? `AI 응답에 phases 가 0개. 응답 앞부분:\n${head}`
+					: `AI 가 phases ${rawPhases.length}개·tasks ${rawTasks.length}개 반환했지만 모두 필수 필드(id/name/start/end) 누락으로 필터링됨. 첫 phase 샘플:\n${JSON.stringify(rawPhases[0])}`;
+			throw new Error(`AI 가 유효한 로드맵을 생성하지 못했습니다.\n\n[진단]\n${details}`);
 		}
 
 		return { phases, tasks, summary: parsed.summary ?? "" };

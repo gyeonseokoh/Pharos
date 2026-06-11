@@ -171,7 +171,9 @@ function Content({
 				<ProgressList currentIndex={currentStepIndex} />
 				{genError ? (
 					<div className="mt-4 space-y-2">
-						<p className="text-xs text-[color:var(--color-red)]">⚠️ {genError}</p>
+						<pre className="max-h-[280px] overflow-auto whitespace-pre-wrap break-words rounded-md border border-[color:var(--color-red)]/30 bg-[color:var(--color-red)]/5 p-3 text-[11px] text-[color:var(--color-red)]">
+							⚠️ {genError}
+						</pre>
 						<Button variant="outline" onClick={regenerate} className="w-full text-xs">
 							다시 시도
 						</Button>
