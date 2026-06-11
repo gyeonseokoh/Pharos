@@ -106,11 +106,22 @@ export class GeminiProvider implements ILLMProvider {
 		}
 
 		const msg = (lastErr as Error)?.message ?? "알 수 없는 오류";
-		const friendly = /\b(503|UNAVAILABLE)\b/.test(msg)
-			? `[${this.model}] Gemini 가 일시 과부하 상태 (503). 1~2분 후 재시도하거나 설정에서 모델을 'gemini-2.0-flash' 로 바꿔주세요 (Flash 가 한도 1500/day 로 가장 안정).`
+		const keyDigest = (() => {
+			const k = apiKey;
+			if (k.length < 8) return "(짧음)";
+			return `${k.slice(0, 4)}…${k.slice(-4)}`;
+		})();
+		const header = `[모델: ${this.model}] [API 키: ${keyDigest}]`;
+
+		// 모든 케이스에서 원본 메시지를 그대로 노출 (truncation 제거).
+		// 사용자가 콘솔 접근 없이 정확한 Google API 에러를 읽고 진단 가능하도록.
+		const hint = /\b(503|UNAVAILABLE)\b/.test(msg)
+			? "→ Gemini 서버 일시 과부하. 1~2분 후 재시도. 잦으면 다른 모델 시도."
 			: /\b(429|RESOURCE_EXHAUSTED)\b/.test(msg)
-				? `[${this.model}] Gemini 무료 할당량 소진 (429). 해결법:\n  ① 설정에서 모델을 'gemini-2.0-flash' 로 변경 (한도 1500/day, 가장 여유)\n  ② 또는 다른 구글 계정으로 새 API 키 발급 후 교체\n  ③ 또는 24시간 (PT 자정) 후 자동 리셋 대기\n  (원본 메시지: ${msg.slice(0, 160)}…)`
-				: msg;
-		throw new Error(friendly);
+				? "→ Google 할당량 초과 응답. 원본 메시지의 'quota metric' / 'limit' 줄을 확인하세요. limit: 0 = 해당 모델이 이 프로젝트의 free tier 에서 막혀있음. 모델 변경 또는 다른 Google 계정 필요."
+				: "";
+		throw new Error(
+			`${header}\n\n원본 응답:\n${msg}${hint ? "\n\n" + hint : ""}`,
+		);
 	}
 }
