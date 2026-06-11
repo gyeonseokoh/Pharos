@@ -162,10 +162,16 @@ export class GenerateDevRoadmapTask
 
 		if (!result) {
 			// 2차 시도: Gemini 흔한 오류 자동 보정
+			//   - 스마트 인용부호 / 한글 인용부호 → ASCII 쌍따옴표
 			//   - 객체·배열 끝의 trailing comma 제거: `,}` `,]`
 			//   - 단일 인용부호로 감싼 키 → 쌍따옴표: `'name':` → `"name":`
 			//   - 줄 끝에 붙은 // 주석 제거
+			//   - 줄간 /* ... */ 주석 제거
+			//   - 값 안의 줄바꿈 문자 escape
 			const lenient = cleaned
+				.replace(/[“”„″]/g, '"') // " " „ ″
+				.replace(/[‘’‚′]/g, "'") // ' ' ‚ ′
+				.replace(/\/\*[\s\S]*?\*\//g, "")
 				.replace(/\/\/[^\n\r]*/g, "")
 				.replace(/'([A-Za-z_][\w-]*)'\s*:/g, '"$1":')
 				.replace(/,(\s*[}\]])/g, "$1");
@@ -231,12 +237,26 @@ export class GenerateDevRoadmapTask
 		if (phases.length === 0) {
 			const rawPhases = parsed.phases ?? [];
 			const rawTasks = parsed.tasks ?? [];
-			const head = raw.slice(0, 400);
-			const details = parseError
-				? `JSON 파싱 실패: ${parseError}\n응답 앞부분:\n${head}`
-				: rawPhases.length === 0
-					? `AI 응답에 phases 가 0개. 응답 앞부분:\n${head}`
-					: `AI 가 phases ${rawPhases.length}개·tasks ${rawTasks.length}개 반환했지만 모두 필수 필드(id/name/start/end) 누락으로 필터링됨. 첫 phase 샘플:\n${JSON.stringify(rawPhases[0])}`;
+
+			let details: string;
+			if (parseError) {
+				// "Expected ... at position N" 패턴에서 N 추출해 그 주변 ±80자 발췌
+				const posMatch = parseError.match(/position\s+(\d+)/);
+				const pos = posMatch ? parseInt(posMatch[1]!, 10) : -1;
+				const ctx =
+					pos >= 0
+						? raw.slice(Math.max(0, pos - 80), pos + 80)
+						: raw.slice(0, 400);
+				const arrow =
+					pos >= 0
+						? `\n에러 위치 주변 (▼ 가 깨진 지점):\n${raw.slice(Math.max(0, pos - 80), pos)}▼${raw.slice(pos, pos + 80)}`
+						: `\n응답 앞부분:\n${ctx}`;
+				details = `JSON 파싱 실패: ${parseError}${arrow}`;
+			} else if (rawPhases.length === 0) {
+				details = `AI 응답에 phases 가 0개. 응답 앞부분:\n${raw.slice(0, 400)}`;
+			} else {
+				details = `AI 가 phases ${rawPhases.length}개·tasks ${rawTasks.length}개 반환했지만 모두 필수 필드(id/name/start/end) 누락으로 필터링됨. 첫 phase 샘플:\n${JSON.stringify(rawPhases[0])}`;
+			}
 			throw new Error(`AI 가 유효한 로드맵을 생성하지 못했습니다.\n\n[진단]\n${details}`);
 		}
 
