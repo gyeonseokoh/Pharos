@@ -54,14 +54,22 @@ export class GeminiProvider implements ILLMProvider {
 				: [{ role: "user" as const, parts: [{ text: "(no input)" }] }];
 
 		// 일시적 과부하 / 네트워크 오류 대응 — 지수 백오프로 최대 4회 재시도.
-		// 503 UNAVAILABLE, 429 RESOURCE_EXHAUSTED, 5xx, fetch 네트워크 에러를
-		// retryable 로 분류. 4xx (인증·요청 형식) 는 즉시 throw.
+		//
+		// 재시도 대상:
+		//   - 503 / 502 / 500 / 504 / UNAVAILABLE — 서버 일시 과부하
+		//   - 네트워크 / timeout
+		//
+		// 재시도 안 함 (즉시 throw):
+		//   - 429 / RESOURCE_EXHAUSTED — quota 초과. 재시도는 quota 소진 가속 → 무의미
+		//   - 4xx (인증·요청 형식) — 코드/키 문제. 재시도해도 동일 결과
 		const MAX_ATTEMPTS = 4;
 		const baseDelayMs = 1500;
 
 		const isRetryable = (err: unknown): boolean => {
 			const msg = (err as Error)?.message ?? "";
-			if (/\b(503|502|500|504|UNAVAILABLE|RESOURCE_EXHAUSTED|429)\b/.test(msg)) {
+			// 429 / RESOURCE_EXHAUSTED 는 재시도 금지 (quota 가속 소진 방지)
+			if (/\b(429|RESOURCE_EXHAUSTED)\b/.test(msg)) return false;
+			if (/\b(503|502|500|504|UNAVAILABLE)\b/.test(msg)) {
 				return true;
 			}
 			if (/(network|fetch failed|ECONNRESET|ETIMEDOUT|timeout)/i.test(msg)) {
@@ -99,9 +107,9 @@ export class GeminiProvider implements ILLMProvider {
 
 		const msg = (lastErr as Error)?.message ?? "알 수 없는 오류";
 		const friendly = /\b(503|UNAVAILABLE)\b/.test(msg)
-			? "Gemini 가 일시적으로 과부하 상태입니다 (503). 잠시 후 다시 시도하거나 모델을 gemini-2.0-flash 로 바꿔주세요."
+			? `[${this.model}] Gemini 가 일시 과부하 상태 (503). 1~2분 후 재시도하거나 설정에서 모델을 'gemini-2.0-flash' 로 바꿔주세요 (Flash 가 한도 1500/day 로 가장 안정).`
 			: /\b(429|RESOURCE_EXHAUSTED)\b/.test(msg)
-				? "Gemini 무료 티어 일일/분당 할당량 초과 (429). 다른 API 키로 교체하거나 모델을 변경해주세요."
+				? `[${this.model}] Gemini 무료 할당량 소진 (429). 해결법:\n  ① 설정에서 모델을 'gemini-2.0-flash' 로 변경 (한도 1500/day, 가장 여유)\n  ② 또는 다른 구글 계정으로 새 API 키 발급 후 교체\n  ③ 또는 24시간 (PT 자정) 후 자동 리셋 대기\n  (원본 메시지: ${msg.slice(0, 160)}…)`
 				: msg;
 		throw new Error(friendly);
 	}
