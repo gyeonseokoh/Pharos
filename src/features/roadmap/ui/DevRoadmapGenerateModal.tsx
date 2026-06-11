@@ -154,6 +154,23 @@ function Content({
 		setPhase("progress");
 	};
 
+	/**
+	 * AI 호출 실패 시 fallback. 기존 demoMode 시뮬레이터를 그대로 사용해
+	 * 회의록·기획 기간·팀원 정보를 바탕으로 기본 개발 로드맵을 결정형으로 생성.
+	 * 외부 API 호출 0건이라 quota 와 무관하게 항상 동작.
+	 */
+	const generateWithoutAi = () => {
+		const result = generateDevelopmentRoadmap({
+			report: args.report,
+			meetings: args.meetings,
+			members: args.members,
+			planningEndIso: args.planningEndIso,
+		});
+		setGenError(null);
+		setRoadmap(result);
+		setPhase("preview");
+	};
+
 	const approve = async () => {
 		if (!roadmap) return;
 		await args.onApprove(roadmap);
@@ -175,8 +192,19 @@ function Content({
 							⚠️ {genError}
 						</pre>
 						<Button variant="outline" onClick={regenerate} className="w-full text-xs">
-							다시 시도
+							🔄 AI 로 다시 시도
 						</Button>
+						<Button
+							variant="secondary"
+							onClick={generateWithoutAi}
+							className="w-full text-xs"
+						>
+							⚡ AI 없이 기본 템플릿으로 생성 (시연용)
+						</Button>
+						<p className="text-[10px] text-text-faint">
+							AI 호출이 계속 실패하면 회의록·팀원 정보를 바탕으로 결정형
+							템플릿으로 로드맵을 만듭니다. 외부 API 호출 없음.
+						</p>
 					</div>
 				) : (
 					<p className="mt-4 text-[11px] text-text-faint">
