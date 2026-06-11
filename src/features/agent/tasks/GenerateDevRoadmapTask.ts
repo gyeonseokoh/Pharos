@@ -42,7 +42,13 @@ const SYSTEM_PROMPT = `당신은 소프트웨어 프로젝트 개발 로드맵�
 - 각 task의 assignee는 팀원 이름 중 기술스택에 맞는 사람으로 배정. 없으면 null
 - 날짜는 planningEndIso 다음날부터 deadline 이전까지 배분
 - phase color는 HEX 색상 코드
-- 모든 텍스트는 한국어`;
+- 모든 텍스트는 한국어
+
+JSON 형식 엄수 (필수):
+- 응답은 순수 JSON 만. 마크다운 코드 펜스, 주석, 설명 텍스트 절대 포함 금지
+- 모든 키와 문자열 값은 큰따옴표(")로만 감싸기. 작은따옴표(') 사용 금지
+- 객체·배열 마지막 항목 뒤에 쉼표(,) 절대 붙이지 말 것 (trailing comma 금지)
+- JavaScript 식 객체 표기 금지 (key 따옴표 생략 등)`;
 
 function buildPrompt(input: GenerateDevRoadmapInput): string {
 	const lines: string[] = [
@@ -134,16 +140,55 @@ export class GenerateDevRoadmapTask
 
 		let parsed: RawResult = {};
 		let parseError = "";
-		try {
-			// Gemini 가 ```json ... ``` 코드 펜스로 감쌀 때 대비 한 번 더 정제
-			const cleaned = raw
+
+		// 1차 시도: 코드 펜스만 제거하고 그대로 파싱
+		const stripFence = (s: string): string =>
+			s
 				.trim()
 				.replace(/^```(?:json)?\s*/i, "")
 				.replace(/\s*```$/, "")
 				.trim();
-			parsed = JSON.parse(cleaned) as RawResult;
-		} catch (e) {
-			parseError = (e as Error).message;
+
+		const tryParse = (input: string): RawResult | null => {
+			try {
+				return JSON.parse(input) as RawResult;
+			} catch {
+				return null;
+			}
+		};
+
+		const cleaned = stripFence(raw);
+		let result = tryParse(cleaned);
+
+		if (!result) {
+			// 2차 시도: Gemini 흔한 오류 자동 보정
+			//   - 객체·배열 끝의 trailing comma 제거: `,}` `,]`
+			//   - 단일 인용부호로 감싼 키 → 쌍따옴표: `'name':` → `"name":`
+			//   - 줄 끝에 붙은 // 주석 제거
+			const lenient = cleaned
+				.replace(/\/\/[^\n\r]*/g, "")
+				.replace(/'([A-Za-z_][\w-]*)'\s*:/g, '"$1":')
+				.replace(/,(\s*[}\]])/g, "$1");
+			result = tryParse(lenient);
+		}
+
+		if (!result) {
+			// 3차 시도: 본문에서 첫 JSON 객체 부분만 추출 (꼬리에 잡문 붙은 경우)
+			const start = cleaned.indexOf("{");
+			const end = cleaned.lastIndexOf("}");
+			if (start !== -1 && end > start) {
+				result = tryParse(cleaned.slice(start, end + 1));
+			}
+		}
+
+		if (result) {
+			parsed = result;
+		} else {
+			try {
+				JSON.parse(cleaned);
+			} catch (e) {
+				parseError = (e as Error).message;
+			}
 			console.warn(
 				"[Pharos Agent] GenerateDevRoadmapTask JSON parse failed. Raw response:",
 				raw,
