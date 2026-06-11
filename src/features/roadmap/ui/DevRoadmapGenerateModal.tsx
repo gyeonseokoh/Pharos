@@ -86,13 +86,19 @@ function Content({
 							role: m.role,
 							techStacks: m.techStacks,
 						})),
+						// 회의록 (minutes) 가 있는 회의는 분석 유무 무관하게 모두 전달.
+						// analysis 가 없거나 decisions/keywords 가 비었어도 contentSnippet
+						// (원문 일부) 으로 LLM 이 Task 를 추출할 수 있음.
 						meetingSummaries: args.meetings
-							.filter((m) => m.analysis !== null)
+							.filter((m) => m.minutes !== null || m.analysis !== null)
 							.map((m) => ({
 								title: m.title,
 								date: m.date,
 								decisions: m.analysis?.decisions ?? [],
 								keywords: m.analysis?.keywords ?? [],
+								summary: m.analysis?.summary,
+								techStacks: m.analysis?.techStacks,
+								contentSnippet: m.minutes?.content.slice(0, 1500),
 							})),
 					});
 					if (agentResult.phases.length === 0) {

@@ -289,8 +289,22 @@ export interface GenerateDevRoadmapInput {
 	planningEndIso: string;
 	/** 팀원 목록 (기술스택 포함). */
 	members: Array<{ id: string; name: string; role: string; techStacks: string[] }>;
-	/** 분석할 회의록 요약 목록. */
-	meetingSummaries: Array<{ title: string; date: string; decisions: string[]; keywords: string[] }>;
+	/**
+	 * 분석할 회의록 요약 목록.
+	 *
+	 * - `decisions` / `keywords` / `summary` / `techStacks` 는 AI 분석 결과.
+	 * - AI 분석이 비어있거나 안 돌았어도 `contentSnippet` (원문 일부) 만으로
+	 *   LLM 이 Task 를 추출할 수 있도록 보강.
+	 */
+	meetingSummaries: Array<{
+		title: string;
+		date: string;
+		decisions: string[];
+		keywords: string[];
+		summary?: string;
+		techStacks?: string[];
+		contentSnippet?: string;
+	}>;
 }
 
 /** 생성된 단일 Task. */
