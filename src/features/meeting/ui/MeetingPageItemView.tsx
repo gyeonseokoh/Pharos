@@ -15,6 +15,7 @@ import { VIEW_TYPE_PHAROS_TOPIC_PAGE } from "./TopicPageItemView";
 import { VIEW_TYPE_PHAROS_DASHBOARD } from "../../progress/ui/DashboardItemView";
 import { AiTopicModal } from "./AiTopicModal";
 import { ResourceUploadModal } from "./ResourceUploadModal";
+import { MinutesUploadModal } from "./MinutesUploadModal";
 import { getMeetingPageMock } from "./meetingPageMock";
 import { mockCalendarData } from "./calendarMock";
 import type { MeetingPageData } from "../domain/meetingPageData";
@@ -200,7 +201,7 @@ export class MeetingPageItemView extends ItemView {
 							}).open()
 						: undefined
 				}
-				onEditMinutes={() => void this.openMinutesInEditor()}
+				onEditMinutes={() => this.openMinutesUploadModal()}
 				onOpenTopic={(topicId) => void this.openTopic(topicId)}
 				onCollectResources={() => void this.runCollectResources()}
 				collectingResources={this.collectingResources}
@@ -273,9 +274,37 @@ export class MeetingPageItemView extends ItemView {
 	}
 
 	/**
+	 * PO-5 회의록 작성 모달 열기.
+	 *
+	 * MeetingPageView 의 "작성하기" 버튼 클릭 시 진입.
+	 * 현재 회의를 후보로 자동 선택해 본문 입력 → AI 분석 → 승인 흐름.
+	 */
+	private openMinutesUploadModal(): void {
+		if (!this.meetingData) return;
+		const m = this.meetingData;
+		new MinutesUploadModal(this.app, {
+			plugin: this.plugin,
+			candidates: [m],
+			defaultAuthorName: "",
+			onApprove: async (meetingId, attached) => {
+				await this.plugin.meetingsService.attachMinutes({
+					meetingId,
+					content: attached.minutes.content,
+					authorName: attached.minutes.authorName,
+					analysis: attached.analysis,
+				});
+				await this.loadAndRender();
+			},
+		}).open();
+	}
+
+	/**
 	 * 회의록 .md 파일을 Obsidian 네이티브 에디터로 열기.
 	 * 파일이 없으면 새로 생성 후 오픈.
 	 * 이미 열린 탭이 있으면 재사용.
+	 *
+	 * 현재는 "작성하기" 버튼이 모달 흐름을 사용하므로 직접 호출 경로 없음.
+	 * 향후 "Markdown 으로 편집" 같은 보조 옵션 추가 시 재활용 가능.
 	 */
 	private async openMinutesInEditor(): Promise<void> {
 		if (!this.meetingData) return;
