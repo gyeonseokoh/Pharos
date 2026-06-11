@@ -8,10 +8,12 @@
 
 import { ItemView, WorkspaceLeaf } from "obsidian";
 import { createRoot, type Root } from "react-dom/client";
-import { ProjectRequiredEmpty } from "shared/ui";
+import { PhaseLockedView, ProjectRequiredEmpty } from "shared/ui";
 import { MyTasksView } from "./MyTasksView";
 import { VIEW_TYPE_PHAROS_TASK_DETAIL } from "../../task/ui/TaskDetailItemView";
 import { VIEW_TYPE_PHAROS_DASHBOARD } from "./DashboardItemView";
+import { VIEW_TYPE_PHAROS_ROADMAP } from "../../roadmap/ui/RoadmapItemView";
+import { getProjectPhase } from "../../project/domain/projectSchema";
 // ── [DEMO] AI·서버·깃허브 연동 전 임시 데모 시연용 하드코딩 연결 ──────────────────
 // 연동 완료 후 이 import 줄을 삭제하세요.
 import { mockMyTasksData } from "./myTasksMock";
@@ -82,6 +84,20 @@ export class MyTasksItemView extends ItemView {
 			this.root?.render(
 				<ProjectRequiredEmpty
 					viewName="내 업무"
+					onOpenDashboard={() => void this.openView(VIEW_TYPE_PHAROS_DASHBOARD)}
+				/>,
+			);
+			return;
+		}
+
+		// PO 단계 게이트: 개발 단계 이전엔 Task 가 없으므로 안내 화면.
+		if (getProjectPhase(project) !== "development") {
+			this.root?.render(
+				<PhaseLockedView
+					viewName="내 업무"
+					reason="개발 로드맵 생성 후 이용 가능합니다."
+					hint="Roadmap 탭에서 개발 로드맵을 생성하면 본인 담당 Task 와 체크리스트가 여기에 표시됩니다."
+					onOpenRoadmap={() => void this.openView(VIEW_TYPE_PHAROS_ROADMAP)}
 					onOpenDashboard={() => void this.openView(VIEW_TYPE_PHAROS_DASHBOARD)}
 				/>,
 			);

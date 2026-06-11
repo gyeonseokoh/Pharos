@@ -44,6 +44,7 @@ import type {
 	ProgressAnalysisCardResult,
 	ProgressSummary,
 	ProjectSummary,
+	RecentMinutesEntry,
 	UpcomingMeeting,
 } from "../domain/dashboardData";
 
@@ -69,6 +70,8 @@ export interface DashboardViewProps {
 	onGenerateMeetingTopics?: () => void;
 	/** PO-12 AI 진행 분석 트리거. 사용자가 "AI 분석 받기" 버튼 클릭 시 호출. */
 	onAnalyzeProgress?: () => void;
+	/** 회의록 관리 페이지 진입. */
+	onOpenMinutesArchive?: () => void;
 }
 
 export function DashboardView({
@@ -83,7 +86,13 @@ export function DashboardView({
 	onOpenSettings,
 	onGenerateMeetingTopics,
 	onAnalyzeProgress,
+	onOpenMinutesArchive,
 }: DashboardViewProps) {
+	const phase = data.phase;
+	const isDevelopment = phase === "development";
+	const showProgressAnalysis = phase !== "setup";
+	const showRecentMinutes =
+		phase !== "setup" && (data.recentMinutes?.length ?? 0) > 0;
 	const progressPercent = useMemo(
 		() =>
 			data.progress.totalTasks === 0
@@ -97,29 +106,50 @@ export function DashboardView({
 	return (
 		<div className="pharos-root min-h-full w-full overflow-y-auto bg-bg-primary p-6">
 			<div className="mx-auto max-w-5xl space-y-6">
-				<Header projectName={data.project.name} onOpenSettings={onOpenSettings} />
+				<Header
+					projectName={data.project.name}
+					phase={phase}
+					onOpenSettings={onOpenSettings}
+				/>
 
 				<StatGrid
+					phase={phase}
 					progressPercent={progressPercent}
 					progress={data.progress}
 					myTasks={data.myTasks}
 					project={data.project}
+					meetingCount={data.meetings.length}
+					minutesCount={data.recentMinutes?.length ?? 0}
+					memberCount={data.members.length}
 				/>
 
 				<div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
 					<div className="lg:col-span-2 space-y-6">
-						<ProgressCard
-							prototypeProgress={data.prototypeProgress}
-							developmentProgress={data.developmentProgress}
-						/>
-						{data.progressAnalysis !== undefined &&
+						{isDevelopment && (
+							<ProgressCard
+								prototypeProgress={data.prototypeProgress}
+								developmentProgress={data.developmentProgress}
+							/>
+						)}
+						{showProgressAnalysis &&
+							data.progressAnalysis !== undefined &&
 							data.progressAnalysis !== null && (
 								<ProgressAnalysisCardSection
 									card={data.progressAnalysis}
 									onAnalyze={onAnalyzeProgress}
 								/>
 							)}
-						<MemberActivityCard members={data.members} />
+						{showRecentMinutes && (
+							<RecentMinutesCard
+								items={data.recentMinutes ?? []}
+								onOpenMeeting={onOpenMeeting}
+								onOpenMinutesArchive={onOpenMinutesArchive}
+							/>
+						)}
+						<MemberActivityCard
+							members={data.members}
+							showActivity={isDevelopment}
+						/>
 					</div>
 					<div className="flex flex-col gap-6">
 						<UpcomingMeetingsCard
@@ -133,9 +163,11 @@ export function DashboardView({
 				</div>
 
 				<QuickActions
+					phase={phase}
 					onOpenRoadmap={onOpenRoadmap}
 					onOpenCalendar={onOpenCalendar}
 					onOpenMeetings={onOpenMeetings}
+					onOpenMinutesArchive={onOpenMinutesArchive}
 					onOpenMyTasks={onOpenMyTasks}
 					onOpenProgress={onOpenProgress}
 					onOpenTeam={onOpenTeam}
@@ -151,17 +183,47 @@ export function DashboardView({
 
 function Header({
 	projectName,
+	phase,
 	onOpenSettings,
 }: {
 	projectName: string;
+	phase: DashboardData["phase"];
 	onOpenSettings?: () => void;
 }) {
+	const phaseConfig = {
+		setup: {
+			label: "프로젝트 시작",
+			class:
+				"bg-bg-modifier text-text-muted",
+		},
+		planning: {
+			label: "📋 기획 단계",
+			class:
+				"bg-[color:var(--interactive-accent)]/15 text-[color:var(--interactive-accent)]",
+		},
+		development: {
+			label: "💻 개발 단계",
+			class:
+				"bg-[color:var(--color-green)]/15 text-[color:var(--color-green)]",
+		},
+	}[phase];
+
 	return (
 		<header className="flex items-center justify-between">
 			<div>
-				<p className="text-xs uppercase tracking-wide text-text-faint">
-					Pharos Dashboard
-				</p>
+				<div className="flex items-center gap-2">
+					<p className="text-xs uppercase tracking-wide text-text-faint">
+						Pharos Dashboard
+					</p>
+					<span
+						className={cn(
+							"rounded-full px-2 py-0.5 text-[10px] font-semibold",
+							phaseConfig.class,
+						)}
+					>
+						{phaseConfig.label}
+					</span>
+				</div>
 				<h1 className="mt-1 text-2xl font-bold text-text-normal">{projectName}</h1>
 			</div>
 			<div className="flex items-center gap-1">
@@ -185,47 +247,88 @@ interface StatProps {
 }
 
 function StatGrid({
+	phase,
 	progressPercent,
 	progress,
 	myTasks,
 	project,
+	meetingCount,
+	minutesCount,
+	memberCount,
 }: {
+	phase: DashboardData["phase"];
 	progressPercent: number;
 	progress: ProgressSummary;
 	myTasks: MyTasksSummary;
 	project: ProjectSummary;
+	meetingCount: number;
+	minutesCount: number;
+	memberCount: number;
 }) {
-	const stats: StatProps[] = [
-		{
-			label: "전체 진척도",
-			value: `${progressPercent}%`,
-			sub: `${progress.completedTasks}/${progress.totalTasks} 체크`,
-			icon: CheckCircle2,
-			tone: progressPercent >= 50 ? "success" : "warning",
-		},
-		{
-			label: "이번 주 커밋",
-			value: `${progress.thisWeekCommits}`,
-			sub: "전체 팀원 합계",
-			icon: GitCommit,
-		},
-		{
-			label: "내 진행 중 Task",
-			value: `${myTasks.inProgress} / ${myTasks.total}`,
-			sub: `${myTasks.memberName}의 담당 업무`,
-			icon: Users2,
-		},
-		{
-			label: "프로토타입 마감",
-			value:
-				project.daysUntilPrototype !== null
-					? `D-${project.daysUntilPrototype}`
-					: "—",
-			sub: project.deadline,
-			icon: CalendarClock,
-			tone: "warning",
-		},
-	];
+	// 개발 단계: 기존 4종 (전체 진척도 / 이번 주 커밋 / 내 Task / 마감)
+	// 기획·setup 단계: 회의 / 회의록 / 팀원 / 마감 (개발 지표 숨김)
+	const stats: StatProps[] =
+		phase === "development"
+			? [
+					{
+						label: "전체 진척도",
+						value: `${progressPercent}%`,
+						sub: `${progress.completedTasks}/${progress.totalTasks} 체크`,
+						icon: CheckCircle2,
+						tone: progressPercent >= 50 ? "success" : "warning",
+					},
+					{
+						label: "이번 주 커밋",
+						value: `${progress.thisWeekCommits}`,
+						sub: "전체 팀원 합계",
+						icon: GitCommit,
+					},
+					{
+						label: "내 진행 중 Task",
+						value: `${myTasks.inProgress} / ${myTasks.total}`,
+						sub: `${myTasks.memberName}의 담당 업무`,
+						icon: Users2,
+					},
+					{
+						label: "프로토타입 마감",
+						value:
+							project.daysUntilPrototype !== null
+								? `D-${project.daysUntilPrototype}`
+								: "—",
+						sub: project.deadline,
+						icon: CalendarClock,
+						tone: "warning",
+					},
+				]
+			: [
+					{
+						label: "다가오는 회의",
+						value: `${meetingCount}건`,
+						sub: meetingCount > 0 ? "캘린더에서 자세히" : "예정된 회의 없음",
+						icon: CalendarClock,
+						tone: meetingCount > 0 ? "success" : "default",
+					},
+					{
+						label: "회의록",
+						value: `${minutesCount}건`,
+						sub: minutesCount > 0 ? "회의록 관리로 이동" : "아직 작성된 회의록 없음",
+						icon: CheckCircle2,
+						tone: minutesCount > 0 ? "success" : "default",
+					},
+					{
+						label: "팀원",
+						value: `${memberCount}명`,
+						sub: "팀원 보기에서 자세히",
+						icon: Users2,
+					},
+					{
+						label: "최종 마감",
+						value: `D-${project.totalDays}`,
+						sub: project.deadline,
+						icon: CalendarClock,
+						tone: project.totalDays <= 14 ? "warning" : "default",
+					},
+				];
 
 	return (
 		<div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
@@ -469,13 +572,24 @@ function InsightIcon({
 	return <Icon className={cn("mt-0.5 h-3 w-3 shrink-0", color)} />;
 }
 
-function MemberActivityCard({ members }: { members: MemberActivity[] }) {
+function MemberActivityCard({
+	members,
+	showActivity = true,
+}: {
+	members: MemberActivity[];
+	/** 개발 단계가 아닐 때 false. 커밋·체크 통계 숨김. */
+	showActivity?: boolean;
+}) {
 	const maxCommits = Math.max(1, ...members.map((m) => m.commits));
 	return (
 		<Card>
 			<CardHeader>
-				<CardTitle>👥 팀원 활동 (이번 주)</CardTitle>
-				<CardDescription>체크리스트 완료 + GitHub 커밋 기준</CardDescription>
+				<CardTitle>👥 팀원 {showActivity ? "활동 (이번 주)" : ""}</CardTitle>
+				<CardDescription>
+					{showActivity
+						? "체크리스트 완료 + GitHub 커밋 기준"
+						: `현재 팀원 ${members.length}명`}
+				</CardDescription>
 			</CardHeader>
 			<CardContent className="space-y-3">
 				{members.map((m) => (
@@ -489,19 +603,85 @@ function MemberActivityCard({ members }: { members: MemberActivity[] }) {
 									{m.name}{" "}
 									<span className="ml-1 text-xs text-text-faint">({m.role})</span>
 								</p>
-								<p className="text-xs text-text-muted">
-									✅ {m.checks} · 💻 {m.commits}
-								</p>
+								{showActivity && (
+									<p className="text-xs text-text-muted">
+										✅ {m.checks} · 💻 {m.commits}
+									</p>
+								)}
 							</div>
-							<div className="mt-1 h-1.5 overflow-hidden rounded-full bg-bg-modifier">
-								<div
-									className="h-full bg-[color:var(--interactive-accent)]"
-									style={{ width: `${(m.commits / maxCommits) * 100}%` }}
-								/>
-							</div>
+							{showActivity && (
+								<div className="mt-1 h-1.5 overflow-hidden rounded-full bg-bg-modifier">
+									<div
+										className="h-full bg-[color:var(--interactive-accent)]"
+										style={{ width: `${(m.commits / maxCommits) * 100}%` }}
+									/>
+								</div>
+							)}
 						</div>
 					</div>
 				))}
+			</CardContent>
+		</Card>
+	);
+}
+
+// ───────────────────────── Recent Minutes Card (PO-5 진입점) ─────────────────────────
+
+function RecentMinutesCard({
+	items,
+	onOpenMeeting,
+	onOpenMinutesArchive,
+}: {
+	items: RecentMinutesEntry[];
+	onOpenMeeting?: (meetingId: string) => void;
+	onOpenMinutesArchive?: () => void;
+}) {
+	return (
+		<Card>
+			<CardHeader>
+				<div className="flex items-center justify-between">
+					<div>
+						<CardTitle>📝 최근 회의록</CardTitle>
+						<CardDescription>최근 작성된 회의록 {items.length}건</CardDescription>
+					</div>
+					{onOpenMinutesArchive && (
+						<Button variant="ghost" size="sm" onClick={onOpenMinutesArchive}>
+							전체 보기
+						</Button>
+					)}
+				</div>
+			</CardHeader>
+			<CardContent>
+				<ul className="space-y-2">
+					{items.map((m) => (
+						<li
+							key={m.meetingId}
+							onClick={() => onOpenMeeting?.(m.meetingId)}
+							role="button"
+							tabIndex={0}
+							onKeyDown={(e) => {
+								if (e.key === "Enter" || e.key === " ") {
+									e.preventDefault();
+									onOpenMeeting?.(m.meetingId);
+								}
+							}}
+							className="cursor-pointer rounded-md border border-bg-modifier bg-bg-secondary p-3 transition-colors hover:border-[color:var(--interactive-accent)]/50 hover:bg-[color:var(--background-modifier-hover)]"
+						>
+							<div className="flex items-baseline justify-between gap-2">
+								<p className="text-sm font-medium text-text-normal">
+									{m.meetingTitle}
+								</p>
+								<span className="text-[11px] text-text-faint">
+									{m.meetingDate}
+								</span>
+							</div>
+							<p className="mt-0.5 text-[11px] text-text-muted">
+								{m.authorName} · {m.preview.slice(0, 80)}
+								{m.preview.length > 80 ? "…" : ""}
+							</p>
+						</li>
+					))}
+				</ul>
 			</CardContent>
 		</Card>
 	);
@@ -703,45 +883,61 @@ function AlertItem({ alert }: { alert: DashboardAlert }) {
 }
 
 function QuickActions({
+	phase,
 	onOpenRoadmap,
 	onOpenCalendar,
 	onOpenMeetings,
+	onOpenMinutesArchive,
 	onOpenMyTasks,
 	onOpenProgress,
 	onOpenTeam,
-	onOpenSettings,
 	onGenerateMeetingTopics,
 }: {
+	phase: DashboardData["phase"];
 	onOpenRoadmap?: () => void;
 	onOpenCalendar?: () => void;
 	onOpenMeetings?: () => void;
+	onOpenMinutesArchive?: () => void;
 	onOpenMyTasks?: () => void;
 	onOpenProgress?: () => void;
 	onOpenTeam?: () => void;
 	onOpenSettings?: () => void;
 	onGenerateMeetingTopics?: () => void;
 }) {
+	const isDevelopment = phase === "development";
+
 	return (
 		<div className="flex flex-wrap gap-3">
-			<Button variant="secondary" onClick={onOpenRoadmap}>📊 로드맵 보기</Button>
+			<Button variant="secondary" onClick={onOpenRoadmap}>
+				📊 로드맵 보기
+			</Button>
 			<Button variant="secondary" onClick={onOpenMeetings}>
 				📋 회의 보기
+			</Button>
+			<Button variant="secondary" onClick={onOpenMinutesArchive}>
+				📝 회의록 보기
 			</Button>
 			<Button variant="secondary" onClick={onOpenCalendar}>
 				📅 캘린더 열기
 			</Button>
-			<Button variant="secondary" onClick={onOpenMyTasks}>
-				✅ 내 업무 보기
-			</Button>
-			<Button variant="secondary" onClick={onOpenProgress}>
-				📈 진행도 확인
-			</Button>
+			{isDevelopment && (
+				<Button variant="secondary" onClick={onOpenMyTasks}>
+					✅ 내 업무 보기
+				</Button>
+			)}
+			{isDevelopment && (
+				<Button variant="secondary" onClick={onOpenProgress}>
+					📈 진행도 확인
+				</Button>
+			)}
 			<Button variant="secondary" onClick={onOpenTeam}>
 				👥 팀원 보기
 			</Button>
-			<Button variant="outline" onClick={onGenerateMeetingTopics}>
-				🤖 AI 회의 주제 생성
-			</Button>
+			{phase !== "setup" && (
+				<Button variant="outline" onClick={onGenerateMeetingTopics}>
+					🤖 AI 회의 주제 생성
+				</Button>
+			)}
 		</div>
 	);
 }

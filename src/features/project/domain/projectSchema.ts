@@ -47,3 +47,39 @@ export interface ProjectInput {
 	fixedMeetingDay?: number;
 	fixedMeetingTime?: string;
 }
+
+/**
+ * 프로젝트 진행 단계.
+ *
+ * - `setup`       기획 로드맵도 아직 없는 초기 단계
+ * - `planning`    기획 로드맵 생성됨, 개발 로드맵 미생성 (회의·분석 중심)
+ * - `development` 개발 로드맵까지 생성됨 (Task·진척도·커밋 중심)
+ *
+ * UI 가 단계별로 노출 영역을 달리해 사용자 인지부하를 줄이는 데 사용.
+ */
+export type ProjectPhase = "setup" | "planning" | "development";
+
+/**
+ * 프로젝트 단계 판별. 플래그 기반 결정형 — null/undefined 입력은 "setup" 반환.
+ */
+export function getProjectPhase(
+	project: Pick<
+		Project,
+		"planningRoadmapGenerated" | "developmentRoadmapGenerated"
+	> | null
+	| undefined,
+): ProjectPhase {
+	if (!project) return "setup";
+	if (project.developmentRoadmapGenerated) return "development";
+	if (project.planningRoadmapGenerated) return "planning";
+	return "setup";
+}
+
+/** UI 표시용 한국어 라벨. */
+export function getProjectPhaseLabel(phase: ProjectPhase): string {
+	return phase === "setup"
+		? "프로젝트 시작"
+		: phase === "planning"
+			? "기획 단계"
+			: "개발 단계";
+}

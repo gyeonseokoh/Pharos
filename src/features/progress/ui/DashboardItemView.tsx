@@ -28,7 +28,7 @@ import { mockDashboardData } from "./mock";
 import { VIEW_TYPE_PHAROS_ROADMAP } from "../../roadmap/ui/RoadmapItemView";
 import { VIEW_TYPE_PHAROS_TEAM_LIST } from "../../team/ui/TeamListItemView";
 import type { PharosPluginLike } from "../../../app/settings";
-import type { Project } from "../../project/domain/projectSchema";
+import { getProjectPhase, type Project } from "../../project/domain/projectSchema";
 import type {
 	DashboardData,
 	DashboardAlert,
@@ -279,24 +279,43 @@ export class DashboardItemView extends ItemView {
 			.slice(0, 3)
 			.map((m) => ({ id: m.id, date: m.date, time: m.time, title: m.title }));
 
+		const recentMinutes = meetings
+			.filter((m) => m.minutes !== null)
+			.sort((a, b) => (b.minutes!.writtenAt > a.minutes!.writtenAt ? 1 : -1))
+			.slice(0, 3)
+			.map((m) => ({
+				meetingId: m.id,
+				meetingTitle: m.title,
+				meetingDate: m.date,
+				authorName: m.minutes!.authorName,
+				writtenAt: m.minutes!.writtenAt,
+				preview: m.minutes!.content.slice(0, 120),
+			}));
+
+		const phase = getProjectPhase(project);
+
 		const alerts: DashboardAlert[] = [];
-		if (taskSummary.blocked > 0) {
+		if (phase === "development" && taskSummary.blocked > 0) {
 			alerts.push({
 				severity: "warning",
 				text: `블로커 Task ${taskSummary.blocked}건이 있습니다.`,
 			});
 		}
-		if (
-			!project.planningRoadmapGenerated &&
-			!project.developmentRoadmapGenerated
-		) {
+		if (phase === "setup") {
 			alerts.push({
 				severity: "info",
 				text: "기획 로드맵이 아직 없습니다. Roadmap 탭에서 생성해주세요.",
 			});
 		}
+		if (phase === "planning" && upcomingMeetings.length === 0) {
+			alerts.push({
+				severity: "info",
+				text: "예정된 회의가 없습니다. 캘린더에서 회의를 추가하거나 정기 회의를 기다려 주세요.",
+			});
+		}
 
 		return {
+			phase,
 			project: {
 				name: project.name,
 				deadline: project.deadline,
@@ -331,6 +350,7 @@ export class DashboardItemView extends ItemView {
 				{ label: "최종 마감", date: project.deadline, dday: daysLeft },
 			],
 			alerts,
+			recentMinutes,
 		};
 	}
 
