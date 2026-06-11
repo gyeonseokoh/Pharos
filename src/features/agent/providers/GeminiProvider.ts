@@ -53,18 +53,56 @@ export class GeminiProvider implements ILLMProvider {
 					}))
 				: [{ role: "user" as const, parts: [{ text: "(no input)" }] }];
 
-		const response = await client.models.generateContent({
-			model: this.model,
-			contents,
-			config: {
-				temperature: request.temperature ?? 0.3,
-				maxOutputTokens: request.maxTokens ?? 2048,
-				...(request.jsonMode ? { responseMimeType: "application/json" } : {}),
-				...(systemText ? { systemInstruction: systemText } : {}),
-			},
-		});
+		// 일시적 과부하 / 네트워크 오류 대응 — 지수 백오프로 최대 4회 재시도.
+		// 503 UNAVAILABLE, 429 RESOURCE_EXHAUSTED, 5xx, fetch 네트워크 에러를
+		// retryable 로 분류. 4xx (인증·요청 형식) 는 즉시 throw.
+		const MAX_ATTEMPTS = 4;
+		const baseDelayMs = 1500;
 
-		const content = response.text ?? "";
-		return { content, model: this.model };
+		const isRetryable = (err: unknown): boolean => {
+			const msg = (err as Error)?.message ?? "";
+			if (/\b(503|502|500|504|UNAVAILABLE|RESOURCE_EXHAUSTED|429)\b/.test(msg)) {
+				return true;
+			}
+			if (/(network|fetch failed|ECONNRESET|ETIMEDOUT|timeout)/i.test(msg)) {
+				return true;
+			}
+			return false;
+		};
+
+		let lastErr: unknown = null;
+		for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
+			try {
+				const response = await client.models.generateContent({
+					model: this.model,
+					contents,
+					config: {
+						temperature: request.temperature ?? 0.3,
+						maxOutputTokens: request.maxTokens ?? 2048,
+						...(request.jsonMode
+							? { responseMimeType: "application/json" }
+							: {}),
+						...(systemText ? { systemInstruction: systemText } : {}),
+					},
+				});
+				const content = response.text ?? "";
+				return { content, model: this.model };
+			} catch (err) {
+				lastErr = err;
+				if (!isRetryable(err) || attempt === MAX_ATTEMPTS - 1) break;
+				// 지수 백오프 + 작은 jitter
+				const delay =
+					baseDelayMs * Math.pow(2, attempt) + Math.floor(Math.random() * 500);
+				await new Promise<void>((r) => setTimeout(r, delay));
+			}
+		}
+
+		const msg = (lastErr as Error)?.message ?? "알 수 없는 오류";
+		const friendly = /\b(503|UNAVAILABLE)\b/.test(msg)
+			? "Gemini 가 일시적으로 과부하 상태입니다 (503). 잠시 후 다시 시도하거나 모델을 gemini-2.0-flash 로 바꿔주세요."
+			: /\b(429|RESOURCE_EXHAUSTED)\b/.test(msg)
+				? "Gemini 무료 티어 일일/분당 할당량 초과 (429). 다른 API 키로 교체하거나 모델을 변경해주세요."
+				: msg;
+		throw new Error(friendly);
 	}
 }
