@@ -40,6 +40,21 @@ import type { Roadmap } from "../features/roadmap/domain/roadmapSchema";
 export async function runMigrationIfNeeded(plugin: PharosPluginLike): Promise<void> {
 	if (plugin.settings.migrated) return;
 
+	// 마이그레이션 실데이터가 없는 경우 (새 Vault 포함) 모달 없이 즉시 완료 처리
+	// mock 등 번들 시연 데이터이므로 제외
+	const s = plugin.settings
+	const hasRealData =
+        s.projectReport != null ||
+        (s.tasks ?? []).length > 0 ||
+        (s.members ?? []).length > 0 ||
+        Object.keys(s.roadmaps ?? {}).length > 0; // 임시조치
+
+    if (!hasRealData) {
+        plugin.settings.migrated = true;
+        await plugin.saveSettings();
+        return;
+    }
+
 	await new Promise<void>((resolve) => {
 		new MigrationModal(plugin.app, plugin, resolve).open();
 	});
