@@ -29,7 +29,14 @@ const SYSTEM_PROMPT = `당신은 회의록을 분석하여 구조화된 요약�
 - % 진척도 표현 금지
 - 모든 텍스트는 한국어로 작성`;
 
-const MAX_MINUTES_LENGTH = 6000;
+/**
+ * 회의록 원문 truncation 한도.
+ *
+ * Gemini 2.x 컨텍스트 윈도우는 1M 토큰 ≈ 한국어 ~330,000자 수준이므로
+ * 100,000자(약 30~50페이지)까지는 잘림 없이 그대로 모델에 전달한다.
+ * 그 이상은 API 비용·응답 시간 보호 차원에서 잘라낸다.
+ */
+const MAX_MINUTES_LENGTH = 100_000;
 
 function buildPrompt(meeting: Meeting): string {
 	const lines: string[] = [
