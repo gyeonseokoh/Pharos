@@ -90,6 +90,9 @@ export class MeetingsListItemView extends ItemView {
 			return;
 		}
 
+		// PO-1-1 정기 회의 자동 생성 (멱등). project 의 fixedMeetingDay/Time 기준.
+		await this.plugin.meetingsService.ensureRegularMeetings(project);
+
 		const meetings = await this.plugin.meetingsService.list();
 		this.meetingsListData = {
 			meetings: meetings.map((m) => ({
